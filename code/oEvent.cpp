@@ -238,6 +238,7 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   // bit 1: without analysis
   // bit 2: without min/km
   // bit 4: without result
+  oEventData->addVariableInt("PrintLabels", oDataContainer::oIS8, "Skriva ut etiketter");
 
   oEventData->addVariableString("SPExtra", "Extra rader");
   oEventData->addVariableString("IVExtra", "Fakturainfo");
@@ -448,7 +449,7 @@ oEvent::~oEvent()
 
 void oEvent::initProperties() {
   setProperty("TextSize", getPropertyString("TextSize", "0"));
-  setProperty("Language", getPropertyString("Language", "103"));
+  setProperty("Language", getPropertyString("Language", "104")); //English
 
   setProperty("Interactive", getPropertyString("Interactive", "1"));
   setProperty("Database", getPropertyString("Database", "1"));
@@ -873,7 +874,8 @@ bool oEvent::save(const string &fileIn) {
   xml.write("ZeroTime", ZeroTime);
   xml.write("NameId", CurrentNameId);
   xml.write("Annotation", Annotation);
-  xml.write("Id", Id);
+	xml.write("Id", Id);
+	writeExtraXml(xml);
   xml.write("Updated", Modified.getStamp());
 
   oEventData->write(this, xml);
@@ -1074,10 +1076,13 @@ bool oEvent::open(const xmlparser &xml) {
   if (xo) Annotation = xo.get();
 
   xo=xml.getObject("ZeroTime");
+  ZeroTime=0;
   if (xo) ZeroTime=xo.getInt();
 
   xo=xml.getObject("Id");
   if (xo) Id=xo.getInt();
+
+	readExtraXml(xml);
 
   xo=xml.getObject("oData");
 
@@ -2798,7 +2803,7 @@ void oEvent::generateInForestList(gdioutput &gdi, GUICALLBACK cb, GUICALLBACK cb
 void oEvent::generateMinuteStartlist(gdioutput &gdi) {
   sortRunners(SortByStartTime);
 
-  int dx[4]={0, gdi.scaleLength(70), gdi.scaleLength(340), gdi.scaleLength(510)};
+  int dx[5]={0, gdi.scaleLength(70), gdi.scaleLength(200), gdi.scaleLength(400), gdi.scaleLength(510)};
   int y=gdi.getCY();
   int x=gdi.getCX();
   int lh=gdi.getLineHeight();
@@ -2922,6 +2927,7 @@ void oEvent::generateMinuteStartlist(gdioutput &gdi) {
 
         gdi.addStringUT(src_y, x+dx[2], fontMedium, r[0]->getClub(), dx[3]-dx[2]-4);
         gdi.addStringUT(src_y, x+dx[3], fontMedium, r[0]->getClass());
+				gdi.addStringUT(src_y, x+dx[4], fontMedium, r[0]->getCourseName());
         y+=lh;
       }
     }
@@ -3439,7 +3445,7 @@ void oEvent::newCompetition(const string &name)
   getDI().setString("Account", getPropertyString("Account", ""));
   getDI().setString("LateEntryFactor", getPropertyString("LateEntryFactor", "50 %"));
 
-  getDI().setString("CurrencySymbol", getPropertyString("CurrencySymbol", "kr"));
+  getDI().setString("CurrencySymbol", getPropertyString("CurrencySymbol", "$"));
   getDI().setString("CurrencySeparator", getPropertyString("CurrencySeparator", "."));
   getDI().setInt("CurrencyFactor", getPropertyInt("CurrencyFactor", 1));
   getDI().setInt("CurrencyPreSymbol", getPropertyInt("CurrencyPreSymbol", 0));

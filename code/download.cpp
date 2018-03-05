@@ -60,6 +60,9 @@ Download::~Download()
 
   if (hInternet)
     InternetCloseHandle(hInternet);
+
+	for (unsigned int i = 0 ; i < usedBuffers.size(); i++)
+		delete usedBuffers[i];
 }
 
 void __cdecl SUThread(void *ptr)
@@ -455,3 +458,93 @@ bool Download::httpSendReqEx(HINTERNET hConnect, const string &dest,
   InternetCloseHandle(hRequest);
   return true;
 }
+
+void Download::postData(const string &url, const string &data, ProgressWindow &pw) {
+  SetLastError(0);
+  DWORD_PTR dw = 0;
+  URL_COMPONENTS uc;
+  memset(&uc, 0, sizeof(uc));
+  uc.dwStructSize = sizeof(uc);
+  char host[128];
+  char path[128];
+  char extra[256];
+  uc.lpszExtraInfo = extra;
+  uc.dwExtraInfoLength = sizeof(extra);
+  uc.lpszHostName = host;
+  uc.dwHostNameLength = sizeof(host);
+  uc.lpszUrlPath = path;
+  uc.dwUrlPathLength = sizeof(path);
+
+  InternetCrackUrl(url.c_str(), url.length(), ICU_ESCAPE, &uc);
+  int port = INTERNET_DEFAULT_HTTP_PORT;
+  if (uc.nScheme == INTERNET_SCHEME_HTTPS)
+    port = INTERNET_DEFAULT_HTTPS_PORT;
+  else if (uc.nPort>0)
+    port = uc.nPort;
+  HINTERNET hConnect = InternetConnect(hInternet, host, port,
+                                       NULL, NULL, INTERNET_SERVICE_HTTP, 0, dw);
+  static TCHAR hdrs[] = _T("Content-Type: application/x-www-form-urlencoded");
+	string* str = new string;
+	usedBuffers.push_back(str);
+	*str = data;
+	PCTSTR accept[] = {_T("*/*"), NULL};
+
+	HINTERNET hRequest(NULL);
+	bool success (true);
+
+	if (!hConnect)
+		success = false;
+
+	if (success)
+		hRequest = HttpOpenRequest(hConnect, "POST", uc.lpszUrlPath, NULL, NULL, accept, 0, 1);
+	if (!hRequest)
+		success = false;
+
+	if (success && !HttpSendRequest(hRequest, hdrs, strlen(hdrs), (TCHAR*)str->c_str(), str->size()))
+		success = false;
+	else {
+		DWORD dwStatus = 0;
+		DWORD dwBufLen = sizeof(dwStatus);
+	  success = !!HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE|HTTP_QUERY_FLAG_NUMBER,
+                          (LPVOID)&dwStatus, &dwBufLen, 0);
+		if (success && dwStatus >= 400) {
+      char bf[256];
+      switch (dwStatus) {
+        case HTTP_STATUS_BAD_REQUEST:
+          sprintf_s(bf, "HTTP Error 400: The request could not be processed by the server due to invalid syntax.");
+          break;
+        case HTTP_STATUS_DENIED:
+          sprintf_s(bf, "HTTP Error 401: The requested resource requires user authentication.");
+          break;
+        case HTTP_STATUS_FORBIDDEN:
+          sprintf_s(bf, "HTTP Error 403: Åtkomst nekad (access is denied).");
+          break;
+        case HTTP_STATUS_NOT_FOUND:
+          sprintf_s(bf, "HTTP Error 404: Resursen kunde ej hittas (not found).");
+          break;
+        case HTTP_STATUS_NOT_SUPPORTED:
+          sprintf_s(bf, "HTTP Error 501: Förfrågan stöds ej (not supported).");
+          break;
+        case HTTP_STATUS_SERVER_ERROR:
+          sprintf_s(bf, "HTTP Error 500: Internt serverfel (server error).");
+          break;
+        default: 
+          sprintf_s(bf, "HTTP Status Error %d", dwStatus);
+      }      
+      throw dwException(bf, dwStatus);
+    }
+	}
+
+  if (hConnect)
+		InternetCloseHandle(hConnect);
+
+  if (!success) {
+ 		DWORD ec = GetLastError();
+
+    string error = ec != 0 ? getErrorMessage(ec) : "";
+    if (error.empty())
+      lang.tl("Ett okänt fel inträffade.");
+    throw std::exception(error.c_str());
+  }
+
+ }

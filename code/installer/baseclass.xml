@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<BaseClassTypes>
+ <Type name="T" class="normal" />
+ <Type name="H" class="normal" />
+ <Type name="H*" class="normal" />
+ <Type name="E" class="elite" />
+ <Type name="I" class="youth" />
+ <Type name="Ö" class="open" />
+ <Type name="M" class="exercise" />
+</BaseClassTypes>

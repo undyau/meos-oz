@@ -215,6 +215,8 @@ void oEvent::generateCompetitionReport(gdioutput &gdi)
       xp += 250;
     }
   }
+
+	generateRunnersPerCourse(gdi);
 }
 
 void oEvent::generateStatisticsPart(gdioutput &gdi, const vector<ClassMetaType> &type,
@@ -307,32 +309,19 @@ void oEvent::getRunnersPerDistrict(vector<int> &runners) const
 
 void oEvent::getDistricts(vector<string> &districts)
 {
-  districts.resize(24);
+  districts.resize(11);
   int i=0;
-  districts[i++]="Övriga";
-  districts[i++]="Blekinge";
-  districts[i++]="Bohuslän-Dal";
-  districts[i++]="Dalarna";
-  districts[i++]="Gotland";
-  districts[i++]="Gästrikland";
-  districts[i++]="Göteborg";
-  districts[i++]="Halland";
-  districts[i++]="Hälsingland";
-  districts[i++]="Jämtland-Härjedalan";
-  districts[i++]="Medelpad";
-  districts[i++]="Norrbotten";
-  districts[i++]="Örebro län";
-  districts[i++]="Skåne";
-  districts[i++]="Småland";
-  districts[i++]="Stockholm";
-  districts[i++]="Södermanland";
-  districts[i++]="Uppland";
-  districts[i++]="Värmland";
-  districts[i++]="Västerbotten";
-  districts[i++]="Västergötland";
-  districts[i++]="Västmanland";
-  districts[i++]="Ångermanland";
-  districts[i++]="Östergötland";
+  districts[i++]="Others";
+  districts[i++]="Overseas";
+  districts[i++]="Australia ?";
+  districts[i++]="New Zealand";
+  districts[i++]="Australian Capital Territory";
+  districts[i++]="New South Wales";
+  districts[i++]="Queensland";
+  districts[i++]="South Australia";
+  districts[i++]="Tasmania";
+  districts[i++]="Victoria";
+  districts[i++]="Western Australia";
 }
 
 
@@ -683,3 +672,26 @@ void oEvent::generatePreReport(gdioutput &gdi) {
   gdi.updateScrollbars();
 }
 
+void oEvent::generateRunnersPerCourse(gdioutput &gdi)
+{
+	map<string, int> count;
+	for (oCourseList::iterator it = Courses.begin(); it != Courses.end(); ++it) 
+			count[it->getName()] = 0;
+	for (oRunnerList::iterator it = Runners.begin(); it != Runners.end(); ++it) 
+      if (it->Class->Course)
+				count[it->Class->Course->getName()] = 1 + count[it->Class->Course->getName()];
+
+	gdi.dropLine();
+	gdi.addString("", boldText, lang.tl("Banor"));
+  int xp = gdi.getCX();
+  int yp = gdi.getCY();
+
+  gdi.addString("", yp, xp+200, textRight|fontMedium, lang.tl("kartor"));
+
+	for (map<string, int>::iterator i = count.begin(); i != count.end(); i++)
+	{
+		yp += gdi.getLineHeight();
+		gdi.addStringUT(yp, xp, 0, i->first);
+		gdi.addStringUT(yp, xp+200, 0, itos(i->second));
+	}
+}

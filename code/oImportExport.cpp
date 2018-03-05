@@ -43,6 +43,7 @@
 #include "random.h"
 #include "SportIdent.h"
 #include "RunnerDB.h"
+
 #include "meos_util.h"
 #include "meos.h"
 #include "importformats.h"
@@ -98,7 +99,7 @@ string &getFirst(string &inout, int maxNames) {
   return inout;
 }
 
-bool oEvent::exportOECSV(const char *file, int languageTypeIndex, bool includeSplits)
+bool oEvent::exportOECSV(const char *file, int languageTypeIndex, bool includeSplits, bool byClass)
 {
   enum {
     OEstno = 0, OEcard = 1, OEid = 2, OEsurname = 3, OEfirstname = 4,
@@ -115,16 +116,20 @@ bool oEvent::exportOECSV(const char *file, int languageTypeIndex, bool includeSp
   if (!csv.openOutput(file))
     return false;
 
-  calculateResults(RTClassResult);
+	if (byClass)
+		calculateResults(RTClassResult);
+	else
+		calculateResults(RTCourseResult);
 
   oRunnerList::iterator it;
   string maleString;
   string femaleString;
 
+	csv.OutputRow(lang.tl("Startnr;Bricka;Databas nr.;Efternamn;Förnamn;År;K;Block;ut;Start;Mål;Tid;Status;Klubb nr.;Namn;Ort;Land;Klass nr.;Kort;Lång;Num1;Num2;Num3;Text1;Text2;Text3;Adr. namn;Gata;Rad 2;Post nr.;Ort;Tel;Fax;E-post;Id/Club;Hyrd;Startavgift;Betalt;Bana nr.;Bana;km;Hm;Bana kontroller;Pl"));
   switch (languageTypeIndex)
   {
   case 1: // English
-    csv.OutputRow("Stno;Chip;Database Id;Surname;First name;YB;S;Block;nc;Start;Finish;Time;Classifier;Club no.;Cl.name;City;Nat;Cl. no.;Short;Long;Num1;Num2;Num3;Text1;Text2;Text3;Adr. name;Street;Line2;Zip;City;Phone;Fax;EMail;Id/Club;Rented;Start fee;Paid;Course no.;Course;km;m;Course controls;Pl;Start punch;Finish punch;Control1;Punch1;Control2;Punch2;Control3;Punch3;Control4;Punch4;Control5;Punch5;Control6;Punch6;Control7;Punch7;Control8;Punch8;Control9;Punch9;Control10;Punch10;(may be more) ...");
+    //csv.OutputRow("Stno;Chip;Database Id;Surname;First name;YB;S;Block;nc;Start;Finish;Time;Classifier;Club no.;Cl.name;City;Nat;Cl. no.;Short;Long;Num1;Num2;Num3;Text1;Text2;Text3;Adr. name;Street;Line2;Zip;City;Phone;Fax;EMail;Id/Club;Rented;Start fee;Paid;Course no.;Course;km;m;Course controls;Pl;Start punch;Finish punch;Control1;Punch1;Control2;Punch2;Control3;Punch3;Control4;Punch4;Control5;Punch5;Control6;Punch6;Control7;Punch7;Control8;Punch8;Control9;Punch9;Control10;Punch10;(may be more) ...");
     maleString = "M";
     femaleString = "F";
     break;
@@ -1767,6 +1772,9 @@ bool oEvent::addXMLClub(const xmlobject &xclub, bool savetoDB)
   if (!shortName.empty() && shortName.length() < Name.length())
     swap(Name, shortName);
 
+	if (Name.length() > 6)
+		Name = shortenName(Name);
+
   int district = xclub.getObjectInt("OrganisationId");
 
   if (Name.length()==0 || !IsCharAlphaNumeric(Name[0]))
@@ -2683,6 +2691,7 @@ void oEvent::exportIOFSplits(IOFVersion version, const char *file,
   calculateResults(RTClassResult);
   calculateTeamResults(true);
   calculateTeamResults(false);
+  calculateRogainingResults();
 
   if (version == IOF20)
     exportIOFResults(xml, true, classes, leg, oldStylePatrolExport);

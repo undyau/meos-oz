@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>SSS Results</ListName>
+<ListOrigin>Summer Series #20 - Pymble (2015-06-13)</ListOrigin>
+<UID>A-8151303428791508141B2494685629</UID>
+<SortOrder>CoursePoints</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<Filter name="FilterResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Place in Class</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Name</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Club</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Time</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Score</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">Name</Align>
+</Block>
+<Block Type="RunnerClub">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTime">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerRogainingReduction">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerRogainingPointTotal">
+<Align BlockAlign="true">Score</Align>
+</Block>
+<Block Type="String">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

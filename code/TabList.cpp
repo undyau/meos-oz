@@ -529,6 +529,9 @@ int TabList::listCB(gdioutput &gdi, int type, void *data)
     else if (bi.id == "PrinterSetup") {
       ((TabSI *)gdi.getTabs().get(TSITab))->printerSetup(gdi);
     }
+    else if (bi.id == "LabelPrinterSetup") {
+      ((TabSI *)gdi.getTabs().get(TSITab))->labelPrinterSetup(gdi);
+    }
     else if (bi.id=="Generate") {
       ListBoxInfo lbi;
       bool advancedResults = false;
@@ -1855,7 +1858,14 @@ void TabList::splitPrintSettings(oEvent &oe, gdioutput &gdi, bool setupPrinter,
     gdi.addCheckbox("Speed", "Med km-tid", 0, withSpeed);
     gdi.addCheckbox("Results", "Med resultat", 0, withResult);
 
+	}
+  gdi.popX();
+	gdi.dropLine(2);
+
+  if (returnMode == TSITab) {
+    gdi.addButton("LabelPrinterSetup", "Etikettskrivare...", ListsCB, "Skrivarinställningar för etiketter");
   }
+
   gdi.popX();
   gdi.fillDown();
   char *ctype = type == Splits ? "SPExtra" : "EntryExtra";

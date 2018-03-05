@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<MeOSListDefinition>
+<ListName>Individuella resultat</ListName>
+<Tag>indresult</Tag>
+<SortOrder>ClassResult</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<Filter name="FilterPrelResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassResultFraction">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="PatrolNameNames">
+<Align BlockAlign="true">ClassName</Align>
+</Block>
+<Block Type="PatrolClubNameNames">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="RunnerTimeAfter">
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

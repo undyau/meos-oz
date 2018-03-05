@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition>
+<ListName>Narrow Results</ListName>
+<UID>A1953845972770663068B776784610</UID>
+<SortOrder>ClassResult</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>Punches</SubListType>
+<Filter name="FilterResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<Text>X </Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerCompleteName">
+<Align BlockAlign="false">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+</Line>
+<Line>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">None</Align>
+<IndentMin>15</IndentMin>
+</Block>
+<Block Type="RunnerTimeAfter">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

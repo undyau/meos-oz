@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.3">
+<ListName>Control Overview</ListName>
+<Tag>controloverview</Tag>
+<SortOrder>SortNameOnly</SortOrder>
+<ListType>Control</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Kontrollrapport - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Kontroll</Text>
+<Align BlockAlign="true">CmpName</Align>
+</Block>
+<Block Type="String">
+<Text>Besökare</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Kvar-i-skogen</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="ControlName">
+<Align BlockAlign="true">CmpName</Align>
+</Block>
+<Block Type="ControlVisitors">
+<Align BlockAlign="true">Besökare</Align>
+</Block>
+<Block Type="ControlRunnersLeft">
+<Align BlockAlign="true">Kvar-i-skogen</Align>
+</Block>
+<Block Type="ControlClasses">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

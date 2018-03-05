@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>OL-Skytte utan tidstillägg</ListName>
+<Tag>shootnoaddtime</Tag>
+<SortOrder>CustomSort</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<ResultModule>result-91F1-253E-1</ResultModule>
+<MeOSResultCalculationSet>
+<Name>Biathlonorienteering Sprint</Name>
+<Tag>result-91F1-253E-1</Tag>
+<Description>olshooting:notimepunishment</Description>
+<Origin>OL-Skytte (2015-02-16)</Origin>
+<Date>2015-05-07 12:01:53</Date>
+<Rule name="RunnerTime">
+<Method>pr = -PointAdjustment;&#13;&#10;OutputNumbers[0] = pr%10; // Standing&#13;&#10;OutputNumbers[1] = (pr/10)%10; // Prone&#13;&#10;&#13;&#10;return Time;&#13;&#10;</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>L  S</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Totaltid</Text>
+<Align BlockAlign="true">None</Align>
+<Color>4000</Color>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>result-91F1-253E-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<ResultModule>result-91F1-253E-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClubName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>result-91F1-253E-1</ResultModule>
+<Leg>1</Leg>
+<Align BlockAlign="true">L  S</Align>
+</Block>
+<Block Type="ResultModuleNumber">
+<Text>  X</Text>
+<ResultModule>result-91F1-253E-1</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTimeStatus">
+<ResultModule>result-91F1-253E-1</ResultModule>
+<Align BlockAlign="true">Totaltid</Align>
+<Color>4000</Color>
+</Block>
+<Block Type="RunnerTimeAfter">
+<ResultModule>result-91F1-253E-1</ResultModule>
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

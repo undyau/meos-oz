@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition>
+<ListName>Team Rogaining</ListName>
+<Tag>teamrogaining</Tag>
+<SortOrder>CustomSort</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<ResultModule>result-ms-4A5B-66C8-1</ResultModule>
+<MeOSResultCalculationSet>
+<Name>Team Rogaining Collect Points</Name>
+<Tag>result-ms-4A5B-66C8-1</Tag>
+<Origin>Lagrogaining (2015-01-21)</Origin>
+<Date>2015-03-25 07:17:19</Date>
+<Rule name="TeamScore">
+<Method>if (ComputedStatus == StatusOK)&#13;&#10;  return 1000000000-Points*100000+ComputedTime;&#13;&#10;else&#13;&#10;  return 1000000000+ComputedStatus;</Method>
+</Rule>
+<Rule name="TeamStatus">
+<Method>if (Status == StatusUnknown &amp;&amp; Points&gt;0)&#13;&#10;  return StatusOK;&#13;&#10;return Status;  </Method>
+</Rule>
+<Rule name="TeamTime">
+<Method>t = Finish-Start;&#13;&#10;for (i = 0; i &lt; RunnerTime.size(); i++)&#13;&#10;  t = max(t, RunnerTime[i]);&#13;&#10;return t;</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterResult"/>
+<SubFilter name="FilterResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Poäng</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Övertid</Text>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Avdrag</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamPlace">
+<ResultModule>result-ms-4A5B-66C8-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamRogainingPoint">
+<Align BlockAlign="true">Poäng</Align>
+</Block>
+<Block Type="TeamTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="TeamRogainingOvertime">
+<Align BlockAlign="true">Övertid</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="TeamRogainingReduction">
+<Align BlockAlign="true">Avdrag</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerRogainingPoint">
+<Align BlockAlign="true">Poäng</Align>
+</Block>
+<Block Type="RunnerTime">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerRogainingOvertime">
+<Align BlockAlign="true">Övertid</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="RunnerRogainingReduction">
+<Align BlockAlign="true">Avdrag</Align>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition>
+<ListName>Resultat per bana</ListName>
+<Tag>courseresult</Tag>
+<SortOrder>CourseResult</SortOrder>
+<ListType>Runner</ListType>
+<Filter name="FilterResult"/>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat per bana - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+
+<Block Type="RunnerCourse">
+<Align BlockAlign="true">None</Align>
+</Block>
+
+</Line>
+</SubHead>
+
+<List>
+<Line>
+
+<Block Type="RunnerPlace">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+<Block Type="RunnerName">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+<Block Type="ClassName">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+
+<Block Type="RunnerClub">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+</Line>
+</List>
+
+<SubList>
+</SubList>
+
+</MeOSListDefinition>

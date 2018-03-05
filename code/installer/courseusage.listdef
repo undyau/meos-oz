@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.3">
+<ListName>Bananvändning</ListName>
+<Tag>courseusage</Tag>
+<SortOrder>SortNameOnly</SortOrder>
+<ListType>Course</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="String">
+<Text>Bananvändning</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Bana</Text>
+<Align BlockAlign="true">None</Align>
+<BlockWidth>15</BlockWidth>
+</Block>
+<Block Type="String">
+<Text>Klasser</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Antal kartor</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="CourseName">
+<Align BlockAlign="true">None</Align>
+<BlockWidth>15</BlockWidth>
+</Block>
+<Block Type="CourseClasses">
+<Align BlockAlign="true">Klasser</Align>
+</Block>
+<Block Type="CourseUsage">
+<Align BlockAlign="true">Antal kartor</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

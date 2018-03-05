@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.3">
+<ListName>Bantilldelning</ListName>
+<Tag>courseteamtable</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Klass</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Lag</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Nummerlapp</Text>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Sträcka</Text>
+<Align BlockAlign="true">None</Align>
+<BlockWidth>5</BlockWidth>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Bana</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+</List>
+<SubList>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">Lag</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="TeamBib">
+<Align BlockAlign="true">Nummerlapp</Align>
+<Font>NormalFont</Font>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="RunnerLegNumberAlpha">
+<Text>X</Text>
+<Align BlockAlign="true">Sträcka</Align>
+<Font>NormalFont</Font>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="CourseName">
+<Align BlockAlign="true">Bana</Align>
+<Font>NormalFont</Font>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

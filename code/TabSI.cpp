@@ -45,6 +45,7 @@
 #include "meosexception.h"
 #include "MeOSFeatures.h"
 #include "RunnerDB.h"
+#include "oExtendedEvent.h"
 #include "recorder.h"
 
 TabSI::TabSI(oEvent *poe):TabBase(poe) {
@@ -370,6 +371,10 @@ int TabSI::siCB(gdioutput &gdi, int type, void *data)
     else if (bi.id=="StartInfo") {
       printStartInfo = gdi.isChecked(bi.id);
     }
+    else if (bi.id=="PrintLabels") {
+      int labels = gdi.isChecked(bi.id);
+			oe->getDI().setInt("PrintLabels", labels);
+    }
     else if (bi.id == "UseManualInput") {
       manualInput = gdi.isChecked("UseManualInput");
       oe->setProperty("ManualInput", manualInput ? 1 : 0);
@@ -660,7 +665,29 @@ int TabSI::siCB(gdioutput &gdi, int type, void *data)
       gdi.setInputFocus("Classes");
 
       if (classes.size()>0)
-        gdi.selectItemByData("Classes", classes[0]->getId());
+      {   
+        pRunner db_r = gEvent->dbLookUpByCard(si_copy.CardNumber);
+        if (db_r)
+        {
+          vector<int> probable_classes;
+          oe->getClassesFromBirthYear(db_r->getBirthYear(), db_r->getSex(), probable_classes);
+        // Will have all classes runner is eligible for. Select lowest numbered class, leave all classes in list.
+          if (!probable_classes.empty()) {
+            int min(-1);
+            for (unsigned int i = 0; i < probable_classes.size(); i++)
+              if (probable_classes.at(i) < min || min == -1)
+                min = probable_classes.at(i);
+				    if (oe->getClass(min))
+              gdi.selectItemByData("Classes", min);
+            else 
+              gdi.selectItemByData("Classes", classes[0]->getId());
+          }
+          else 
+            gdi.selectItemByData("Classes", classes[0]->getId());
+        }
+        else
+          gdi.selectItemByData("Classes", classes[0]->getId());
+      }
 
       gdi.dropLine();
 
@@ -1585,7 +1612,7 @@ bool TabSI::loadPage(gdioutput &gdi) {
     gdi.addCheckbox("Database", "Använd löpardatabasen", SportIdentCB, useDatabase);
 
   gdi.addCheckbox("PrintSplits", "Sträcktidsutskrift[check]", SportIdentCB, printSplits);
-  
+	gdi.addCheckbox("PrintLabels", "Skriva ut etiketter", SportIdentCB, !!oe->getDCI().getInt("PrintLabels"));
   if (!oe->empty()) {
     gdi.addCheckbox("StartInfo", "Startbevis", SportIdentCB, printStartInfo, "Skriv ut startbevis för deltagaren");
     if (mode != ModeEntry)
@@ -1624,6 +1651,7 @@ bool TabSI::loadPage(gdioutput &gdi) {
     generateEntryLine(gdi, 0);
     gdi.disableInput("Interactive");
     gdi.disableInput("PrintSplits");
+		gdi.disableInput("PrintLabels");
     gdi.disableInput("UseManualInput");
   }
   else if (mode == ModeCardData) {
@@ -2296,7 +2324,9 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
                           lang.tl("Tid: ") + runner->getRunningTimeS() +
                           lang.tl(",      Prel. placering: ") + placeS;
 
-
+			if (runner->getCourse(false)->hasRogaining())
+				statusline += lang.tl(",     Poäng: ") + itos(runner->getRogainingPoints(false));
+			else
       statusline += lang.tl(",     Prel. bomtid: ") + runner->getMissedTimeS();
       gdi.addStringUT(rc.top+6+lh, rc.left+20, 0, statusline);
 
@@ -2307,8 +2337,9 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
     else {
       string msg="#" + runner->getName()  + " (" + cardno + ")\n"+
           runner->getClub()+". "+runner->getClass() +
-          "\n" + lang.tl("Tid:  ") + runner->getRunningTimeS() + lang.tl(", Plats  ") + placeS;
-
+					"\n" + lang.tl("Tid: ") + runner->getRunningTimeS() + lang.tl(", Plats: ") + placeS;
+			if (runner->getCourse(false)->hasRogaining())
+				msg += lang.tl(", Poäng: ") + itos(runner->getRogainingPoints(false));
       gdi.addInfoBox("SIINFO", msg, 10000);
     }
   }
@@ -2358,6 +2389,10 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
   // Print splits
   if (printSplits)
     generateSplits(runner, gdi);
+
+  // Print labels
+	if (oe->getDCI().getInt("PrintLabels"))
+		generateLabel(runner, gdi);
 
   activeSIC.clear(&csic);
 
@@ -2415,17 +2450,38 @@ void TabSI::entryCard(gdioutput &gdi, const SICard &sic)
 
   string name;
   string club;
-  if (useDatabase) {
+	oExtendedEvent* ev = static_cast<oExtendedEvent*>(oe);
+
+	gdi.check("RentCard",ev->isRentedCard(sic.CardNumber));
+  if (useDatabase && !ev->isRentedCard(sic.CardNumber)) {
     pRunner db_r=oe->dbLookUpByCard(sic.CardNumber);
 
     if (db_r) {
       name=db_r->getNameRaw();
       club=db_r->getClub();
+      vector<int> classes;
+      oe->getClassesFromBirthYear(db_r->getBirthYear(), db_r->getSex(), classes);
+    // Will have all classes runner is eligible for. Select lowest numbered class.
+      if (gdi.hasField("Class") && !classes.empty()) {
+        int min(-1);
+        for (unsigned int i = 0; i < classes.size(); i++)
+          if (classes.at(i) < min || min == -1)
+            min = classes.at(i);
+				if (oe->getClass(min)) {  // Want to just match on class, but list contains map count too :(
+					char bf[256];
+					int nmaps = oe->getClass(min)->getNumRemainingMaps(false);
+					if (nmaps != numeric_limits<int>::min())
+						sprintf_s(bf, "%s (%d %s)", oe->getClass(min)->getName().c_str(), nmaps, lang.tl("kartor").c_str());
+					else
+						sprintf_s(bf, "%s ( - %s)", oe->getClass(min)->getName().c_str(), lang.tl("kartor").c_str());
+          gdi.selectItemByData("Class", min);
+				}
+      }
     }
   }
 
   //Else get name from card
-  if (name.empty() && (sic.FirstName[0] || sic.LastName[0]))
+  if (name.empty() && !ev->isRentedCard(sic.CardNumber) && (sic.FirstName[0] || sic.LastName[0]))
     name=string(sic.LastName) + ", " + string(sic.FirstName);
 
   gdi.setText("Name", name);
@@ -2672,7 +2728,7 @@ void TabSI::generateSplits(const pRunner r, gdioutput &gdi)
     vector<int> mp;
     r->evaluateCard(true, mp);
     r->printSplits(gdiprint);
-    printProtected(gdi, gdiprint);
+    printProtected(splitPrinter, gdi, gdiprint);
     //gdiprint.print(splitPrinter, oe, false, true);
   }
 }
@@ -2681,14 +2737,28 @@ void TabSI::generateStartInfo(gdioutput &gdi, const oRunner &r) {
   if (printStartInfo) {
     gdioutput gdiprint(2.0, gdi.getEncoding(), gdi.getHWND(), splitPrinter);
     r.printStartInfo(gdiprint);
-    printProtected(gdi, gdiprint);
+    printProtected(splitPrinter, gdi, gdiprint);
     //gdiprint.print(splitPrinter, oe, false, true);
   }
 }
 
+void TabSI::generateLabel(const pRunner r, gdioutput &gdi) 
+{
+  vector<int> mp;
+  r->evaluateCard(true, mp);
+  gdioutput gdiprint(2.0, gdi.getEncoding(), gdi.getHWND(), labelPrinter);
+  r->printLabel(gdiprint);
+  //gdiprint.print(labelPrinter, oe, false, true);
+  printProtected(labelPrinter, gdi, gdiprint);
+}
 void TabSI::printerSetup(gdioutput &gdi)
 {
   gdi.printSetup(splitPrinter);
+}
+
+void TabSI::labelPrinterSetup(gdioutput &gdi) 
+{
+  gdi.printSetup(labelPrinter);
 }
 
 void TabSI::checkMoreCardsInQueue(gdioutput &gdi) {
@@ -2812,6 +2882,7 @@ void TabSI::showAssignCard(gdioutput &gdi, bool showHelp) {
   gdi.disableInput("Database", true);
   gdi.disableInput("PrintSplits");
   gdi.disableInput("StartInfo");
+	gdi.disableInput("PrintLabels");
   gdi.disableInput("UseManualInput");
   gdi.setRestorePoint("ManualTie");
   gdi.fillDown();
@@ -3132,12 +3203,12 @@ int TabSI::analyzePunch(SIPunch &p, int &start, int &accTime, int &days) {
 void TabSI::generateSplits(int cardId, gdioutput &gdi) {
   gdioutput gdiprint(2.0, gdi.getEncoding(), gdi.getHWND(), splitPrinter);
   printCard(gdiprint, cardId, true);
-  printProtected(gdi, gdiprint);
+  printProtected(splitPrinter, gdi, gdiprint);
 }
 
-void TabSI::printProtected(gdioutput &gdi, gdioutput &gdiprint) {
+void TabSI::printProtected(PrinterObject& po, gdioutput &gdi, gdioutput &gdiprint) {
   try {
-    gdiprint.print(splitPrinter, oe, false, true);
+    gdiprint.print(po, oe, false, true);
   }
   catch (meosException &ex) {
     DWORD loaded;
@@ -3570,7 +3641,7 @@ bool TabSI::checkpPrintQueue(gdioutput &gdi) {
     gdiprint.dropLine(4);
   }
   
-  printProtected(gdi, gdiprint);
+  printProtected(splitPrinter, gdi, gdiprint);
   //gdiprint.print(splitPrinter, oe, false, true);
   return true;
 }

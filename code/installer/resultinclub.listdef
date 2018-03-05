@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>Individual results in a club</ListName>
+<Tag>indresultinclub</Tag>
+<SortOrder>CustomSort</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<MeOSResultCalculationSet>
+<Name>select-club</Name>
+<Tag>result-5C89-7E82-1</Tag>
+<Description>listinfo:singleclub</Description>
+<Date>2015-03-27 21:14:11</Date>
+<Rule name="RunnerStatus">
+<Method>if (InputNumber == ClubId)&#13;&#10;  return Status;&#13;&#10;else&#13;&#10;  return 0</Method>
+</Rule>
+<Rule name="TeamStatus">
+<Method>if (InputNumber == ClubId)&#13;&#10;  return Status;&#13;&#10;else&#13;&#10;  return 0</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassResultFraction">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="PatrolNameNames">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">ClassName</Align>
+</Block>
+<Block Type="PatrolClubNameNames">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="RunnerTimeAfter">
+<ResultModule>result-5C89-7E82-1</ResultModule>
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

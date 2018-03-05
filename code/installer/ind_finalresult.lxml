@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition>
+<ListName>Individuella slutresultat</ListName>
+<Tag>finalresult</Tag>
+<SortOrder>ClassTotalResult</SortOrder>
+<ListType>Runner</ListType>
+<Filter name="FilterResult"/>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Totalresultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+
+<Block Type="ClassResultFraction">
+<Align BlockAlign="true">None</Align>
+</Block>
+
+<Block Type="String">
+<Align BlockAlign="false">None</Align>
+<Text>Totaltid</Text>
+</Block>
+
+<Block Type="String">
+<Align BlockAlign="false">None</Align>
+<Text>Efter</Text>
+</Block>
+
+</Line>
+</SubHead>
+
+<List>
+<Line>
+
+<Block Type="RunnerTotalPlace">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+<Block Type="RunnerName">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+<Block Type="RunnerClub">
+<Align BlockAlign="false">None</Align>
+</Block>
+
+<Block Type="RunnerTotalTimeStatus">
+<Align BlockAlign="true">Totaltid</Align>
+</Block>
+
+<Block Type="RunnerTotalTimeAfter">
+<Align BlockAlign="true">AlignNext</Align>
+</Block>
+
+</Line>
+</List>
+
+<SubList>
+</SubList>
+
+</MeOSListDefinition>

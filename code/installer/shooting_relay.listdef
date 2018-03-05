@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>OL-Skytte stafettresultat</ListName>
+<Tag>shootingrelaytotalresult</Tag>
+<SortOrder>ClassResult</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<MeOSResultCalculationSet>
+<Name>Biathlonorienteering Relay</Name>
+<Tag>result-90A7-3EFA-1</Tag>
+<Description>olshooting:notimepunishment</Description>
+<Origin>OL-Skytte (2015-02-16)</Origin>
+<Date>2015-05-01 20:14:44</Date>
+<Rule name="RunnerTime">
+<Method>pr = -PointAdjustment;&#13;&#10;OutputNumbers[0] = pr%10;&#13;&#10;OutputNumbers[1] = (pr/10)%10;&#13;&#10;&#13;&#10;return Time;</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterResult"/>
+<SubFilter name="FilterPrelResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="110"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+<BlockWidth>20</BlockWidth>
+</Block>
+<Block Type="String">
+<Text>Sträcktid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>L   S</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamPlace">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Text> X</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="TeamTimeStatus">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="TeamTimeAfter">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="SubSubCounter">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="false">None</Align>
+<IndentMin>5</IndentMin>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerName">
+<Text> X</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">TeamName</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">Sträcktid</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerPlace">
+<Text> (X)</Text>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTimeAfter">
+<Text>  X</Text>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Leg>1</Leg>
+<Align BlockAlign="true">L   S</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="ResultModuleNumber">
+<Text>   X</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTotalTimeStatus">
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">Tid</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerTotalPlace">
+<Text> (X)</Text>
+<ResultModule>result-90A7-3EFA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

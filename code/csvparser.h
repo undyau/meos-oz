@@ -119,6 +119,7 @@ public:
   int nimport;
   bool ImportOCAD_CSV(oEvent &event, const char *file, bool addClasses);
   bool ImportOS_CSV(oEvent &event, const char *file);
+  bool ImportOr_CSV(oEvent &event, const char *file);
   bool ImportRAID(oEvent &event, const char *file);
 
   bool importPunches(const oEvent &oe, const char *file,
@@ -127,7 +128,7 @@ public:
   bool importCards(const oEvent &oe, const char *file,
                    vector<SICard> &punches);
 
-  int split(char *line, vector<char *> &split);
+	int split(char *line, vector<char *> &split, char sep = ';');
 
   bool ImportOE_CSV(oEvent &event, const char *file);
   int iscsv(const char *file);

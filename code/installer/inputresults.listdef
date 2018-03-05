@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>Input Results</ListName>
+<Tag>inputresult</Tag>
+<SortOrder>CustomSort</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<MeOSResultCalculationSet>
+<Name>Input Results</Name>
+<Tag>ms-result-02FF-3FE2-1</Tag>
+<Description>listinfo:inputresults</Description>
+<Origin>New Competition A E2 (2015-03-23)</Origin>
+<Date>2015-04-14 16:28:10</Date>
+<Rule name="RunnerPoints">
+<Method>InputPoints</Method>
+</Rule>
+<Rule name="RunnerStatus">
+<Method>OutputNumbers[0] = InputPlace;&#13;&#10;InputStatus;</Method>
+</Rule>
+<Rule name="RunnerTime">
+<Method>InputTime</Method>
+</Rule>
+<Rule name="TeamPoints">
+<Method>InputPoints</Method>
+</Rule>
+<Rule name="TeamStatus">
+<Method>OutputNumbers[0] = InputPlace;&#13;&#10;return InputStatus;</Method>
+</Rule>
+<Rule name="TeamTime">
+<Method>InputTime</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterNotVacant"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Input Results - X</Text>
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Placering</Text>
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="String">
+<Text>Status</Text>
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="String">
+<Text>Poäng</Text>
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="false">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerName">
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="RunnerClub">
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="ResultModuleNumber">
+<Text>@;X</Text>
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="false">Placering</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="true">Status</Align>
+</Block>
+<Block Type="RunnerRogainingPoint">
+<ResultModule>ms-result-02FF-3FE2-1</ResultModule>
+<Align BlockAlign="false">Poäng</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

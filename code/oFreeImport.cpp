@@ -868,8 +868,8 @@ bool oFreeImport::isName(const char *p) const
       n+=familyDB.lookup(w[k]) || givenDB.lookup(w[k]) ? 1:0;
       if (isCard(w[k]))
         return false;
-      if (classDB.lookup(w[k]))
-        return false;
+     // if(classDB.lookup(w[k]))
+     //   return false;
     }
     return n>=t;
   }
@@ -971,7 +971,7 @@ void oFreeImport::analyzePart(char *part, const MatchPattern &ptrn, int nNamesPe
         lastType = Name;
       else lastType = Unknown;
     }
-    else if (isClass[k]) {
+    else if(isClass[k] && !(k == 1 && lastType == Name)) {
       while(k<words.size() && isClass[k])
         cls+=string(words[k])+" ", used[k]=true, k++;
       lastType = Class;
@@ -979,6 +979,7 @@ void oFreeImport::analyzePart(char *part, const MatchPattern &ptrn, int nNamesPe
     else if (isClub[k]) {
       while(k<words.size() && isClub[k])
         clb+=string(words[k])+" ", used[k]=true, k++;
+      if (k==words.size())
       lastType = Club;
     }
     else if (isNameV[k] && allowName) {

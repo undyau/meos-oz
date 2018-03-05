@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.3">
+<ListName>Control Statistics</ListName>
+<Tag>controlstatistics</Tag>
+<SortOrder>SortNameOnly</SortOrder>
+<ListType>Control</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Control Statistics - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Kontroll</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Besökare</Text>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Bomkvot</Text>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Medianbom</Text>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Maxbom</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="ControlName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ControlPunches">
+<Align BlockAlign="true">Besökare</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="ControlMistakeQuotient">
+<Align BlockAlign="true">Bomkvot</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="ControlMedianLostTime">
+<Align BlockAlign="true">Medianbom</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="ControlMaxLostTime">
+<Align BlockAlign="true">Maxbom</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

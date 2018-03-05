@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<MeOSListDefinition version="3.3">
+<ListName>Latest Results</ListName>
+<Tag>latestresult</Tag>
+<SortOrder>FinishTimeReverse</SortOrder>
+<ListType>RunnerLeg</ListType>
+<SubListType>None</SubListType>
+<ResultModule>totatcontrol</ResultModule>
+<SupportFrom>1</SupportFrom>
+<SupportTo>1</SupportTo>
+<Filter name="FilterPrelResult"/>
+<HeadFont scale="200" above="0">arial</HeadFont>
+<SubHeadFont scale="150" above="0">arial</SubHeadFont>
+<ListFont scale="150" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+<Color>381d3f</Color>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Klass</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Namn</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Placering</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="ClassName">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerCompleteName">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Namn</Align>
+</Block>
+<Block Type="RunnerPlace">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Placering</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="RunnerTimeAfter">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

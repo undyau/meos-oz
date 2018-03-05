@@ -21,7 +21,6 @@
 ************************************************************************/
 
 #include "stdafx.h"
-
 #include <algorithm>
 #include <cassert>
 
@@ -1633,7 +1632,18 @@ pRunner IOF30Interface::readPerson(gdioutput &gdi, const xmlobject &person) {
       pid++;
       r = oe.getRunner(pid, 0);
     }
-
+  }
+  else
+	{
+		// Runner may already exist, but without a number ?
+		if (pname)
+		{
+			string given, family;
+			r = oe.getRunnerByName(getFirst(pname.getObjectString("Given", given), 2)+" "+pname.getObjectString("Family", family));
+		}
+	}
+	
+	if (pid || r){
     if (r) {
       // Check that a with this id runner does not happen to exist with a different source
       if (entrySourceId>0 && r->getEntrySource() != entrySourceId) {
@@ -1705,11 +1715,27 @@ pClub IOF30Interface::readOrganization(gdioutput &gdi, const xmlobject &xclub, b
   if (name.length()==0 || !IsCharAlphaNumeric(name[0]))
     return 0;
 
+	if (name.length() > 6)
+		name = oe.shortenName(name);
+
   pClub pc=0;
 
   if ( !saveToDB ) {
     if (clubId)
       pc = oe.getClubCreate(clubId, name);
+		else {
+			std::vector<pClub>c;
+			oe.getClubs(c, false);
+			for (unsigned int i = 0; i < c.size(); i++)
+				if (c[i]->getName() == name) {
+					pc = c[i];
+					break;
+				}
+		}
+		if (!pc && oe.useRunnerDb() && oe.getRunnerDatabase().getClub(name)) // Have match in the databse, so feel OK to add to this event (why wasn't DB used for search ?)
+			{
+			pc = new oClub(&oe, oe.getRunnerDatabase().getClub(name)->getId());
+			}
 
     if (!pc) return false;
   }
@@ -2000,16 +2026,38 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
 
   pClass pc = 0;
 
-  if (classId) {
+	if (name.length() > 0) {
+		pc = oe.getClass(name);
+		if (!pc) {
+			pc = oe.addClass(name, 0, oe.getClass(classId) ? 0 : classId);
+		}		
+	}
+	else {
+		pc = oe.getClass(classId);
+		if (!pc) {
+				oClass c(&oe, classId);
+				pc = oe.addClass(c);
+		}
+	}
+
+ /* if (classId) {
     pc = oe.getClass(classId);
 
     if (!pc) {
-      oClass c(&oe, classId);
-      pc = oe.addClass(c);
+			if (name.length() > 0)
+				pc = oe.getClass(name);
+			if (!pc) {
+				oClass c(&oe, classId);
+				pc = oe.addClass(c);
+			}
     }
   }
-  else
-    pc = oe.addClass(name);
+	else {
+    if (name.length() > 0)
+			pc = oe.getClass(name);
+		if (!pc)
+			pc = oe.addClass(name);
+	}*/
 
   oDataInterface DI = pc->getDI();
 
@@ -2528,6 +2576,10 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
     }
 
     xml.write("Status", formatStatus(r.getStatus()));
+    if (r.getClassRef()->isRogaining()) {
+        xml.write("Score", "type", "Score", itos(r.getRogainingPoints(true)));
+        xml.write("Score", "type", "Penalty", itos(r.getRogainingReduction()));
+    }
 
     if ( (r.getTeam() && r.getClassRef()->getClassType() != oClassPatrol && !teamsAsIndividual) || hasInputTime) {
       xml.startTag("OverallResult");
@@ -2550,6 +2602,9 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
         xml.write("Position", r.getTotalPlace());
 
       xml.write("Status", formatStatus(stat));
+      if (r.getClassRef()->isRogaining()) {
+        xml.write("Score", "type", "Score", itos(r.getRogainingPoints(true)));
+      }
 
       xml.endTag();
     }

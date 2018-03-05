@@ -220,7 +220,7 @@ enum PropertyType {
 
 class oEvent : public oBase
 {
-private:
+  friend class oSSSQuickStart;   //Trying to minimise code chanes to oEvent, but this is a bit ugly
   oDataDefiner *firstStartDefiner;
   oDataDefiner *intervalDefiner;
 
@@ -365,6 +365,7 @@ protected:
   char CurrentFile[260];
   char CurrentNameId[64];
 
+
   static int dbVersion;
   string MySQLServer;
   string MySQLUser;
@@ -423,6 +424,7 @@ protected:
                               int baseFee, int &entries_sum, int &started_sum, int &fee_sum) const;
   void getRunnersPerDistrict(vector<int> &runners) const;
   void getDistricts(vector<string> &district);
+	void generateRunnersPerCourse(gdioutput &gdi);
 
   void autoAddTeam(pRunner pr);
   void autoRemoveTeam(pRunner pr);
@@ -544,7 +546,7 @@ public:
   void setMaximalTime(const string &time);
 
   void saveProperties(const char *file);
-  void loadProperties(const char *file);
+  virtual void loadProperties(const char *file);
 
   // Get window handle
   HWND hWnd() const;
@@ -782,7 +784,9 @@ protected:
   mutable multimap<int, oAbstractRunner*> bibStartNoToRunnerTeam;
   int tClubDataRevision;
   bool readOnly;
+	virtual void writeExtraXml(xmlparser &xml){};
   mutable int tLongTimesCached;
+	virtual void readExtraXml(const xmlparser &xml) {};
 
   map<pair<int, int>, oFreePunch> advanceInformationPunches;
 
@@ -884,7 +888,7 @@ public:
                           bool includeStageInfo,
                           bool forceSplitFee);
 
-  bool exportOECSV(const char *file, int LanguageTypeIndex, bool includeSplits);
+  bool exportOECSV(const char *file, int LanguageTypeIndex, bool includeSplits, bool byClass = true);
   bool save();
   void duplicate();
   void newCompetition(const string &Name);
@@ -1194,6 +1198,9 @@ protected:
   bool addXMLControl(const xmlobject &xcontrol, int type);
 
 public:
+	string shortenName(string name);  // implemented in oExtendedEvent.cpp
+  void setShortClubNames(bool shorten); // implemented in oExtendedEvent.cpp
+	void calculateCourseRogainingResults(); // implemented in oExtendedEvent.cpp
 
   GeneralResult &getGeneralResult(const string &tag, string &sourceFileOut) const;
   void getGeneralResults(bool onlyEditable, vector< pair<int, pair<string, string> > > &tagNameList, bool includeDateInName) const;

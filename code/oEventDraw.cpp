@@ -43,11 +43,11 @@
 int ClassInfo::sSortOrder=0;
 
 DrawInfo::DrawInfo() {
-  vacancyFactor = 0.05;
+  vacancyFactor = 0.00;
   extraFactor = 0.1;
-  minVacancy = 1;
+  minVacancy = 0;
   maxVacancy = 10;
-  baseInterval = 60;
+  baseInterval = 120;
   minClassInterval = 120;
   maxClassInterval = 180;
   nFields = 10;
@@ -265,6 +265,7 @@ void oEvent::optimizeStartOrder(gdioutput &gdi, DrawInfo &di, vector<ClassInfo> 
   gdi.dropLine();
   //Find last starter
   int last = opt.last;
+
 
   int laststart=0;
   for (size_t k=0;k<cInfo.size();k++) {
@@ -1118,7 +1119,8 @@ void oEvent::automaticDrawAll(gdioutput &gdi, const string &firstStart,
   const double extraFactor = 0.0;
   int drawn = 0;
 
-  int baseInterval = convertAbsoluteTimeMS(minIntervall)/2;
+  //int baseInterval = convertAbsoluteTimeMS(minIntervall)/2;
+  int baseInterval = convertAbsoluteTimeMS(minIntervall);
 
   if (baseInterval == 0) {
     gdi.fillDown();
@@ -1400,6 +1402,7 @@ void oEvent::drawPersuitList(int classId, int firstTime, int restartTime,
 
   int reverseDelta = 0;
   if (reverse) {
+ 
     for (size_t k = 0; k<times.size(); k++) {
       if ((times[k].first - delta) < maxTime)
         reverseDelta = times[k].first;

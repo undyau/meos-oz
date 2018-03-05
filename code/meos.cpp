@@ -60,6 +60,7 @@
 #include "metalist.h"
 #include "gdiconstants.h"
 #include "socket.h"
+#include "oExtendedEvent.h"
 #include "autotask.h"
 #include "meosexception.h"
 #include "parser.h"
@@ -221,7 +222,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   gdi_extra.push_back(gdi_main);
 
   try {
-    gEvent = new oEvent(*gdi_main);
+	  gEvent = new oExtendedEvent(*gdi_main);
   }
   catch (std::exception &ex) {
     gdi_main->alert(string("Failed to create base event: ") + ex.what());
@@ -249,7 +250,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
       lang.get().addLangResource("Extraspråk", lpath);
   }
 
-  string defLang = gEvent->getPropertyString("Language", "Svenska");
+  string defLang = gEvent->getPropertyString("Language", "English");
 
   // Backward compatibility
   if (defLang=="103")
@@ -263,7 +264,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     lang.get().loadLangResource(defLang);
   }
   catch (std::exception &) {
-    lang.get().loadLangResource("Svenska");
+    lang.get().loadLangResource("English (ISO 8859-2)");
   }
 
   try {
@@ -1620,6 +1621,7 @@ bool getMeOSFile(char *FileNamePath, const char *FileName) {
   strcpy_s(FileNamePath, MAX_PATH, Path);
   return true;
 }
+
 
 bool getUserFile(char *FileNamePath, const char *FileName)
 {

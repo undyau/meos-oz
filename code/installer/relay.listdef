@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>Stafettresultat</ListName>
+<Tag>relaytotalresult</Tag>
+<SortOrder>ClassResult</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<Filter name="FilterResult"/>
+<SubFilter name="FilterPrelResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="110"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+<BlockWidth>20</BlockWidth>
+</Block>
+<Block Type="ClassResultFraction">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamPlace">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Text> X</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="TeamTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="TeamTimeAfter">
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="SubSubCounter">
+<Align BlockAlign="false">None</Align>
+<IndentMin>5</IndentMin>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerName">
+<Text> X</Text>
+<Align BlockAlign="true">TeamName</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">ClassResultFraction</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerPlace">
+<Text> (X)</Text>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTimeAfter">
+<Text>  X</Text>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTotalTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerTotalPlace">
+<Text> (X)</Text>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="TeamLegTimeAfter">
+<Align BlockAlign="true">Efter</Align>
+<Font>NormalFont</Font>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

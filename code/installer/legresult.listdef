@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.3">
+<ListName>Stafettresultat, sträcka</ListName>
+<Tag>legresult</Tag>
+
+<SortOrder>ClassResult</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<Filter name="FilterResult"/>
+<SubFilter name="FilterResult"/>
+<SubFilter name="FilterSameParallelNotFirst"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerLegNumberAlpha">
+<Text> - Resultat efter sträcka X</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassResultFraction">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamPlace">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamLegTimeStatus">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamLegTimeAfter">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Text>(X)</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="RunnerName">
+<Align BlockAlign="true">RunnerName</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Text>(X)</Text>
+<Align BlockAlign="true">RunnerTimeStatus</Align>
+<Font>NormalFont</Font>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

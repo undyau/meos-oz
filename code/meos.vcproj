@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9,00"
+	Version="9.00"
 	Name="meos"
 	ProjectGUID="{B854EF2A-2BB7-4D62-B08B-96BD64B347E8}"
 	RootNamespace="meos"
@@ -745,6 +745,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\oExtendedEvent.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\oFreeImport.cpp"
 				>
 			</File>
@@ -839,6 +843,10 @@
 						PreprocessorDefinitions=""
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\oSSSQuickStart.cpp"
+				>
 			</File>
 			<File
 				RelativePath=".\oTeam.cpp"
@@ -1225,6 +1233,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\oExtendedEvent.h"
+				>
+			</File>
+			<File
 				RelativePath=".\oFreeImport.h"
 				>
 			</File>
@@ -1242,6 +1254,10 @@
 			</File>
 			<File
 				RelativePath=".\ospeaker.h"
+				>
+			</File>
+			<File
+				RelativePath=".\oSSSQuickStart.h"
 				>
 			</File>
 			<File

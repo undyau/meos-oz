@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>OL-Skytte med tidstillägg</ListName>
+<Tag>shootaddtime</Tag>
+<SortOrder>CustomSort</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<ResultModule>result-3243-76EA-1</ResultModule>
+<MeOSResultCalculationSet>
+<Name>OL/Shooting Time Punishment</Name>
+<Tag>result-3243-76EA-1</Tag>
+<Description>olshooting:timepunishment</Description>
+<Origin>OL-Skytte (2015-02-16)</Origin>
+<Date>2015-05-07 12:01:12</Date>
+<Rule name="RunnerTime">
+<Method>pr = -PointAdjustment;&#13;&#10;OutputNumbers[0] = pr%10; // Standing&#13;&#10;OutputNumbers[1] = (pr/10)%10; // Standing&#13;&#10;OutputNumbers[2] = (pr/100)%10; // Prone&#13;&#10;OutputNumbers[3] = (pr/1000)%10; // Prone&#13;&#10;OutputNumbers[4] = pr/10000; // Location&#13;&#10;OutputNumbers[5] = OutputNumbers[0] + OutputNumbers[1] + OutputNumbers[2] + OutputNumbers[3]; // Total # shooting&#13;&#10;OutputNumbers[6] = 2*OutputNumbers[0] + 2*OutputNumbers[1] + 2*OutputNumbers[2] + 2*OutputNumbers[3] + OutputNumbers[4]; // Total penalty&#13;&#10;&#13;&#10;if (Time == 0)&#13;&#10;  return 0;&#13;&#10;else&#13;&#10;  return Time + (OutputNumbers[0]+OutputNumbers[1]+OutputNumbers[2]+OutputNumbers[3])*120 + OutputNumbers[4]*60;&#13;&#10;</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="100"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tot löptid (Pl)</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>mm</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>L  L  S  S</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>T</Text>
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tot tillägg</Text>
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Totaltid</Text>
+<Align BlockAlign="true">None</Align>
+<Color>4000</Color>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClubName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTime">
+<Align BlockAlign="true">Tot löptid (Pl)</Align>
+</Block>
+<Block Type="RunnerPlace">
+<Text> (X)</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Leg>4</Leg>
+<Align BlockAlign="true">mm</Align>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Leg>3</Leg>
+<Align BlockAlign="true">L  L  S  S</Align>
+</Block>
+<Block Type="ResultModuleNumber">
+<Text>  X</Text>
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Leg>2</Leg>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="ResultModuleNumber">
+<Text>   X</Text>
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Leg>1</Leg>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="ResultModuleNumber">
+<Text>  X</Text>
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Leg>5</Leg>
+<Align BlockAlign="true">T</Align>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Leg>6</Leg>
+<Align BlockAlign="true">Tot tillägg</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Align BlockAlign="true">Totaltid</Align>
+<Color>4000</Color>
+</Block>
+<Block Type="RunnerTimeAfter">
+<ResultModule>result-3243-76EA-1</ResultModule>
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

@@ -474,6 +474,7 @@ protected:
   string tProblemDescription;
   // Sets up mutable data above
   void setupRunnerStatistics() const;
+  void printRogainingSplits(gdioutput &gdi) const;
 
   // Update hash
   void changeId(int newId);
@@ -600,6 +601,7 @@ public:
                     int cardNo, int birthYear);
 
   void printSplits(gdioutput &gdi) const;
+	void printLabel(gdioutput &gdi) const;
 
   void printStartInfo(gdioutput &gdi) const;
 

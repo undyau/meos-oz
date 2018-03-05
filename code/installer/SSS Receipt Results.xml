@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+
+<MeOSListDefinition version="3.2">
+<ListName>SSS Results Receipt</ListName>
+<ListOrigin>Summer Series #20 - Pymble (2015-06-13)</ListOrigin>
+<UID>A6608405055551431389B3535213210</UID>
+<SortOrder>ClassPoints</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<Filter name="FilterResult"/>
+<HeadFont scale="100"></HeadFont>
+<SubHeadFont scale="100"></SubHeadFont>
+<ListFont scale="120"></ListFont>
+<SubListFont scale="100"></SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+</Line>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+<Font>BoldHuge</Font>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<Align BlockAlign="true">None</Align>
+<Font>BoldLarge</Font>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+<Font>BoldLarge</Font>
+</Block>
+<Block Type="RunnerRogainingPointTotal">
+<Align BlockAlign="false">None</Align>
+<Font>BoldLarge</Font>
+<TextAdjust>Right</TextAdjust>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>
