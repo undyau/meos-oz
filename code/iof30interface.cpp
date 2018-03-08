@@ -1131,6 +1131,22 @@ void IOF30Interface::readEvent(gdioutput &gdi, const xmlobject &xo,
     string timeStr;
     date.getObjectString("Time", timeStr);
     if (!timeStr.empty()) {
+      if (timeStr[timeStr.size()-1] == 'Z') { //Uh-oh - got UTC time        
+        SYSTEMTIME utc, local;
+        convertDateYMS(dateStr, utc, false);
+        if (timeStr.size() > 7 && timeStr[2] == ':' && timeStr[5] == ':') { // being lazy
+          utc.wHour = atoi(timeStr.c_str());
+          utc.wMinute = atoi(timeStr.substr(3).c_str());
+          utc.wSecond = atoi(timeStr.substr(6).c_str());
+          SystemTimeToTzSpecificLocalTime(0, &utc, &local);
+          char buf[25];
+          sprintf_s(buf, 25, "%d-%02d-%02d", local.wYear, local.wMonth, local.wDay);
+          dateStr = string(buf);
+          oe.setDate(dateStr);
+          sprintf_s(buf, 25, "%02d:%02d:%02d", local.wHour, local.wMinute, local.wSecond);
+          timeStr = string(buf);
+        }       
+      }
       int t = convertAbsoluteTimeISO(timeStr);
       if (t >= 0 && oe.getNumRunners() == 0) {
         int zt = t - 3600;
@@ -2201,12 +2217,13 @@ void IOF30Interface::setupRelayClass(pClass pc, const vector<LegInfo> &legs) {
     for (size_t k = 0; k < legs.size(); k++) {
       nStage += legs[k].maxRunners;
     }
+
     if (int(pc->getNumStages())>=nStage)
       return; // Do nothing
     
     pc->setNumStages(nStage);
-    pc->setStartType(0, STTime, false);
-    pc->setStartData(0, oe.getAbsTime(3600));
+//    pc->setStartType(0, STTime, false);
+//    pc->setStartData(0, oe.getAbsTime(3600));
 
     int ix = 0;
     for (size_t k = 0; k < legs.size(); k++) {

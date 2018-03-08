@@ -1523,11 +1523,12 @@ int getTimeZoneInfo(const string &date) {
   }
   strcpy_s(lastDate, 16, date.c_str());
 //  TIME_ZONE_INFORMATION tzi;
-  SYSTEMTIME st;
-  convertDateYMS(date, st, false);
-  st.wHour = 12;
-  SYSTEMTIME utc;
-  TzSpecificLocalTimeToSystemTime(0, &st, &utc);
+  SYSTEMTIME st, utc;
+  convertDateYMS(date, utc, false);
+  utc.wHour = 12;
+
+  SystemTimeToTzSpecificLocalTime(0, &utc, &st);
+ // TzSpecificLocalTimeToSystemTime(0, &st, &utc);
 
   int datecode = ((st.wYear * 12 + st.wMonth) * 31) + st.wDay;
   int datecodeUTC = ((utc.wYear * 12 + utc.wMonth) * 31) + utc.wDay;
