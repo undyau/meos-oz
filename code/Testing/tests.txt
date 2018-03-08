@@ -12,7 +12,5 @@
 12. Test no crash if creating an auto report service on a list that is empty.
 13. Print splits on splits printer for regular line event - check for size.
 14. Check that runners remaining logic works.
-15. Print Splits from a normal event - is bolding working ?
-16. Does start list show courses
-17 Print splits from an SSS event
-
+15. Check that zero time is set correctly when event is loaded from Eventor
+16. Check that Eventor is not setting mass start times for classes

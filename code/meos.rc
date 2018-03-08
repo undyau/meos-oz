@@ -146,12 +146,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", " "
             VALUE "FileDescription", "meos"
-            VALUE "FileVersion", "3.4.717.4"
+            VALUE "FileVersion", "3.4.717.5"
             VALUE "InternalName", "meos"
             VALUE "LegalCopyright", "Copyright © 2007-2017"
             VALUE "OriginalFilename", "meos.exe"
             VALUE "ProductName", "  meos"
-            VALUE "ProductVersion", "3.4.717.4"
+            VALUE "ProductVersion", "3.4.717.5"
         END
     END
     BLOCK "VarFileInfo"

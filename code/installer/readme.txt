@@ -1,3 +1,8 @@
+  9 March 2018
+- Zero time set incorrectly when events were loaded from Eventor.
+- Start time was set to zero time for all classes (ie masss start) when
+  events were loaded from Eventor.
+
   15 November 2017
 - MEOS crashed when an unknown runner downloaded (bug introduced 3.4.717.2)
 
