@@ -1,3 +1,7 @@
+  10 March 2018
+- Handle defective XML import (contained "Leg" info for classes that
+  weren't relays). This is an improvement on fix from 9th March 2018.
+
   9 March 2018
 - Zero time set incorrectly when events were loaded from Eventor.
 - Start time was set to zero time for all classes (ie masss start) when

@@ -2087,7 +2087,9 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
   }
   xmlList legs;
   xclass.getObjects("Leg", legs);
-  if (!legs.empty()) {
+
+//  if (!legs.empty()) {  Eventor sending Leg info for individual races :(
+  if (legs.size() > 1) {
     vector<LegInfo> &legInfo = teamClassConfig[pc->getId()];
     if (legInfo.size() < legs.size())
       legInfo.resize(legs.size());
@@ -2222,8 +2224,8 @@ void IOF30Interface::setupRelayClass(pClass pc, const vector<LegInfo> &legs) {
       return; // Do nothing
     
     pc->setNumStages(nStage);
-//    pc->setStartType(0, STTime, false);
-//    pc->setStartData(0, oe.getAbsTime(3600));
+    pc->setStartType(0, STTime, false);
+    pc->setStartData(0, oe.getAbsTime(3600));
 
     int ix = 0;
     for (size_t k = 0; k < legs.size(); k++) {
