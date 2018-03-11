@@ -553,12 +553,6 @@ pClass oEvent::getClass(const string &cname) const
 {
   // Try for exact match first
   for (oClassList::const_iterator it=Classes.begin(); it != Classes.end(); ++it) {
-    if (cname.compare(it->Name) == 0 && !it->isRemoved())
-			return pClass(&*it);
-  }
-
-  // Then try the normal MEOS match
-  for (oClassList::const_iterator it=Classes.begin(); it != Classes.end(); ++it) {
     if (!it->isRemoved() && compareClassName(cname, it->Name))
       return pClass(&*it);
   }

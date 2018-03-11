@@ -1,3 +1,6 @@
+  11 March 2018
+- XML import unified classes incorrectly, eg M21A and M21AS.
+
   10 March 2018
 - Handle defective XML import (contained "Leg" info for classes that
   weren't relays). This is an improvement on fix from 9th March 2018.

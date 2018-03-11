@@ -1120,6 +1120,9 @@ bool compareClassName(const string &a, const string &b)
     if (sample >= '0' && sample <= '9')
       return false; // Numbers must match
 
+    if (acanon.size() == 3 && (acanon[k][1] != bcanon[k][1]))
+      return false; // A <> AS for example in W21A, W21AS
+
     if (acanon[k][0] == bcanon[k][0] && (acanon[k].length() == 1 || bcanon[k].length() == 1))
       continue; // Abbrevation W <-> Women etc
 

@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{5A8ACFDC-9E0A-4B59-9D8F-4013251EB156}
 AppName=MEOS-OZ
-AppVersion=3.4.717.6
+AppVersion=3.4.717.7
 AppPublisher=undy
 AppPublisherURL=http://sourceforge.net/projects/meosoz/
 AppSupportURL=http://sourceforge.net/projects/meosoz/
