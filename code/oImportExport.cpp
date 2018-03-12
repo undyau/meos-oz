@@ -1772,9 +1772,6 @@ bool oEvent::addXMLClub(const xmlobject &xclub, bool savetoDB)
   if (!shortName.empty() && shortName.length() < Name.length())
     swap(Name, shortName);
 
-	if (Name.length() > 6)
-		Name = shortenName(Name);
-
   int district = xclub.getObjectInt("OrganisationId");
 
   if (Name.length()==0 || !IsCharAlphaNumeric(Name[0]))

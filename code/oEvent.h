@@ -1198,8 +1198,8 @@ protected:
   bool addXMLControl(const xmlobject &xcontrol, int type);
 
 public:
-	string shortenName(string name);  // implemented in oExtendedEvent.cpp
   void setShortClubNames(bool shorten); // implemented in oExtendedEvent.cpp
+  bool getShortenClubNames();         // implemented in oExtendedEvent.cpp
 	void calculateCourseRogainingResults(); // implemented in oExtendedEvent.cpp
 
   GeneralResult &getGeneralResult(const string &tag, string &sourceFileOut) const;

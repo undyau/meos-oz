@@ -1731,8 +1731,8 @@ pClub IOF30Interface::readOrganization(gdioutput &gdi, const xmlobject &xclub, b
   if (name.length()==0 || !IsCharAlphaNumeric(name[0]))
     return 0;
 
-	if (name.length() > 6)
-		name = oe.shortenName(name);
+  if (oe.getShortenClubNames() && shortName.length() < name.length())
+    name = shortName;
 
   pClub pc=0;
 
