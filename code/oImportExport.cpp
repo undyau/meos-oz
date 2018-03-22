@@ -2394,7 +2394,7 @@ void oEvent::exportIOFResults(xmlparser &xml, bool selfContained, const set<int>
                 xml.startTag("SplitTime", "sequence", itos(no++));
                 xml.write("ControlCode", pcourse->Controls[k]->getFirstNumber());
                 if (unsigned(k)<sp.size() && sp[k].time>0)
-                  xml.write("Time", "clockFormat", "HH:MM:SS", getAbsTime((sp[k].time-it->tStartTime)-ZeroTime));
+                  xml.write("Time", "clockFormat", "HH:MM:SS", getAbsTime((sp[k].time-it->tStartTime)-ZeroTime, true));
                 else
                   xml.write("Time", "--:--:--");
 
@@ -2499,7 +2499,7 @@ void oEvent::exportIOFResults(xmlparser &xml, bool selfContained, const set<int>
             xml.startTag("SplitTime", "sequence", itos(no++));
             xml.write("ControlCode", pcourse->Controls[k]->getFirstNumber());
             if (unsigned(k)<sp.size() && sp[k].time>0)
-              xml.write("Time", "timeFormat", "HH:MM:SS", getAbsTime((sp[k].time-it->tStartTime)-ZeroTime));
+              xml.write("Time", "timeFormat", "HH:MM:SS", getAbsTime((sp[k].time-it->tStartTime)-ZeroTime, true));
             else
               xml.write("Time", "--:--:--");
 

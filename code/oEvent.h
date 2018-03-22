@@ -938,7 +938,7 @@ public:
   static int convertAbsoluteTime(const string &m);
 
   /// Get clock time from relative time
-  const string &getAbsTime(DWORD relativeTime) const;
+  const string &getAbsTime(DWORD relativeTime, bool oldStyle = false) const;
   string getAbsDateTimeISO(DWORD relativeTime, bool includeDate, bool useGMT) const;
 
   const string &getAbsTimeHM(DWORD relativeTime) const;

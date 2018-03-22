@@ -2041,10 +2041,13 @@ void oEvent::setDate(const string &m)
   }
 }
 
-const string &oEvent::getAbsTime(DWORD time) const {
+const string &oEvent::getAbsTime(DWORD time, bool oldStyle) const {
   DWORD t = ZeroTime + time;
   if (int(t)<0)
     t = 0;
+  if (oldStyle)
+    return formatTimeHMS(t % (24*3600));
+
   int days = time/(3600*24);
   if (days <= 0)
     return formatTimeHMS(t % (24*3600));

@@ -14,3 +14,4 @@
 14. Check that runners remaining logic works.
 15. Check that zero time is set correctly when event is loaded from Eventor
 16. Check that Eventor is not setting mass start times for classes
+17. Export to RouteGadget (ie XML 2 result formatting)
