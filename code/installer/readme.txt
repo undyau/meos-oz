@@ -1,4 +1,8 @@
-  11 March 2018
+  23 March 2018 3.4.717.7
+- XML results export for IOF XML 2.0.3 had broken split times
+- Use Eventor provided shortnames for club short names
+	
+	11 March 2018 3.4.717.6
 - XML import unified classes incorrectly, eg M21A and M21AS.
 
   10 March 2018
