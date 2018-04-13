@@ -41,9 +41,9 @@ class oDataInterface;
 class oDataConstInterface;
 class oDataContainer;
 typedef void * pvoid;
-typedef vector< vector<string> > * pvectorstr;
+typedef vector< vector<wstring> > * pvectorstr;
 
-enum RunnerStatus {StatusOK=1, StatusDNS=20, StatusMP=3,
+enum RunnerStatus {StatusOK=1, StatusDNS=20, StatusCANCEL = 21, StatusMP=3,
                    StatusDNF=4, StatusDQ=5, StatusMAX=6,
                    StatusUnknown=0, StatusNotCompetiting=99};
 
@@ -64,6 +64,7 @@ enum SortOrder {ClassStartTime,
                 SortByFinishTimeReverse,
                 SortByStartTime,
                 CourseResult,
+                SortByEntryTime,
                 Custom,
 								CoursePoints,
                 SortEnumLastItem};
@@ -75,7 +76,7 @@ private:
   void resetChangeStatus() {changed &= reChanged;}
   bool reChanged;
   bool changed;
-
+  bool localObject;
   const static unsigned long long BaseGenStringFlag = 1ull << 63;
   const static unsigned long long Base36StringFlag = 1ull << 62;
   const static unsigned long long ExtStringMask = ~(BaseGenStringFlag|Base36StringFlag);
@@ -106,24 +107,26 @@ protected:
   /** Change the id of the object */
   virtual void changeId(int newId);
 
-  //Used for handeling GUI combo boxes;
-  static void clearCombo(HWND hWnd);
-  static void addToCombo(HWND hWnd, const string &str, int data);
-
   /** Get internal data buffers for DI */
   virtual oDataContainer &getDataBuffers(pvoid &data, pvoid &olddata, pvectorstr &strData) const = 0;
   virtual int getDISize() const = 0;
 
+  void setLocalObject() { localObject = true; }
+
 public:
+
+  // Returns true if the object is local, not stored in DB/On disc
+  bool isLocalObject() { return localObject; }
+
   /// Returns textual information on the object
-  virtual string getInfo() const = 0;
+  virtual wstring getInfo() const = 0;
 
   //Called (by a table) when user enters data in a cell
-  virtual bool inputData(int id, const string &input, int inputId,
-                         string &output, bool noUpdate) {output=""; return false;}
+  virtual bool inputData(int id, const wstring &input, int inputId,
+                         wstring &output, bool noUpdate) {output=L""; return false;}
 
   //Called (by a table) to fill a list box with contents in a table
-  virtual void fillInput(int id, vector< pair<string, size_t> > &elements, size_t &selected)
+  virtual void fillInput(int id, vector< pair<wstring, size_t> > &elements, size_t &selected)
     {throw std::exception("Not implemented");}
 
   oEvent *getEvent() const {return oe;}
@@ -134,7 +137,7 @@ public:
   unsigned int getModificationTime() const {return Modified.getModificationTime();}
   
   bool synchronize(bool writeOnly=false);
-  string getTimeStamp() const;
+  wstring getTimeStamp() const;
 
   bool existInDB() const { return !sqlUpdated.empty(); }
 
@@ -154,15 +157,15 @@ public:
   /// Get an external identifier (or 0) if none
   __int64 getExtIdentifier() const;
 
-  string getExtIdentifierString() const;
-  void setExtIdentifier(const string &str);
+  wstring getExtIdentifierString() const;
+  void setExtIdentifier(const wstring &str);
   bool isStringIdentifier() const;
 
   // Convert an external to a int id. The result
   // need not be unique, of course.
   static int idFromExtId(__int64 extId);
-  static void converExtIdentifierString(__int64 raw, char bf[16]);
-  static __int64 converExtIdentifierString(const string &str);
+  static void converExtIdentifierString(__int64 raw, wchar_t bf[16]);
+  static __int64 converExtIdentifierString(const wstring &str);
 
   oBase(oEvent *poe);
   virtual ~oBase();

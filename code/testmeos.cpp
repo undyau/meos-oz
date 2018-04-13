@@ -125,11 +125,12 @@ void TestMeOS::runProtected(bool protect) const {
   gdi_main->setOnClearCb(0);
   gdi_main->setPostClearCb(0);
   gdi_main->clearPage(false, false);
+  gdi_main->dbRegisterSubCommand(0, "");
   subWindows.clear();
   oe_main->clear();
   gdi_main->isTestMode = true;
   showTab(TCmpTab);
-  string tp = oe_main->getPropertyString("TestPath", "");
+  wstring tp = oe_main->getPropertyString("TestPath", L"");
   oe_main->useDefaultProperties(true);
   oe_main->setProperty("FirstTime", 0);
   oe_main->setProperty("TestPath", tp);
@@ -155,6 +156,7 @@ void TestMeOS::runProtected(bool protect) const {
     status = FAILED;
     oe_main->useDefaultProperties(false);
     gdi_main->clearDialogAnswers(false);
+    gdi_main->dbRegisterSubCommand(0, "");
     gdi_main->isTestMode = false;
     subWindows.clear();
     message = ex.message;
@@ -166,10 +168,11 @@ void TestMeOS::runProtected(bool protect) const {
     status = FAILED;
     oe_main->useDefaultProperties(false);
     gdi_main->clearDialogAnswers(false);
+    gdi_main->dbRegisterSubCommand(0, "");
     gdi_main->isTestMode = false;
     subWindows.clear();
     //oe_main->setProperty("PayModes", pmOrig);
-    message = ex.what();
+    message = gdi_main->widen(ex.what());
     if (!protect)
       throw;
   }
@@ -177,17 +180,18 @@ void TestMeOS::runProtected(bool protect) const {
     status = FAILED;
     oe_main->useDefaultProperties(false);
     gdi_main->clearDialogAnswers(false);
+    gdi_main->dbRegisterSubCommand(0, "");
     gdi_main->isTestMode = false;
     subWindows.clear();
     //oe_main->setProperty("PayModes", pmOrig);
-    message = "Unknown Exception";
+    message = L"Unknown Exception";
     cleanup();
     if (!protect)
       throw;
   }
   //oe_main->setProperty("PayModes", pmOrig);
   oe_main->useDefaultProperties(false);
-    
+  gdi_main->dbRegisterSubCommand(0, "");
   for (size_t k = 0; k < tmpFiles.size(); k++)
     removeTempFile(tmpFiles[k]);
   tmpFiles.clear();
@@ -221,8 +225,8 @@ bool TestMeOS::runSpecific(int id) const {
   return false;
 }
 
-void TestMeOS::getTests(vector< pair<string, size_t> > &tl) const {
-  tl.push_back(make_pair(test, testId));
+void TestMeOS::getTests(vector< pair<wstring, size_t> > &tl) const {
+  tl.push_back(make_pair(gdi_main->widen(test), testId));
   for (size_t k = 0; k < subTests.size(); k++) {
     subTests[k]->getTests(tl);    
   }
@@ -270,7 +274,7 @@ string TestMeOS::selectString(const char *id, const char *data) const {
 
 string TestMeOS::select(const char *id, size_t data) const {
   string res = gdi_main->dbSelect(id, data);
-  mainMessageLoop(0, 50);
+  mainMessageLoop(0, 100);
   return res;
 }
 
@@ -306,7 +310,7 @@ void TestMeOS::click(const char *id, int extra) const {
 
 
 string TestMeOS::getText(const char *ctrl) const {
-  return gdi_main->getText(ctrl, false);
+  return gdi_main->narrow(gdi_main->getText(ctrl, false));
 }
 
 bool TestMeOS::isChecked(const char *ctrl) const {
@@ -318,6 +322,13 @@ void TestMeOS::assertEquals(const string &expected,
   if (expected != value)
     throw meosAssertionFailure("Expected " + expected + " but got " + value);
 }
+
+void TestMeOS::assertEquals(const wstring &expected,
+                            const wstring &value) const {
+  if (expected != value)
+    throw meosAssertionFailure(L"Expected " + expected + L" but got " + value);
+}
+
 
 void TestMeOS::assertEquals(int expected, int value) const {
   assertEquals(itos(expected), itos(value));
@@ -340,6 +351,13 @@ void TestMeOS::assertEquals(const char *message,
   assertEquals(string(message), string(expected), value);
 }
 
+void TestMeOS::assertEquals(const wstring &message,
+                            const wstring &expected,
+                            const wstring &value) const {
+  if (expected != value)
+    throw meosAssertionFailure(message + L": Expected " + expected + L" but got " + value);
+}
+
 void TestMeOS::checkString(const char *str, int count) const {
   int c = gdi_main->dbGetStringCount(str, false);
   assertEquals("String " + string(str) + " not found", itos(count), itos(c));
@@ -352,7 +370,7 @@ void TestMeOS::checkSubString(const char *str, int count) const {
 
 
 void TestMeOS::checkStringRes(const char *str, int count) const {
-  int c = gdi_main->dbGetStringCount(lang.tl(str), false);
+  int c = gdi_main->dbGetStringCount(gdi_main->narrow(lang.tl(str)), false);
   assertEquals("String " + string(str) + " not found", itos(count), itos(c));
 }
 
@@ -377,7 +395,7 @@ void TestMeOS::cleanup() const {
 }
 
 int TestMeOS::getResultModuleIndex(const char *tag) const {
-  vector< pair<int, pair<string, string> > > mol;
+  vector< pair<int, pair<string, wstring> > > mol;
   oe_main->getGeneralResults(false, mol, true);
   for (size_t k = 0; k < mol.size(); k++) {
     if (mol[k].second.first == tag) {
@@ -388,7 +406,7 @@ int TestMeOS::getResultModuleIndex(const char *tag) const {
 }
 
 int TestMeOS::getListIndex(const char *name) const {
-  vector< pair<string, size_t> > lst;
+  vector< pair<wstring, size_t> > lst;
   oe_main->getListContainer().getLists(lst, false, false, false);
   for (size_t k = 0; k < lst.size(); k++) {
     if (lst[k].first == lang.tl(name))
@@ -430,8 +448,8 @@ string TestMeOS::getTestFile(const char *relPath) const {
     return tp + "\\" + relPath;
 }
 
-string TestMeOS::getTempFile() const {
-  string fn = ::getTempFile();
+wstring TestMeOS::getTempFile() const {
+  wstring fn = ::getTempFile();
   tmpFiles.push_back(fn);
   return fn;
 }
@@ -443,11 +461,15 @@ void TestMeOS::tableCmd(const char *id) const {
 
 void TestMeOS::setTableText(int editRow, int editCol, const string &text) const {
   Table &t = gdi_main->getTable();
-  t.setTableText(*gdi_main, editRow, editCol, text);
+  t.setTableText(*gdi_main, editRow, editCol, gdi_main->widen(text));
   mainMessageLoop(0, 50);
 }
 
 string TestMeOS::getTableText(int editRow, int editCol) const {
   Table &t = gdi_main->getTable();
-  return t.getTableText(*gdi_main, editRow, editCol);
+  return gdi_main->narrow(t.getTableText(*gdi_main, editRow, editCol));
+}
+
+void TestMeOS::registerSubCommand(const string &cmd) const {
+  gdi_main->dbRegisterSubCommand(this, cmd);
 }

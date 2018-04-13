@@ -27,8 +27,9 @@
 //V2: ABCDEFGHIHJKMN
 //V31: a
 //V33: abcde
+//V35: abcde
 int getMeosBuild() {
-  string revision("$Rev: 543 $");
+  string revision("$Rev: 634 $");
   return 174 + atoi(revision.substr(5, string::npos).c_str());
 }
 
@@ -39,34 +40,34 @@ int getMeosBuild() {
 //V32: abcdefgh
 //V33: abcdefghij
 //V34: abcdfg
-string getMeosDate() {
-  string date("$Date: 2017-03-25 20:00:02 +0100 (lÃ¶, 25 mar 2017) $");
+wstring getMeosDate() {
+  wstring date(L"$Date: 2017-12-25 16:08:33 +0100 (mÃ¥, 25 dec 2017) $");
   return date.substr(7,10);
 }
 
-string getBuildType() {
-  return ""; // No parantheses (...)
+wstring getBuildType() {
+  return L"Snapshot"; // No parantheses (...)
 }
 
-string getMajorVersion() {
-  return "3.4";
+wstring getMajorVersion() {
+  return L"3.5";
 }
 
-string getMeosFullVersion() {
-  char bf[256];
-  string maj = getMajorVersion();
+wstring getMeosFullVersion() {
+  wchar_t bf[256];
+  wstring maj = getMajorVersion();
   if (getBuildType().empty())
-    sprintf_s(bf, "Version X#%s.%d, %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getMeosDate().c_str());
+    sprintf_s(bf, L"Version X#%s.%d, %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getMeosDate().c_str());
   else
-    sprintf_s(bf, "Version X#%s.%d, %s %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getBuildType().c_str(), getMeosDate().c_str());
+    sprintf_s(bf, L"Version X#%s.%d, %s %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getBuildType().c_str(), getMeosDate().c_str());
   return bf;
 }
 
-string getMeosCompectVersion() {
+wstring getMeosCompectVersion() {
   if (getBuildType().empty())
-    return getMajorVersion() + "." + itos(getMeosBuild());
+    return getMajorVersion() + L"." + itow(getMeosBuild());
   else
-    return getMajorVersion() + "." + itos(getMeosBuild()) + " (" + getBuildType() + ")";
+    return getMajorVersion() + L"." + itow(getMeosBuild()) + L" (" + getBuildType() + L")";
 }
 
 void getSupporters(vector<string> &supp)
@@ -108,7 +109,7 @@ void getSupporters(vector<string> &supp)
   supp.push_back("Oskarström OK");
   supp.push_back("Skogslöparna");
   supp.push_back("OK Milan");
-  supp.push_back("GoIF Tjalve");
+  supp.push_back("Tjalve IF");
   supp.push_back("OK Skärmen");
   supp.push_back("Østkredsen");
   supp.push_back("OK Roskilde");
@@ -169,4 +170,14 @@ void getSupporters(vector<string> &supp)
   supp.push_back("O-travel");
   supp.push_back("Bengt Bengtsson");
   supp.push_back("OK Landehof");
+  supp.push_back("OK Orinto");
+  supp.push_back("Bredaryds SOK");
+  supp.push_back("Thore Nilsson, Uddevalla OK");
+  supp.push_back("Timrå SOK");
+  supp.push_back("Åke Larsson, OK Hedströmmen");
+  supp.push_back("Avesta OK");
+  supp.push_back("Motionsorientering Göteborg");
+  supp.push_back("OK Måsen");
+  supp.push_back("IF Thor");
+  supp.push_back("SOS Jindrichuv Hradec");
 }

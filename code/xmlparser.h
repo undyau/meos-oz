@@ -51,13 +51,17 @@ struct xmldata
 
 struct xmlattrib
 {
-  xmlattrib(const char *t, char *d);
+
+  xmlattrib(const char *t, char *d, const xmlparser *parser);
   const char *tag;
   char *data;
   operator bool() const {return data!=0;}
 
   int getInt() const {if (data) return atoi(data); else return 0;}
   const char *get() const;
+  const wchar_t *wget() const;
+private:
+  const xmlparser *parser;
 };
 
 class ProgressWindow;
@@ -97,12 +101,14 @@ protected:
   bool parse(int maxobj);
 
   void convertString(const char *in, char *out, int maxlen) const;
+  void convertString(const char *in, wchar_t *out, int maxlen) const;
 
   // True if empty/zero values are excluded when writing
   bool cutMode;
 
   bool isUTF;
   char strbuff[buff_pre_alloc]; // Temporary buffer for processing (no threading allowed)
+  wchar_t strbuffw[buff_pre_alloc]; // Temporary buffer for processing (no threading allowed)
 
   ProgressWindow *progress;
   int lastIndex;
@@ -119,25 +125,41 @@ public:
   const xmlobject getObject(const char *pname) const;
 //	const char *getError();
 
-  void read(const string &file, int maxobj = 0);
+  void read(const wstring &file, int maxobj = 0);
   void readMemory(const string &mem, int maxobj);
 
   void write(const char *tag, const char *prop,
               const string &value);
+  void write(const char *tag, const char *prop,
+              const wstring &value);
   void write(const char *tag); // Empty case
   void write(const char *tag, const char *prop,
-             const char *value);
-  void write(const char *tag, const char *prop,
+             const wchar_t *value);
+  void writeBool(const char *tag, const char *prop,
              const bool value);
+
+  //void write(const char *tag, const char *prop,
+  //           const string &propValue, const string &value);
   void write(const char *tag, const char *prop,
-             const string &propValue, const string &value);
+             const wstring &propValue, const wstring &value);
+
+  //void write(const char *tag, const char *prop,
+  //           bool propValue, const string &value);
+  void writeBool(const char *tag, const char *prop,
+                 bool propValue, const wstring &value);
+
+  //void write(const char *tag, const char *prop,
+  //           const char *propValue, const string &value);
   void write(const char *tag, const char *prop,
-             bool propValue, const string &value);
-  void write(const char *tag, const char *prop,
-             const char *propValue, const string &value);
-  void write(const char *tag, const vector< pair<string, string> > &propValue, const string &value);
+             const wchar_t *propValue, const wstring &value);
+
+  //void write(const char *tag, const vector< pair<string, string> > &propValue, const string &value);
+  //void write(const char *tag, const vector< pair<string, string> > &propValue, const wstring &value);
+  void write(const char *tag, const vector< pair<string, wstring> > &propValue, const wstring &value);
 
   void write(const char *tag, const string &value);
+  void write(const char *tag, const wstring &value);
+  
   void write(const char *tag, int value);
 
   void writeBool(const char *tag, bool value);
@@ -146,23 +168,30 @@ public:
   void startTag(const char *tag);
   void startTag(const char *tag, const char *Property,
                 const string &Value);
-  void startTag(const char *tag, const vector<string> &propvalue);
+  //void startTag(const char *tag, const vector<string> &propvalue);
+
+  void startTag(const char *tag, const char *Property,
+                const wstring &Value);
+  void startTag(const char *tag, const vector<wstring> &propvalue);
+
 
   void endTag();
   int closeOut();
-  void openOutput(const char *file, bool useCutMode);
-  void openOutputT(const char *file, bool useCutMode, const string &type);
+  void openOutput(const wchar_t *file, bool useCutMode);
+  void openOutputT(const wchar_t *file, bool useCutMode, const string &type);
 
   void openMemoryOutput(bool useCutMode);
   void getMemoryOutput(string &res);
 
 
   const string &encodeXML(const string &input);
+  const string &encodeXML(const wstring &input);
 
-  xmlparser(gdioutput *utfConverter);
+  xmlparser();
   virtual ~xmlparser();
 
   friend class xmlobject;
+  friend struct xmlattrib;
 };
 
 class xmlobject
@@ -191,10 +220,26 @@ public:
     return 0;
   }
 
+  bool got(const char *pname) const {
+    xmlobject x(getObject(pname));
+    if (x)
+      return true;
+    else {
+      xmlattrib xa(getAttrib(pname));
+      if (xa)
+        return true;
+    }
+    return false;
+  }
+
   bool getObjectBool(const char *pname) const;
 
   string &getObjectString(const char *pname, string &out) const;
   char *getObjectString(const char *pname, char *out, int maxlen) const;
+
+  wstring &getObjectString(const char *pname, wstring &out) const;
+  wchar_t *getObjectString(const char *pname, wchar_t *out, int maxlen) const;
+
 
   void getObjects(xmlList &objects) const;
   void getObjects(const char *tag, xmlList &objects) const;
@@ -204,7 +249,11 @@ public:
     return n[0] == pname[0] && strcmp(n, pname)==0;
   }
 
-  const char *get() const {return parser->xmlinfo[index].data;}
+  const char *getRaw() const {return parser->xmlinfo[index].data;}
+  
+  const char *get() const;
+  const wchar_t *getw() const;
+
   int getInt() const {const char *d = parser->xmlinfo[index].data;
                       return d ? atoi(d) : 0;}
   __int64 getInt64() const {const char *d = parser->xmlinfo[index].data;

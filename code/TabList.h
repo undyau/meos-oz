@@ -34,7 +34,7 @@ protected:
   EStdListType currentListType;
   oListInfo currentList;
   string SelectedList;
-  string lastInputNumber;
+  wstring lastInputNumber;
   int lastLimitPer;
   bool lastInterResult;
   bool lastSplitState;
@@ -48,7 +48,7 @@ protected:
 
   static void createListButtons(gdioutput &gdi);
 
-  void generateList(gdioutput &gdi);
+  void generateList(gdioutput &gdi, bool forceUpdate = false);
   void selectGeneralList(gdioutput &gdi, EStdListType type);
 
   int offsetY;
@@ -78,7 +78,34 @@ private:
   TabList(const TabList &);
   const TabList &operator = (const TabList &);
   
+  string settingsTarget;
+  oListParam tmpSettingsParam;
+  void changeListSettingsTarget(gdioutput &oldWindow, gdioutput &newWindow);
+  void leavingList(const string &wnd);
+
+  pair<gdioutput *, TabList *> makeOwnWindow(gdioutput &gdi);
+
+  /** Set animation mode*/
+  void setAnimationMode(gdioutput &gdi);
+
+  static void getStartIndividual(oListParam &par, ClassConfigInfo &cnf);
+  static void getStartClub(oListParam &par);
+  static void getResultIndividual(oListParam &par, ClassConfigInfo &cnf);
+  static void getResultClub(oListParam &par, ClassConfigInfo &cnf);
+
+  static void getStartPatrol(oListParam &par, ClassConfigInfo &cnf);
+  static void getResultPatrol(oListParam &par, ClassConfigInfo &cnf);
+
+  static void getStartTeam(oListParam &par, ClassConfigInfo &cnf);
+  static void getResultTeam(oListParam &par, ClassConfigInfo &cnf);
+
+  static void getResultRogaining(oListParam &par, ClassConfigInfo &cnf);
+
+
 public:
+  /** Returns a collection of public lists. */
+  void static getPublicLists(oEvent &oe, vector<oListParam> &lists);
+
   bool loadPage(gdioutput &gdi);
   bool loadPage(gdioutput &gdi, const string &command);
   
@@ -94,6 +121,8 @@ public:
   void rebuildList(gdioutput &gdi);
   void settingsResultList(gdioutput &gdi);
 
+  void loadSettings(gdioutput &gdi, string targetTag);
+  void handleListSettings(gdioutput &gdi, BaseInfo &info, GuiEventType type, gdioutput &dest_gdi);
   enum PrintSettingsSelection {
     Splits = 0,
     StartInfo = 1,

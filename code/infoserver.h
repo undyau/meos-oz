@@ -42,8 +42,8 @@ class xmlbuffer {
 private:
   struct block {
     string tag;
-    vector<pair<string, string>> prop;
-    string value;
+    vector< pair<string, wstring> > prop;
+    wstring value;
     vector<xmlbuffer> subValues;
   };
 
@@ -51,16 +51,21 @@ private:
   bool complete;
 public:
   void setComplete(bool c) {complete = c;}
-  xmlbuffer &startTag(const char *tag, const vector< pair<string, string> > &prop);
+  xmlbuffer &startTag(const char *tag, const vector< pair<string, wstring> > &prop);
   void endTag();
   void write(const char *tag,
              const vector< pair<string, string> > &prop,
              const string &value);
 
+  void write(const char *tag,
+             const vector< pair<string, wstring> > &prop,
+             const wstring &value);
+
+
   size_t size() const {return blocks.size();}
   bool commit(xmlparser &xml, int count);
 
-  void startXML(xmlparser &xml, const string &dest);
+  void startXML(xmlparser &xml, const wstring &dest);
 };
 
 class InfoBase
@@ -93,7 +98,7 @@ typedef InfoBase * pInfoBase;
 
 class InfoRadioControl : public InfoBase {
   protected:
-    string name;
+    wstring name;
     bool synchronize(oControl &c, int number);
     void serialize(xmlbuffer &xml, bool diffOnly) const;
   public:
@@ -105,13 +110,14 @@ class InfoRadioControl : public InfoBase {
 
 class InfoClass : public InfoBase {
   protected:
-    string name;
+    wstring name;
     int sortOrder;
     vector< vector<int> > radioControls;
     vector<int> linearLegNumberToActual;
-    bool synchronize(oClass &c);
-    void serialize(xmlbuffer &xml, bool diffOnly) const;
   public:
+    bool synchronize(oClass &c, const set<int> &ctrls);
+    void serialize(xmlbuffer &xml, bool diffOnly) const;
+
     InfoClass(int id);
     virtual ~InfoClass() {}
 
@@ -120,12 +126,13 @@ class InfoClass : public InfoBase {
 
 class InfoOrganization : public InfoBase {
   protected:
-    string name;
-    bool synchronize(oClub &c);
-    void serialize(xmlbuffer &xml, bool diffOnly) const;
+    wstring name;
   public:
     InfoOrganization(int id);
     virtual ~InfoOrganization() {}
+
+    bool synchronize(oClub &c);
+    void serialize(xmlbuffer &xml, bool diffOnly) const;
 
     friend class InfoCompetition;
 };
@@ -141,7 +148,7 @@ struct RadioTime {
 
 class InfoBaseCompetitor : public InfoBase {
   protected:
-    string name;
+    wstring name;
     int organizationId;
     int classId;
 
@@ -161,10 +168,12 @@ class InfoCompetitor : public InfoBaseCompetitor {
     int inputTime;
     int totalStatus;
     bool synchronize(const InfoCompetition &cmp, oRunner &c);
-    void serialize(xmlbuffer &xml, bool diffOnly) const;
     bool changeTotalSt;
     bool changeRadio;
   public:
+    bool synchronize(bool useTotalResults, oRunner &c);
+    void serialize(xmlbuffer &xml, bool diffOnly) const;
+
     InfoCompetitor(int id);
     virtual ~InfoCompetitor() {}
 
@@ -175,9 +184,10 @@ class InfoTeam : public InfoBaseCompetitor {
   protected:
     // The outer level holds legs, the inner level holds (parallel/patrol) runners on each leg.
     vector< vector<int> > competitors;
+    public:
     bool synchronize(oTeam &t);
     void serialize(xmlbuffer &xml, bool diffOnly) const;
-  public:
+  
     InfoTeam(int id);
     virtual ~InfoTeam() {}
     friend class InfoCompetition;
@@ -185,12 +195,14 @@ class InfoTeam : public InfoBaseCompetitor {
 
 class InfoCompetition : public InfoBase {
 private:
-    string name;
-    string date;
-    string organizer;
-    string homepage;
+    wstring name;
+    wstring date;
+    wstring organizer;
+    wstring homepage;
 protected:
     bool forceComplete;
+
+    bool includeTotal;
 
     list<InfoBase *> toCommit;
 
@@ -201,13 +213,20 @@ protected:
     map<int, InfoTeam> teams;
 
     void needCommit(InfoBase &obj);
+   
+  public:
     void serialize(xmlbuffer &xml, bool diffOnly) const;
 
 
-  public:
-    const vector<int> &getControls(int classId, int legNumber) const;
-    bool synchronize(oEvent &oe, const set<int> &classes);
+    bool includeTotalResults() const {return includeTotal;}
+    void includeTotalResults(bool inc) {includeTotal = inc;}
 
+    const vector<int> &getControls(int classId, int legNumber) const;
+    bool synchronize(oEvent &oe, bool onlyCmp, const set<int> &classes, const set<int> &ctrls);
+    bool synchronize(oEvent &oe) {
+      set<int> dmy;
+      return synchronize(oe, true, dmy, dmy);
+    }
     void getCompleteXML(xmlbuffer &xml);
     void getDiffXML(xmlbuffer &xml);
 

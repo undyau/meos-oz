@@ -26,7 +26,7 @@ class oRunner;
 #include "gdioutput.h"
 
 struct SpeakerString {
-  string str;
+  wstring str;
   int format;
   bool hasTimer;
   int timer;
@@ -34,7 +34,7 @@ struct SpeakerString {
   string moveKey;
   GDICOLOR color;
   SpeakerString() : format(0), hasTimer(false), timer(0), timeout(NOTIMEOUT), color(colorDefault) {}
-  SpeakerString(int formatIn, const string &in) : str(in), format(formatIn), hasTimer(false),
+  SpeakerString(int formatIn, const wstring &in) : str(in), format(formatIn), hasTimer(false),
                                            timer(0), timeout(NOTIMEOUT),  color(colorDefault) {}
   SpeakerString(int formatIn, int timerIn, int timeoutIn = NOTIMEOUT) : format(formatIn),
                                            hasTimer(true), timer(timerIn),
@@ -45,18 +45,34 @@ class oSpeakerObject
 {
 public:
   struct RunningTime {
+    void reset() { time = 0; preliminary = 0; }
     int time;
     int preliminary;
     RunningTime() : time(0), preliminary(0) {}
   };
 
+  void reset() {
+    owner = 0;
+    bib.clear();
+    names.clear();
+    outgoingnames.clear();
+    resultRemark.clear();
+    club.clear();
+    startTimeS.clear();
+    status = StatusUnknown;
+    finishStatus = StatusUnknown;
+    useSinceLast = 0;
+    runningTime.reset();
+    runningTimeLeg.reset();
+    runningTimeSinceLast.reset();
+  }
   oRunner *owner;
-  string bib;
-  vector<string> names;
-  vector<string> outgoingnames;
+  wstring bib;
+  vector<wstring> names;
+  vector<wstring> outgoingnames;
   string resultRemark;
-  string club;
-  string startTimeS;
+  wstring club;
+  wstring startTimeS;
 
   bool useSinceLast;
   int place;

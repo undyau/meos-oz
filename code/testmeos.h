@@ -28,6 +28,7 @@ class BaseInfo;
 
 #include <vector>
 #include "TabBase.h"
+#include "subcommand.h"
 
 enum GDICOLOR;
 enum PropertyType;
@@ -40,12 +41,13 @@ enum TestStatus {
 };
 
 struct meosAssertionFailure {
-  meosAssertionFailure() {message = "MeOS assertion failure";};
-  meosAssertionFailure(const string &err) : message(err) {}
-  string message;
+  meosAssertionFailure() {message = L"MeOS assertion failure";};
+  meosAssertionFailure(const string &err) : message(err.begin(), err.end()) {}
+  meosAssertionFailure(const wstring &err) : message(err) {}
+  wstring message;
 };
 
-class TestMeOS {
+class TestMeOS : public SubCommand {
 private:
   oEvent *oe_main;
   gdioutput *gdi_main;
@@ -53,10 +55,10 @@ private:
   vector<TestMeOS *> subTests;
   void runProtected(bool protect) const;
   mutable list<TestMeOS> subWindows;
-  mutable vector<string> tmpFiles;
+  mutable vector<wstring> tmpFiles;
 
   mutable TestStatus status;
-  mutable string message;
+  mutable wstring message;
   int testId;
   int *testIdMain; // Pointer to main test id
 
@@ -69,6 +71,8 @@ protected:
   
   TestMeOS &registerTest(const TestMeOS &test);
 
+  void registerSubCommand(const string &cmd) const;
+
   void showTab(TabType type) const;
   
   void insertCard(int cardNo, const char *ser) const;
@@ -77,6 +81,10 @@ protected:
   void assertEquals(const string &expected, const string &value) const;
   void assertEquals(const char *message, const char *expected, const string &value) const;
   void assertEquals(const string &message, const string &expected, const string &value) const;
+
+  void assertEquals(const wstring &expected, const wstring &value) const;
+  void assertEquals(const wstring &message, const wstring &expected, const wstring &value) const;
+
 
   void assertTrue(const char *message, bool condition) const;
 
@@ -132,12 +140,15 @@ public:
   bool runSpecific(int id) const;
 
   void publish(gdioutput &gdi) const;
-  void getTests(vector< pair<string, size_t> > &tl) const;
+  void getTests(vector< pair<wstring, size_t> > &tl) const;
 
   string getTestFile(const char *relPath) const;
-  string getTempFile() const;
+  wstring getTempFile() const;
 
   virtual void run() const;
+
+  // Run a test sub command
+  virtual void subCommand(const string &cmd) const override {}
 
   TestMeOS(oEvent *oe, const string &test);
   TestMeOS(TestMeOS &tmIn, const char *test);

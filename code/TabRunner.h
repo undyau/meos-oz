@@ -31,7 +31,7 @@ class TabRunner :
 private:
   void addToolbar(gdioutput &gdi);
 
-  const string &getSearchString() const;
+  const wstring &getSearchString() const;
 
   void setCardNo(gdioutput &gdi, int cardNo);
 
@@ -41,8 +41,8 @@ private:
 
   void selectRunner(gdioutput &gdi, pRunner r);
 
-  string lastSearchExpr;
-  stdext::hash_set<int> lastFilter;
+  wstring lastSearchExpr;
+  unordered_set<int> lastFilter;
   DWORD timeToFill;
   int inputId;
   int searchCB(gdioutput &gdi, int type, void *data);
@@ -59,7 +59,7 @@ private:
 
   int cardModeStartY;
   int lastRace;
-  string lastFee;
+  wstring lastFee;
   int runnerId;
   bool ownWindow;
   bool listenToPunches;
@@ -92,6 +92,21 @@ private:
 
   static void autoGrowCourse(gdioutput &gdi);
 
+  void loadEconomy(gdioutput &gdi, oRunner &r);
+
+  class EconomyHandler : public GuiHandler {
+    int runnerId;
+    oEvent *oe;
+    oRunner &getRunner() const;
+  public:
+    void init(oRunner &r);
+    void handle(gdioutput &gdi, BaseInfo &info, GuiEventType type);
+    void save(gdioutput &gdi);
+  };
+
+  shared_ptr<EconomyHandler> ecoHandler;
+  EconomyHandler *getEconomyHandler(oRunner &r);
+
 protected:
   void clearCompetitionData();
 
@@ -104,6 +119,8 @@ public:
 
   bool loadPage(gdioutput &gdi);
   bool loadPage(gdioutput &gdi, int runnerId);
+
+
 
   TabRunner(oEvent *oe);
   ~TabRunner(void);

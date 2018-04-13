@@ -158,8 +158,8 @@ void gdioutput::printSetup(PrinterObject &po)
   pd.lCustData = 0L;
   pd.lpfnPrintHook = (LPPRINTHOOKPROC) NULL;
   pd.lpfnSetupHook = (LPSETUPHOOKPROC) NULL;
-  pd.lpPrintTemplateName = (LPSTR) NULL;
-  pd.lpSetupTemplateName = (LPSTR)  NULL;
+  pd.lpPrintTemplateName = (LPCWSTR) NULL;
+  pd.lpSetupTemplateName = (LPCWSTR)  NULL;
   pd.hPrintTemplate = (HANDLE) NULL;
   pd.hSetupTemplate = (HANDLE) NULL;
 
@@ -190,8 +190,8 @@ void gdioutput::printSetup(PrinterObject &po)
         po.DevMode=*dm;
         po.DevMode.dmSize=sizeof(po.DevMode);
       }
-      po.Driver=(char *)(dn)+dn->wDriverOffset;
-      po.Device=(char *)(dn)+dn->wDeviceOffset;
+      po.Driver=(wchar_t *)(dn)+dn->wDriverOffset;//XXX WCS
+      po.Device=(wchar_t *)(dn)+dn->wDeviceOffset;
       //GlobalUnlock(pd.hDevMode);
     }
     //GlobalUnlock(pd.hDevNames);
@@ -225,8 +225,8 @@ void gdioutput::print(pEvent oe, Table *t, bool printMeOSHeader, bool noMargin)
   pd.lCustData = 0L;
   pd.lpfnPrintHook = (LPPRINTHOOKPROC) NULL;
   pd.lpfnSetupHook = (LPSETUPHOOKPROC) NULL;
-  pd.lpPrintTemplateName = (LPSTR) NULL;
-  pd.lpSetupTemplateName = (LPSTR)  NULL;
+  pd.lpPrintTemplateName = (LPCWSTR) NULL;
+  pd.lpSetupTemplateName = (LPCWSTR)  NULL;
   pd.hPrintTemplate = (HANDLE) NULL;
   pd.hSetupTemplate = (HANDLE) NULL;
 
@@ -261,8 +261,8 @@ void gdioutput::print(pEvent oe, Table *t, bool printMeOSHeader, bool noMargin)
       po.DevMode=*dm;
       po.DevMode.dmSize=sizeof(po.DevMode);
     }
-    po.Driver=(char *)(dn)+dn->wDriverOffset;
-    po.Device=(char *)(dn)+dn->wDeviceOffset;
+    po.Driver=(wchar_t *)(dn)+dn->wDriverOffset;//XXX WCS
+    po.Device=(wchar_t *)(dn)+dn->wDeviceOffset;
     //GlobalUnlock(pd.hDevMode);
     //GlobalUnlock(pd.hDevNames);
   }
@@ -299,8 +299,8 @@ void gdioutput::print(PrinterObject &po, pEvent oe, bool printMeOSHeader, bool n
     pd.lCustData = 0L;
     pd.lpfnPrintHook = (LPPRINTHOOKPROC) NULL;
     pd.lpfnSetupHook = (LPSETUPHOOKPROC) NULL;
-    pd.lpPrintTemplateName = (LPSTR) NULL;
-    pd.lpSetupTemplateName = (LPSTR)  NULL;
+    pd.lpPrintTemplateName = (LPCWSTR) NULL;
+    pd.lpSetupTemplateName = (LPCWSTR)  NULL;
     pd.hPrintTemplate = (HANDLE) NULL;
     pd.hSetupTemplate = (HANDLE) NULL;
 
@@ -328,8 +328,8 @@ void gdioutput::print(PrinterObject &po, pEvent oe, bool printMeOSHeader, bool n
         po.DevMode.dmSize=sizeof(po.DevMode);
       }
 
-      po.Driver=(char *)(dn)+dn->wDriverOffset;
-      po.Device=(char *)(dn)+dn->wDeviceOffset;
+      po.Driver=(wchar_t *)(dn)+dn->wDriverOffset; //XXX WCS
+      po.Device=(wchar_t *)(dn)+dn->wDeviceOffset;
       po.hDC=CreateDC(po.Driver.c_str(), po.Device.c_str(), NULL, dm);
       GlobalUnlock(pd.hDevMode);
     }
@@ -357,8 +357,8 @@ bool gdioutput::startDoc(PrinterObject &po)
   int nError;
   di.cbSize = sizeof(DOCINFO);
 
-  char sb[256];
-  sprintf_s(sb, "MeOS");
+  wchar_t sb[256];
+  swprintf_s(sb, L"MeOS");
 
   di.lpszDocName = sb;
   di.lpszOutput = (LPTSTR) NULL;
@@ -375,7 +375,7 @@ bool gdioutput::startDoc(PrinterObject &po)
     if (nError == ERROR_CANCELLED)
       return false;
 
-    string err = "Printing failed (X: Y) Z#StartDoc#"+ itos(nError) + "#" + getErrorMessage(nError);
+    wstring err = L"Printing failed (X: Y) Z#StartDoc#"+ itow(nError) + L"#" + getErrorMessage(nError);
     throw meosException(err);
     //sprintf_s(sb, "Window's StartDoc API returned with error code %d,", nError);
     //alert("StartDoc error: " + getErrorMessage(nError));
@@ -478,7 +478,7 @@ bool gdioutput::doPrint(PrinterObject &po, PageInfo &pageInfo, pEvent oe)
         po.freePrinter();
         OffsetY = sOffsetY;
         OffsetX = sOffsetX;
-        alert("StartPage error: " + getErrorMessage(nError));
+        alert(L"StartPage error: " + getErrorMessage(nError));
         return false;
       }
 
@@ -494,7 +494,7 @@ bool gdioutput::doPrint(PrinterObject &po, PageInfo &pageInfo, pEvent oe)
       nError=GetLastError();
       DeleteDC(po.hDC);
       po.hDC=0;
-      alert("EndDoc error: " + getErrorMessage(nError));
+      alert(L"EndDoc error: " + getErrorMessage(nError));
       return false;
     }
   }
@@ -561,8 +561,8 @@ void PageSetup(HWND hWnd, PrinterObject &po)
 
     if (dn)
     {
-      char *driver=(char *)(dn)+dn->wDriverOffset;
-      char *device=(char *)(dn)+dn->wDeviceOffset;
+      wchar_t *driver=(wchar_t *)(dn)+dn->wDriverOffset;//WCS
+      wchar_t *device=(wchar_t *)(dn)+dn->wDeviceOffset;
 
       HDC hDC=CreateDC(driver, device, NULL, dm);
 
@@ -623,6 +623,11 @@ struct PrintItemInfo {
     const TextInfo *ti = dynamic_cast<const TextInfo *>(obj);
     return ti && ti->format == pageNewPage;
   }
+
+  bool isNoPrint() const {
+    const TextInfo *ti = dynamic_cast<const TextInfo *>(obj);
+    return ti && gdioutput::skipTextRender(ti->format);
+  }
 };
 
 void PageInfo::renderPages(const list<TextInfo> &tl,
@@ -645,13 +650,16 @@ void PageInfo::renderPages(const list<TextInfo> &tl,
     const TextInfo &text = *it;
     if (text.format == 10)
       continue;
+    if (!text.isFormatInfo()) {
+      if (currentYP > text.yp) {
+        needSort = true;
+      }
 
-    if (currentYP > text.yp) {
-      needSort = true;
+      minX = min(minX, (float)it->textRect.left);
+      top = min(top, text.yp);
     }
-    minX = min(minX, (float)it->textRect.left);
-    top = min(top, text.yp);
     currentYP = text.yp;
+    
     indexedTL.push_back(PrintItemInfo(currentYP, &text));
   }
 
@@ -667,7 +675,7 @@ void PageInfo::renderPages(const list<TextInfo> &tl,
   bool addPage = true;
   bool wasOrphan = false;
   int offsetY = 0;
-  string infoText;
+  wstring infoText;
   int extraLimit = 0;
   for (size_t k = 0; k < indexedTL.size(); k++) {
     const TextInfo *tlp = dynamic_cast<const TextInfo *>(indexedTL[k].obj);
@@ -682,12 +690,12 @@ void PageInfo::renderPages(const list<TextInfo> &tl,
       RectangleInfo &r = pages.back().rectangles.back();
 
       ///xxxx
-      r.rc.left = (r.rc.left - minX) * pi.scaleX + pi.leftMargin;
-      r.rc.right = (r.rc.right - minX) * pi.scaleX + pi.leftMargin;
+      r.rc.left = LONG((r.rc.left - minX) * pi.scaleX + pi.leftMargin);
+      r.rc.right = LONG((r.rc.right - minX) * pi.scaleX + pi.leftMargin);
       
       int off = invertHeightY ? (r.rc.bottom - r.rc.top) : 0;
-      r.rc.top = (r.rc.top + offsetY + off) * pi.scaleY + pi.topMargin;
-      r.rc.bottom = (r.rc.bottom + offsetY + off) * pi.scaleY + pi.topMargin;
+      r.rc.top = LONG((r.rc.top + offsetY + off) * pi.scaleY + pi.topMargin);
+      r.rc.bottom = LONG((r.rc.bottom + offsetY + off) * pi.scaleY + pi.topMargin);
       continue;
     }
 
@@ -737,6 +745,8 @@ void PageInfo::renderPages(const list<TextInfo> &tl,
 
     if (k + 1 < indexedTL.size() && tlp->yp != indexedTL[k+1].yp) {
       size_t j = k + 1;
+      while (j + 1 < indexedTL.size() && indexedTL[j].isNoPrint() && !indexedTL[j].isNewPage())
+        j++;
 
       // Required new page
       if (indexedTL[j].isNewPage()) {
@@ -811,23 +821,23 @@ void PageInfo::renderPages(const list<TextInfo> &tl,
   nPagesTotal = pages.size();
 }
 
-string PageInfo::pageInfo(const RenderedPage &page) const {
+wstring PageInfo::pageInfo(const RenderedPage &page) const {
   if (printHeader) {
-    char bf[256];
+    wchar_t bf[256];
     if (nPagesTotal > 1) {
       if (!page.info.empty())
-        sprintf_s(bf, "MeOS %s, %s, (%d/%d)", getLocalTime().c_str(),
+        swprintf_s(bf, L"MeOS %s, %s, (%d/%d)", getLocalTime().c_str(),
                   page.info.c_str(), page.nPage, nPagesTotal);
       else
-        sprintf_s(bf, "MeOS %s, (%d/%d)", getLocalTime().c_str(), page.nPage, nPagesTotal);
+        swprintf_s(bf, L"MeOS %s, (%d/%d)", getLocalTime().c_str(), page.nPage, nPagesTotal);
     }
     else {
       if (!page.info.empty())
-        sprintf_s(bf, "MeOS %s, %s", getLocalTime().c_str(), page.info.c_str());
+        swprintf_s(bf, L"MeOS %s, %s", getLocalTime().c_str(), page.info.c_str());
       else
-        sprintf_s(bf, "MeOS %s", getLocalTime().c_str());
+        swprintf_s(bf, L"MeOS %s", getLocalTime().c_str());
     }
     return bf;
   }
-  else return "";
+  else return L"";
 }
