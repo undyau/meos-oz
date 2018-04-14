@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ namespace MeOSUtil {
 string convertSystemTimeN(const SYSTEMTIME &st);
 string convertSystemDateN(const SYSTEMTIME &st);
 string convertSystemTimeOnlyN(const SYSTEMTIME &st);
-
+extern int defaultCodePage;
 
 DWORD mainThreadId = -1;
 StringCache &StringCache::getInstance() {
@@ -180,7 +180,7 @@ SYSTEMTIME Int64SecondToSystemTime(__int64 time) {
 //2014-11-03 07:02:00
 string convertSystemTimeN(const SYSTEMTIME &st)
 {
-  char bf[32];
+  char bf[64];
   sprintf_s(bf, "%d-%02d-%02d %02d:%02d:%02d", st.wYear, st.wMonth, st.wDay,
     st.wHour, st.wMinute, st.wSecond);
 
@@ -190,7 +190,7 @@ string convertSystemTimeN(const SYSTEMTIME &st)
 //2014-11-03 07:02:00
 wstring convertSystemTime(const SYSTEMTIME &st)
 {
-  wchar_t bf[32];
+  wchar_t bf[64];
   swprintf_s(bf, L"%d-%02d-%02d %02d:%02d:%02d", st.wYear, st.wMonth, st.wDay,
     st.wHour, st.wMinute, st.wSecond);
 
@@ -1302,6 +1302,12 @@ static double stringDistance(const wchar_t *a, int al, const wchar_t *b, int bl)
   return (sqrt(dist)+mfactor*mfactor)/double(al);
 }
 
+double stringDistanceAssymetric(const wstring &target, const wstring &sample) {
+  double d = stringDistance(target.c_str(), target.length(), sample.c_str(), sample.length());
+  return min(1.0, d);
+}
+
+
 double stringDistance(const wchar_t *a, const wchar_t *b)
 {
   int al = wcslen(a);
@@ -2165,7 +2171,7 @@ void processGeneralTime(const wstring &generalTime, wstring &meosTime, wstring &
 }
 
 void string2Wide(const string &in, wstring &out) {
-  int cp = 1252;
+  int cp = defaultCodePage;
   if (in.empty()) {
     out = L"";
     return;

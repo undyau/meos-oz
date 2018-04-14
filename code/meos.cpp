@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -65,7 +65,12 @@
 #include "meosexception.h"
 #include "parser.h"
 #include "restserver.h"
+#include "autocomplete.h"
+#include "image.h"
 
+int defaultCodePage = 1252;
+
+Image image;
 gdioutput *gdi_main=0;
 oEvent *gEvent=0;
 SportIdent *gSI=0;
@@ -150,6 +155,9 @@ void LoadPage(gdioutput &gdi, TabType type) {
 static wchar_t settings[260];
 // Startup path
 static wchar_t programPath[MAX_PATH];
+// Exe path
+static wchar_t exePath[MAX_PATH];
+
 
 void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
   MSG msg;
@@ -176,12 +184,20 @@ void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
   }
 }
 
+INT_PTR CALLBACK splashDialogProc(
+  _In_ HWND   hwndDlg,
+  _In_ UINT   uMsg,
+  _In_ WPARAM wParam,
+  _In_ LPARAM lParam
+);
 
 int APIENTRY WinMain(HINSTANCE hInstance,
   HINSTANCE hPrevInstance,
   LPSTR     lpCmdLine,
   int       nCmdShow)
 {
+  hInst = hInstance; // Store instance handle in our global variable
+
   atexit(dumpLeaks);	//
   _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -192,6 +208,15 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   else if (strstr(lpCmdLine, "-test") != 0) {
     enableTests = true;
   }
+
+  HWND hSplash = nullptr;
+  if (strstr(lpCmdLine, "-nosplash") == 0) {
+    hSplash = CreateDialog(hInstance, MAKEINTRESOURCE(IDD_SPLASH), nullptr, splashDialogProc);
+    ShowWindow(hSplash, SW_SHOW);
+    UpdateWindow(hSplash);
+  }
+
+  DWORD splashStart = GetTickCount();
 
   for (int k = 0; k < 100; k++) {
     RunnerStatusOrderMap[k] = 0;
@@ -210,6 +235,19 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   StringCache::getInstance().init();
 
   GetCurrentDirectory(MAX_PATH, programPath);
+  
+  GetModuleFileName(NULL, exePath, MAX_PATH);
+  int lastDiv = -1;
+  for (int i = 0; i < MAX_PATH; i++) {
+    if (exePath[i] == 0)
+      break;
+    if (exePath[i] == '\\' || exePath[i] == '/')
+      lastDiv = i;
+  }
+  if (lastDiv != -1)
+    exePath[lastDiv] = 0;
+  else
+    exePath[0] = 0;
 
   getUserFile(settings, L"meoswpref.xml");
   Parser::test();
@@ -221,7 +259,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 
   HACCEL hAccelTable;
 
-  gdi_main = new gdioutput("main", 1.0, 0);
+  gdi_main = new gdioutput("main", 1.0);
   gdi_extra.push_back(gdi_main);
 
   try {
@@ -251,9 +289,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   lang.get().addLangResource(L"Deutsch", L"105");
   lang.get().addLangResource(L"Dansk", L"106");
   lang.get().addLangResource(L"Français", L"110");
-  lang.get().addLangResource(L"Russian (ISO 8859-5)", L"107");
-  lang.get().addLangResource(L"English (ISO 8859-2)", L"108");
-  lang.get().addLangResource(L"English (ISO 8859-8)", L"109");
+  lang.get().addLangResource(L"Russian", L"107");
 
   if (fileExist(L"extra.lng")) {
     lang.get().addLangResource(L"Extraspråk", L"extra.lng");
@@ -266,6 +302,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   }
 
   wstring defLang = gEvent->getPropertyString("Language", L"English");
+
+  defaultCodePage = gEvent->getPropertyInt("CodePage", 1252);
 
   // Backward compatibility
   if (defLang==L"103")
@@ -283,20 +321,37 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   }
 
   try {
+    vector<wstring> res;
+#ifdef _DEBUG
+    expandDirectory(L".\\..\\Lists\\", L"*.lxml", res);
+    expandDirectory(L".\\..\\Lists\\", L"*.listdef", res);
+#endif
+    
+    if (exePath[0]) {
+      expandDirectory(exePath, L"*.lxml", res);
+      expandDirectory(exePath, L"*.listdef", res);
+    }
+
+    expandDirectory(programPath, L"*.lxml", res);
+    expandDirectory(programPath, L"*.listdef", res);
+
     wchar_t listpath[MAX_PATH];
     getUserFile(listpath, L"");
-    vector<wstring> res;
     expandDirectory(listpath, L"*.lxml", res);
     expandDirectory(listpath, L"*.listdef", res);
-#
-#ifdef _DEBUG
-    expandDirectory(L".\\Lists\\", L"*.lxml", res);
-    expandDirectory(L".\\Lists\\", L"*.listdef", res);
-#endif
-    wstring err;
 
+    wstring err;
+    set<wstring> processed;
     for (size_t k = 0; k<res.size(); k++) {
       try {
+
+        wchar_t filename[128];
+        wchar_t ext[32];
+        _wsplitpath_s(res[k].c_str(), NULL, 0, NULL, 0, filename, 128, ext, 32);
+        wstring fullFile = wstring(filename) + ext;
+        if (processed.count(fullFile))
+          continue;
+        processed.insert(fullFile);
         xmlparser xml;
 
         wcscpy_s(listpath, res[k].c_str());
@@ -352,6 +407,11 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   gdi_main->setFont(gEvent->getPropertyInt("TextSize", 0),
                     gEvent->getPropertyString("TextFont", L"Arial"));
 
+  if (hSplash != nullptr) {
+    DWORD startupToc = GetTickCount() - splashStart;
+    Sleep(min<int>(1000, max<int>(0, 700 - startupToc)));
+  }
+
   // Perform application initialization:
   if (!InitInstance (hInstance, nCmdShow)) {
     return FALSE;
@@ -374,7 +434,9 @@ int APIENTRY WinMain(HINSTANCE hInstance,
       (HINSTANCE) NULL, GetCurrentThreadId());
 
   hAccelTable = LoadAccelerators(hInstance, (LPCTSTR)IDC_MEOS);
-
+    
+  DestroyWindow(hSplash);
+  
   initMySQLCriticalSection(true);
   // Main message loop:
   mainMessageLoop(hAccelTable, 0);
@@ -467,6 +529,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
   wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
   RegisterClassEx(&wcex);
 
+  AutoCompleteInfo::registerAutoClass();
+
   return true;
 }
 
@@ -551,12 +615,15 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
   }
   else if (wParam==VK_RETURN && (lParam & (1<<31))) {
     if (gdi)
-      gdi->Enter();
+      gdi->enter();
   }
   else if (wParam==VK_UP) {
     bool c = false;
     if (gdi  && (lParam & (1<<31)))
-      c = gdi->UpDown(1);
+      c = gdi->upDown(1);
+
+    if (gdi && gdi->hasAutoComplete())
+      return 1;
 
     if (!c  && !(lParam & (1<<31)) && !(gdi && gdi->lockUpDown))
       SendMessage(hWnd, WM_VSCROLL, MAKELONG(SB_LINEUP, 0), 0);
@@ -570,7 +637,10 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
   else if (wParam==VK_DOWN) {
     bool c = false;
     if (gdi && (lParam & (1<<31)))
-      c = gdi->UpDown(-1);
+      c = gdi->upDown(-1);
+
+    if (gdi && gdi->hasAutoComplete())
+      return 1;
 
     if (!c && !(lParam & (1<<31)) && !(gdi && gdi->lockUpDown))
       SendMessage(hWnd, WM_VSCROLL, MAKELONG(SB_LINEDOWN, 0), 0);
@@ -585,7 +655,7 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
   }
   else if (wParam==VK_ESCAPE && (lParam & (1<<31))) {
     if (gdi)
-      gdi->Escape();
+      gdi->escape();
   }
   else if (wParam==VK_F2) {
     ProgressWindow pw(hWnd);
@@ -667,8 +737,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
   HWND hWnd;
 
-  hInst = hInstance; // Store instance handle in our global variable
-  //WS_EX_CONTROLPARENT
   HWND hDskTop=GetDesktopWindow();
   RECT rc;
   GetClientRect(hDskTop, &rc);
@@ -793,7 +861,7 @@ gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x,
 
   ShowWindow(hWnd, SW_SHOWNORMAL);
   UpdateWindow(hWnd);
-  gdioutput *gdi = new gdioutput(tag, 1.0, 0);
+  gdioutput *gdi = new gdioutput(tag, 1.0);
   gdi->setFont(gEvent->getPropertyInt("TextSize", 0),
                gEvent->getPropertyString("TextFont", L"Arial"));
 
@@ -1101,7 +1169,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       //The card has been read and posted to a synchronized
       //queue by different thread. Read and process this card.
       {
-        SICard sic;
+        SICard sic(ConvertedTimeStatus::Unknown);
         while (gSI && gSI->getCard(sic))
           InsertSICard(*gdi_main, sic);
         break;
@@ -1639,9 +1707,9 @@ void Setup(bool overwrite, bool overwriteAll)
   wchar_t dir[260];
   GetCurrentDirectory(260, dir);
   vector<wstring> dyn;
-  expandDirectory(dir, L"*.lxml", dyn);
-  expandDirectory(dir, L"*.listdef", dyn);
-  expandDirectory(dir, L"*.meos", dyn);
+  if (overwrite)
+    expandDirectory(dir, L"*.meos", dyn);
+  
   for (size_t k = 0; k < dyn.size(); k++)
     toInstall.push_back(make_pair(dyn[k], true));
 
@@ -1803,4 +1871,37 @@ void removeTempFiles() {
     RemoveDirectory(tempPath.c_str());
     tempPath.clear();
   }
+}
+
+INT_PTR CALLBACK splashDialogProc(
+  _In_ HWND   hwndDlg,
+  _In_ UINT   uMsg,
+  _In_ WPARAM wParam,
+  _In_ LPARAM lParam
+) {
+  PAINTSTRUCT ps;
+
+  switch (uMsg) {
+  case WM_INITDIALOG:
+   // SetWindowLong(hwndDlg, GWL_EXSTYLE, GetWindowLong(hwndDlg, GWL_EXSTYLE) | WS_EX_LAYERED);
+    // Make this window 40% alpha
+    //SetLayeredWindowAttributes(hwndDlg, 0, (255 * 60) / 100, LWA_ALPHA);
+    break;
+
+  case WM_PAINT: {
+    HDC hdc = BeginPaint(hwndDlg, &ps);
+    RECT rt;
+    GetClientRect(hwndDlg, &rt);
+    image.loadImage(IDI_SPLASHIMAGE, Image::ImageMethod::MonoAlpha);
+    int h = image.getHeight(IDI_SPLASHIMAGE);
+    int w = image.getWidth(IDI_SPLASHIMAGE);
+    image.drawImage(IDI_SPLASHIMAGE, Image::ImageMethod::MonoAlpha, hdc, (rt.right - w) / 2, (rt.bottom - h) / 2, w, h);
+    EndPaint(hwndDlg, &ps);
+    break;
+  }
+  case WM_ERASEBKGND:
+    return 1;
+  }
+
+  return 0;
 }

@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1688,7 +1688,7 @@ void oClass::updateChangedCoursePool() {
     }
   }
 
-  SICard card;
+  SICard card(ConvertedTimeStatus::Unknown);
   oRunnerList::iterator it;
   for (it = oe->Runners.begin(); it != oe->Runners.end(); ++it) {
     if (it->isRemoved() || it->Class != this)
@@ -4094,13 +4094,33 @@ void oClass::setDrawVacant(int st) {
 }
 
 int oClass::getDrawNumReserved() const {
-  return getDCI().getInt("Reserved");    
+  return getDCI().getInt("Reserved") & 0xFF;    
 }
 
 void oClass::setDrawNumReserved(int st) {
-  getDI().setInt("Reserved", st);
+  int v = getDCI().getInt("Reserved") & 0xFF00;
+  getDI().setInt("Reserved", v|st);
 }
 
+void oClass::setDrawSpecification(const vector<DrawSpecified> &spec) {
+  int flag = 0;
+  for (auto ds : spec) {
+    flag |= int(ds);
+  }
+  int v = getDrawNumReserved();
+  getDI().setInt("Reserved", v | (flag<<8));
+}
+
+set<oClass::DrawSpecified> oClass::getDrawSpecification() const {
+  int v = (getDCI().getInt("Reserved") & 0xFF00) >> 8;
+  set<DrawSpecified> res;
+ 
+  for (auto dk : DrawKeys) {
+    if (int(dk) & v)
+      res.insert(dk);
+  }
+  return res;
+}
 
 void oClass::initClassId(oEvent &oe) {
   vector<pClass> cls;
@@ -4264,6 +4284,17 @@ void oClass::loadQualificationFinalScheme(const wstring &fileName) {
     inst->synchronize();
   }
   synchronize();
+  for (oRunner &r : oe->Runners) {
+    if (r.getClassRef(false) == this) {
+      pTeam t = r.getTeam();
+      if (t == 0) {
+        t = oe->addTeam(r.getName(), r.getClubId(), getId());
+        t->setStartNo(r.getStartNo(), false);
+        t->setRunner(0, &r, true);
+      }
+      r.synchronizeAll();
+    }
+  }
 }
 
 void oClass::updateFinalClasses(oRunner *causingResult, bool updateStartNumbers) {
@@ -4387,4 +4418,42 @@ void oClass::updateFinalClasses(oRunner *causingResult, bool updateStartNumbers)
       }
     }
   }
+}
+
+vector<pair<wstring, size_t>> oClass::getAllFees() const {
+  set<int> fees;
+  int f = getDCI().getInt("ClassFee");
+  if (f > 0)
+    fees.insert(f);
+
+  f = getDCI().getInt("ClassFeeRed");
+  if (f > 0)
+    fees.insert(f);
+
+  f = getDCI().getInt("HighClassFee");
+  if (f > 0)
+    fees.insert(f);
+
+  f = getDCI().getInt("HighClassFeeRed");
+  if (f > 0)
+    fees.insert(f);
+
+  if (fees.empty()) {
+    f = oe->getDCI().getInt("EliteFee");
+    if (f > 0)
+      fees.insert(f);
+
+    f = oe->getDCI().getInt("EntryFee");
+    if (f > 0)
+      fees.insert(f);
+
+    f = oe->getDCI().getInt("YouthFee");
+    if (f > 0)
+      fees.insert(f);
+  }
+  vector< pair<wstring, size_t> > ff;
+  for (set<int>::iterator it = fees.begin(); it != fees.end(); ++it)
+    ff.emplace_back(oe->formatCurrency(*it), *it);
+
+  return ff;
 }

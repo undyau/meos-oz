@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -724,7 +724,7 @@ void oRunner::addPunches(pCard card, vector<int> &missingPunches) {
   updateChanged();
 
   if (card) {
-    if (CardNo==0)
+    if (card->cardNo > 0)
       CardNo=card->cardNo;
     //315422
     assert(card->tOwner==0 || card->tOwner==this);
@@ -740,7 +740,7 @@ void oRunner::addPunches(pCard card, vector<int> &missingPunches) {
       int numCtrlLong = mainCourse->getNumControls();
       int numCtrlShort = shortVersion->getNumControls();
 
-      SICard sic;
+      SICard sic(ConvertedTimeStatus::Unknown);
       Card->getSICard(sic);
       int level = 0;
       while (mainCourse->distance(sic) < 0 && abs(numCtrl-numCtrlShort) < abs(numCtrl-numCtrlLong)) {
@@ -960,6 +960,7 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
   if (Card) {
     for (p_it=Card->punches.begin(); p_it!=Card->punches.end(); ++p_it) {
         p_it->tRogainingIndex = -1;
+        p_it->anyRogainingMatchControlId = -1;
         p_it->tRogainingPoints = 0;
         p_it->isUsed = false;
         p_it->tIndex = -1;
@@ -1061,6 +1062,7 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
   // Reset rogaining
   for (p_it=Card->punches.begin(); p_it!=Card->punches.end(); ++p_it) {
     p_it->tRogainingIndex = -1;
+    p_it->anyRogainingMatchControlId = -1;
     p_it->tRogainingPoints = 0;
   }
 
@@ -1255,11 +1257,12 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
     for (p_it=Card->punches.begin(); p_it != Card->punches.end(); ++p_it) {
       pair<int, int> pt;
       if (rogaining.lookup(p_it->Type, pt)) {
+        p_it->anyRogainingMatchControlId = course->Controls[pt.first]->getId();
         if (visitedControls.count(pt.first) == 0) {
           visitedControls.insert(pt.first); // May noy be revisited
           p_it->isUsed = true;
           p_it->tRogainingIndex = pt.first;
-          p_it->tMatchControlId = course->Controls[pt.first]->getId();
+          p_it->tMatchControlId = p_it->anyRogainingMatchControlId;
           p_it->tRogainingPoints = pt.second;
           tRogaining.push_back(make_pair(course->Controls[pt.first], p_it->getAdjustedTime()));
           splitTimes[pt.first].setPunchTime(p_it->getAdjustedTime());
@@ -1952,6 +1955,17 @@ bool oRunner::operator<(const oRunner &c) const {
         }
       }
     }
+  }
+  else if (oe->CurrentSortOrder == CourseStartTime) {
+    const pCourse crs1 = getCourse(false);
+    const pCourse crs2 = c.getCourse(false);
+    if (crs1 != crs2) {
+      int id1 = crs1 ? crs1->getId() : 0;
+      int id2 = crs2 ? crs2->getId() : 0;
+      return id1 < id2;
+    }
+    else if (tStartTime != c.tStartTime)
+      return tStartTime < c.tStartTime;
   }
   else if (oe->CurrentSortOrder==ClassStartTimeClub) {
     if (myClass != cClass)
@@ -4731,17 +4745,25 @@ bool oRunner::matchName(const wstring &pname) const
   return nMatched >= min<int>(myNames.size(), 2);
 }
 
-bool oRunner::autoAssignBib() {
+oRunner::BibAssignResult oRunner::autoAssignBib() {
   if (Class == 0 || !getBib().empty())
-    return !getBib().empty();
+    return BibAssignResult::NoBib;
 
   int maxbib = 0;
   wchar_t pattern[32];
   int noBib = 0;
   int withBib = 0;
+  unordered_set<wstring> allBibs;
+  allBibs.reserve(oe->Runners.size());
+
   for(oRunnerList::iterator it = oe->Runners.begin(); it !=oe->Runners.end();++it) {
+    if (it->isRemoved())
+      continue;
+
+    const wstring &bib = it->getBib();
+    allBibs.insert(bib);
+
     if (it->Class == Class) {
-      const wstring &bib = it->getBib();
       if (!bib.empty()) {
         withBib++;
         int ibib = oClass::extractBibPattern(bib, pattern); 
@@ -4755,10 +4777,13 @@ bool oRunner::autoAssignBib() {
   if (maxbib>0 && withBib>noBib) {
     wchar_t bib[32];
     swprintf_s(bib, pattern, maxbib+1);
-    setBib(bib, maxbib+1, true, false);
-    return true;
+    wstring nBib = bib;
+    if (allBibs.count(nBib))
+      return BibAssignResult::Failed; // Bib already use. Do not allow duplicates.
+    setBib(nBib, maxbib+1, true, false);
+    return BibAssignResult::Assigned;
   }
-  return false;
+  return BibAssignResult::NoBib;
 }
 
 void oRunner::getSplitAnalysis(vector<int> &deltaTimes) const {

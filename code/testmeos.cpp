@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -376,7 +376,7 @@ void TestMeOS::checkStringRes(const char *str, int count) const {
 
 
 void TestMeOS::insertCard(int cardNo, const char *ser) const {
-  SICard sic;
+  SICard sic(ConvertedTimeStatus::Unknown);
   sic.CardNumber = cardNo;
   sic.deserializePunches(ser);
   TabSI::getSI(*gdi_main).addCard(sic);

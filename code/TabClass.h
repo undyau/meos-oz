@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -70,11 +70,14 @@ class TabClass :
   void save(gdioutput &gdi, bool skipReload);
   void legSetup(gdioutput &gdi);
   vector<ClassInfo> cInfo;
-
+  void saveDrawSettings() const;
+  
   map<int, ClassInfo> cInfoCache;
 
   DrawInfo drawInfo;
   void setMultiDayClass(gdioutput &gdi, bool hasMulti, DrawMethod defaultMethod);
+  set<DrawMethod> getSupportedDrawMethods(bool multiDay) const;
+
   void drawDialog(gdioutput &gdi, DrawMethod method, const oClass &cls);
 
   void pursuitDialog(gdioutput &gdi);
@@ -135,7 +138,7 @@ class TabClass :
 
   void updateSplitDistribution(gdioutput &gdi, int numInClass, int tot) const;
 
-  DrawMethod getDefaultMethod(bool allowPursuit) const;
+  DrawMethod getDefaultMethod(const set<DrawMethod> &allowedValues) const;
 
   void enableLoadSettings(gdioutput &gdi);
 
@@ -146,6 +149,10 @@ class TabClass :
 
   void setLockForkingState(gdioutput &gdi, bool poolState, bool lockState);
 
+  void loadBasicDrawSetup(gdioutput &gdi, int &bx, int &by, const wstring& firstStart, 
+                          int maxNumControl, const wstring& minInterval, const wstring& vacances, const set<int> &clsId);
+
+  void loadReadyToDistribute(gdioutput &gdi, int &bx, int &by);
 public:
   
   void clearCompetitionData();

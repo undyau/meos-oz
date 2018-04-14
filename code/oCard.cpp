@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -463,6 +463,7 @@ bool oCard::isCardRead(const SICard &card) const
 void oCard::getSICard(SICard &card) const {
   card.clear(0);
   card.CardNumber = cardNo;
+  card.convertedTime = ConvertedTimeStatus::Done;
   oPunchList::const_iterator it;
   for (it = punches.begin(); it != punches.end(); ++it) {
     if (it->Type>30)

@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -140,7 +140,6 @@ bool TabCompetition::save(gdioutput &gdi, bool write)
 	}
 
   oe->synchronize();
-  if (gSI) gSI->setZeroTime(oe->getZeroTimeNum());
 
   gdi.setWindowTitle(oe->getTitleName());
   gdi.setText("Date", oe->getDate());
@@ -165,7 +164,6 @@ bool TabCompetition::importFile(HWND hWnd, gdioutput &gdi)
 
   gdi.setWaitCursor(true);
   if (oe->open(fileName, true)) {
-    if (gSI) gSI->setZeroTime(oe->getZeroTimeNum());
     gdi.setWindowTitle(oe->getTitleName());
     resetSaveTimer();
     return true;
@@ -1544,11 +1542,12 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
         gdi.dropLine();
         gdi.addString("", 1, "Behandlar tävlingsdata").setColor(colorGreen);
         set<int> noFilter;
+        string noType;
 
         if (createNew && id>0) {
           gdi.addString("", 1, "Skapar ny tävling");
           oe->newCompetition(L"New");
-          oe->importXML_EntryData(gdi, tEvent, false, false, noFilter);
+          oe->importXML_EntryData(gdi, tEvent, false, false, noFilter, noType);
           oe->setZeroTime(formatTimeHMS(zeroTime));
           oe->getDI().setDate("OrdinaryEntry", lastEntry);
           if (ci) {
@@ -1561,12 +1560,13 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
         }
         removeTempFile(tEvent);
 
-        oe->importXML_EntryData(gdi, tClass.c_str(), false, false, noFilter);
+        oe->importXML_EntryData(gdi, tClass.c_str(), false, false, noFilter, noType);
         removeTempFile(tClass);
 
         set<int> stageFilter;
-        checkStageFilter(gdi, tEntry, stageFilter);
-        oe->importXML_EntryData(gdi, tEntry.c_str(), false, removeRemoved, stageFilter);
+        string preferredIdType;
+        checkStageFilter(gdi, tEntry, stageFilter, preferredIdType);
+        oe->importXML_EntryData(gdi, tEntry.c_str(), false, removeRemoved, stageFilter, preferredIdType);
         removeTempFile(tEntry);
 
         if (!course.empty()) {
@@ -1808,7 +1808,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
         oListInfo li;
         par.selection = allTransfer;
         oe->generateListInfo(par,  gdi.getLineHeight(), li);
-        gdioutput tGdi("temp", gdi.getScale(), gdi.getCP());
+        gdioutput tGdi("temp", gdi.getScale());
         oe->generateList(tGdi, true, li, false);
         tGdi.writeTableHTML(save, oe->getName(), 0);
         tGdi.openDoc(save.c_str());
@@ -1901,7 +1901,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
         par.setLegNumberCoded(-1);
         oListInfo li;
         oe->generateListInfo(par,  gdi.getLineHeight(), li);
-        gdioutput tGdi("temp", gdi.getScale(), gdi.getCP());
+        gdioutput tGdi("temp", gdi.getScale());
         oe->generateList(tGdi, true, li, false);
         tGdi.writeTableHTML(save, oe->getName(), 0);
         tGdi.openDoc(save.c_str());
@@ -2337,7 +2337,6 @@ void TabCompetition::openCompetition(gdioutput &gdi, int id) {
     err = ex.wwhat();
   }
 
-  if (gSI) gSI->setZeroTime(oe->getZeroTimeNum());
   resetSaveTimer();
   oe->setProperty("LastCompetition", id);
   gdi.setWindowTitle(oe->getTitleName());
@@ -2359,8 +2358,6 @@ int TabCompetition::restoreCB(gdioutput &gdi, int type, void *data) {
       gdi.alert("Kunde inte öppna tävlingen.");
     }
     else {
-      if (gSI) gSI->setZeroTime(oe->getZeroTimeNum());
-
       const wstring &name = oe->getName();
       if (name.find_last_of(L"}") != name.length()-1)
         oe->setName(name + L" {" + lang.tl(L"återställd") + L"}");
@@ -2410,7 +2407,7 @@ void TabCompetition::copyrightLine(gdioutput &gdi) const
 
   gdi.dropLine(0.4);
   gdi.fillDown();
-  gdi.addString("", 0, makeDash(L"#Copyright © 2007-2017 Melin Software HB"));
+  gdi.addString("", 0, makeDash(L"#Copyright © 2007-2018 Melin Software HB"));
   gdi.dropLine(1);
   gdi.popX();
 
@@ -2423,7 +2420,7 @@ void TabCompetition::loadAboutPage(gdioutput &gdi) const
   gdi.clearPage(false);
   gdi.addString("", 2, makeDash(L"Om MeOS - ett Mycket Enkelt OrienteringsSystem")).setColor(colorDarkBlue);
   gdi.dropLine(2);
-  gdi.addStringUT(1, makeDash(L"Copyright © 2007-2017 Melin Software HB"));
+  gdi.addStringUT(1, makeDash(L"Copyright © 2007-2018 Melin Software HB"));
   gdi.dropLine();
   gdi.addStringUT(10, "The database connection used is MySQL++\nCopyright "
                         "(c) 1998 by Kevin Atkinson, (c) 1999, 2000 and 2001 by MySQL AB,"
@@ -2442,7 +2439,7 @@ void TabCompetition::loadAboutPage(gdioutput &gdi) const
 
   gdi.dropLine();
   gdi.addString("", 1, "Vi stöder MeOS");
-  vector<string> supp;
+  vector<wstring> supp;
   getSupporters(supp);
   for (size_t k = 0; k<supp.size(); k++)
     gdi.addStringUT(0, supp[k]);
@@ -2551,7 +2548,8 @@ bool TabCompetition::loadPage(gdioutput &gdi)
     oe->checkNecessaryFeatures();
     gdi.selectTab(tabId);
 
-    gdi.addString("", 3, "MeOS");
+    //gdi.addString("", 3, "MeOS");
+    gdi.addString("", textImage, "513");
     gdi.dropLine();
     oe->synchronize();
 
@@ -3546,12 +3544,14 @@ TabCompetition::FlowOperation TabCompetition::saveEntries(gdioutput &gdi, bool r
     }
     else {
       set<int> stageFilter;
-      FlowOperation res = checkStageFilter(gdi, filename[i], stageFilter);
+      string preferredIdType;
+
+      FlowOperation res = checkStageFilter(gdi, filename[i], stageFilter, preferredIdType);
 
       if (res != FlowContinue)
         return res;
 
-      oe->importXML_EntryData(gdi, filename[i], false, removeRemoved, stageFilter);
+      oe->importXML_EntryData(gdi, filename[i], false, removeRemoved, stageFilter, preferredIdType);
     }
     if (!isGuide) {
       gdi.setWindowTitle(oe->getTitleName());
@@ -3581,24 +3581,35 @@ int stageInfoCB(gdioutput *gdi, int type, void *data)
 
 void mainMessageLoop(HACCEL hAccelTable, DWORD time);
 
-TabCompetition::FlowOperation TabCompetition::checkStageFilter(gdioutput & gdi, const wstring & fname, set<int>& filter) {
+TabCompetition::FlowOperation TabCompetition::checkStageFilter(gdioutput & gdi,
+                                                               const wstring & fname, 
+                                                               set<int>& filter,
+                                                               string &preferredIdProvider) {
   xmlparser xml;
   xml.read(fname);
   xmlobject xo = xml.getObject("EntryList");
   set<int> scanFilter;
+  IOF30Interface reader(oe, false);
+  vector<string> idProviders;
   if (xo) {
     if (xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(oe, false);
       reader.prescanEntryList(xo, scanFilter);
+      reader.getIdTypes(idProviders);
     }
   }
+  bool stageFilter = scanFilter.size() > 1;
+  bool idtype = idProviders.size() > 1;
 
-  if (scanFilter.size() > 1) {
-    //gdi.dropLine();
+  bool needUseInput = stageFilter || idtype;
+
+  if (needUseInput) {
     gdi.enableEditControls(false, true);
     gdi.fillDown();
     gdi.pushX();
-    gdi.dropLine(0.5);  
+  }
+
+  if (stageFilter) {
+    gdi.dropLine(0.5);
     gdi.addString("", 0, "Det finns anmälningsdata för flera etapper.");
     gdi.dropLine(0.5);
     gdi.fillRight();
@@ -3613,7 +3624,25 @@ TabCompetition::FlowOperation TabCompetition::checkStageFilter(gdioutput & gdi, 
       gdi.selectItemByData("Stage", cn);
     else
       gdi.selectItemByData("Stage", 0);
+  }
 
+  if (idtype) {
+    if (stageFilter) {
+      gdi.popX();
+      gdi.dropLine(2);
+    }
+    gdi.dropLine(0.5);
+    gdi.addString("", 0, "Det finns multiplia Id-nummer för personer");
+    gdi.dropLine(0.5);
+    gdi.fillRight();
+    gdi.addSelection("IdType", 150, 200, stageInfoCB, L"Välj vilken typ du vill importera:");
+    int i = 0;
+    for (string &sn : idProviders) {
+      gdi.addItem("IdType", gdi.widen(sn), i++);
+    }
+  }
+
+  if (needUseInput) {
     gdi.dropLine();
     gdi.addButton("OK_Stage", "OK", stageInfoCB);
     gdi.fillDown();
@@ -3634,18 +3663,31 @@ TabCompetition::FlowOperation TabCompetition::checkStageFilter(gdioutput & gdi, 
 
       gdi.removeControl("OK_Stage");
       gdi.removeControl("Cancel_Stage");
-      gdi.disableInput("Stage");
+      if (stageFilter)
+        gdi.disableInput("Stage");
+      if (idtype)
+        gdi.disableInput("IdType");
     }
     if (ok) {
       //OK was pressed
-      int stage = gdi.getSelectedItem("Stage").first;
-      if (stage > 0) {
-        filter.insert(stage);
-        if (oe->getStageNumber() == 0) {
-          oe->setStageNumber(stage);
-          oe->getMeOSFeatures().useFeature(MeOSFeatures::SeveralStages, true, *oe);
+      if (scanFilter.size() > 1) {
+        int stage = gdi.getSelectedItem("Stage").first;
+        if (stage > 0) {
+          filter.insert(stage);
+          if (oe->getStageNumber() == 0) {
+            oe->setStageNumber(stage);
+            oe->getMeOSFeatures().useFeature(MeOSFeatures::SeveralStages, true, *oe);
+          }
         }
       }
+
+      if (idProviders.size() > 1) {
+        ListBoxInfo lbi;
+        if (gdi.getSelectedItem("IdType", lbi)) {
+          preferredIdProvider = gdi.narrow(lbi.text);
+        }
+      }
+
       return FlowContinue;
     }
     else if (cancel)
@@ -3829,14 +3871,22 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   fields.push_back("EMail");
   fields.push_back("Homepage");
 
-  oe->getDI().buildDataFields(gdi, fields);
+  oe->getDI().buildDataFields(gdi, fields, 32);
 
-  gdi.dropLine();
+  gdi.dropLine(0.3);
+  gdi.addString("", 1, "Betalningsinformation");
+  fields.clear();
+  fields.push_back("Account");
+  fields.push_back("PaymentDue");
+
+  oe->getDI().buildDataFields(gdi, fields, 32);
+
   gdi.addString("", 1, "Tidszon");
 
   gdi.dropLine(0.3);
   gdi.addCheckbox("UTC", "Exportera tider i UTC", 0,
-                  oe->getDCI().getInt("UTC") == 1);
+  oe->getDCI().getInt("UTC") == 1);
+
 
   gdi.newColumn();
   gdi.popY();
@@ -3850,7 +3900,7 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   fields.push_back("EntryFee");
   fields.push_back("YouthFee");
 
-  oe->getDI().buildDataFields(gdi, fields);
+  oe->getDI().buildDataFields(gdi, fields, 6);
 
   gdi.popX();
   gdi.dropLine(3);
@@ -3859,7 +3909,7 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   fields.push_back("OrdinaryEntry");
   fields.push_back("LateEntryFactor");
 
-  oe->getDI().buildDataFields(gdi, fields);
+  oe->getDI().buildDataFields(gdi, fields, 10);
 
   gdi.fillDown();
   gdi.popX();
@@ -3870,7 +3920,7 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   fields.push_back("YouthAge");
   fields.push_back("SeniorAge");
   gdi.fillRight();
-  oe->getDI().buildDataFields(gdi, fields);
+  oe->getDI().buildDataFields(gdi, fields, 10);
 
   gdi.fillDown();
   gdi.popX();
@@ -3883,14 +3933,15 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   fields.push_back("CurrencyCode");
 
   gdi.fillRight();
-  oe->getDI().buildDataFields(gdi, fields);
+  oe->getDI().buildDataFields(gdi, fields, 10);
 
-  gdi.dropLine();
+  gdi.popX();
+  gdi.dropLine(3);
   gdi.addCheckbox("PreSymbol", "Valutasymbol före", 0,
                   oe->getDCI().getInt("CurrencyPreSymbol") == 1);
 
   gdi.popX();
-  gdi.dropLine(3);
+  gdi.dropLine(2.5);
   bool useFrac = oe->getDCI().getInt("CurrencyFactor") == 100;
   gdi.addCheckbox("UseFraction", "Tillåt decimaler", CompetitionCB,
                     useFrac, "Tillåt valutauttryck med decimaler");
@@ -3898,7 +3949,7 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   fields.clear();
   gdi.dropLine(-1);
   fields.push_back("CurrencySeparator");
-  oe->getDI().buildDataFields(gdi, fields);
+  oe->getDI().buildDataFields(gdi, fields, 10);
 
   gdi.setInputStatus("CurrencySeparator_odc", useFrac);
 
@@ -3906,23 +3957,20 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   gdi.popX();
   gdi.dropLine(3);
 
-  gdi.addString("", 1, "Betalningsinformation");
-  fields.clear();
-  fields.push_back("Account");
-  fields.push_back("PaymentDue");
-
-  oe->getDI().buildDataFields(gdi, fields);
-
   gdi.fillDown();
   gdi.addString("", 1, "Tävlingsregler");
   fields.clear();
   gdi.fillRight();
   gdi.pushX();
   fields.push_back("MaxTime");
-  oe->getDI().buildDataFields(gdi, fields);
+  if (oe->getMeOSFeatures().hasFeature(MeOSFeatures::Rogaining)) {
+    fields.push_back("DiffTime");
+  }
+  gdi.fillDown();
+  oe->getDI().buildDataFields(gdi, fields, 10);
   oe->getDI().fillDataFields(gdi);
 
-  gdi.dropLine(3);
+  gdi.dropLine(1);
   int bottom = gdi.getCY();
 
 
@@ -3930,7 +3978,7 @@ void TabCompetition::loadSettings(gdioutput &gdi) {
   gdi.popY();
   gdi.pushX();
   gdi.fillDown();
-  gdi.addString("", 1, "Betalningsmetoder");
+  gdi.addString("", 1, "Betalningsmetoder"); 
   gdi.dropLine();
   gdi.addString("", 10, "help:paymentmodes");
   gdi.dropLine();

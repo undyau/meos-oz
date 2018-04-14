@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -263,6 +263,7 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oEventData->addVariableInt("ExtId", oDataContainer::oIS64, "Externt Id");
 
   oEventData->addVariableInt("MaxTime", oDataContainer::oISTime, "Gräns för maxtid");
+  oEventData->addVariableInt("DiffTime", oDataContainer::oISTime, "Stämplingsintervall, rogaining-patrull");
 
   oEventData->addVariableString("PreEvent", 64, "");
   oEventData->addVariableString("PostEvent", 64, "");
@@ -558,7 +559,7 @@ void oEvent::listProperties(bool userProps, vector< pair<string, PropertyType> >
   b.insert("pagebreak");
   b.insert("FirstTime");
   b.insert("ExportCSVSplits");
-
+  b.insert("DrawInterlace");
   // Integers
   i.insert("YouthFee");
   i.insert("YouthAge");
@@ -578,6 +579,8 @@ void oEvent::listProperties(bool userProps, vector< pair<string, PropertyType> >
   i.insert("addressypos");
   i.insert("addressxpos");
   i.insert("AutoSaveTimeOut");
+  i.insert("ServicePort");
+  i.insert("CodePage");
 
   propNames.clear();
   for(map<string, wstring>::const_iterator it = eventProperties.begin(); 
@@ -923,7 +926,7 @@ bool oEvent::save(const wstring &fileIn) {
   xml.startTag("meosdata", "version", getMajorVersion());
   xml.write("Name", Name);
   xml.write("Date", Date);
-  xml.write("ZeroTime", ZeroTime);
+  xml.write("ZeroTime", itos(ZeroTime));
   xml.write("NameId", currentNameId);
   xml.write("Annotation", Annotation);
 	xml.write("Id", Id);
@@ -1119,6 +1122,7 @@ void oEvent::restoreBackup()
 
 bool oEvent::open(const xmlparser &xml) {
   xmlobject xo;
+  ZeroTime = 0;
 
   xo = xml.getObject("Date");
   if (xo) Date=xo.getw();
@@ -1523,7 +1527,7 @@ void oEvent::updateRunnerDatabase()
     map<int, int> clubIdMap;
     for (it=Runners.begin(); it != Runners.end(); ++it){
       if (it->Card && it->Card->cardNo == it->CardNo &&
-        it->getDI().getInt("CardFee")==0 && it->Card->getNumPunches()>7)
+        it->getDI().getInt("CardFee")==0 && it->Card->getNumPunches()>5)
         updateRunnerDatabase(&*it, clubIdMap);
     }
     runnerDB->refreshTables();
@@ -2440,37 +2444,6 @@ int oEvent::getRelativeTime(const wstring &m) const {
   else return -1;
 }
 
-int oEvent::getRelativeTimeFrom12Hour(const wstring &m) const
-{
-  int atime=convertAbsoluteTime(m);
-
-  if (atime>=0 && atime<3600*24) {
-    int lowBound = ZeroTime;
-    int highBound = ZeroTime + 3600 * 12;
-
-    bool ok = ( atime >= lowBound && atime <= highBound) ||
-              ( (atime+3600*24) >= lowBound && (atime+3600*24) <= highBound);
-
-    int rtime = atime - ZeroTime;
-    if (!ok)
-      rtime += 12 * 3600;
-
-    rtime = (rtime+24*3600)%(24*3600);
-      
-    //int rtime=atime-(ZeroTime % (3600*12));
-
-/*    if (rtime<=0)
-      rtime+=3600*12;
-    */
-    //Don't allow times just before zero time.
-    if (rtime>3600*22)
-      return -1;
-
-    return rtime;
-  }
-  else return -1;
-}
-
 void oEvent::removeRunner(const vector<int> &ids)
 {
   oRunnerList::iterator it;
@@ -3060,7 +3033,7 @@ void oEvent::generateMinuteStartlist(gdioutput &gdi) {
     if (k>0)
       gdi.addStringUT(gdi.getCY()-1, 0, pageNewPage, "");
 
-    gdi.addStringUT(boldLarge, lang.tl(L"Minutstartlista") +  makeDash(L" - ") + getName());
+    gdi.addStringUT(boldLarge|Capitalize, lang.tl(L"Minutstartlista", true) +  makeDash(L" - ") + getName());
     if (!starts[k].empty()) {
       swprintf_s(bf, lang.tl("%s, block: %d").c_str(), starts[k].c_str(), blocks[k]);
       gdi.addStringUT(fontMedium, bf);
@@ -4043,12 +4016,47 @@ int oEvent::findBestClass(const SICard &card, vector<pClass> &classes) const
   return Distance;
 }
 
-void oEvent::convertTimes(SICard &sic) const
+void oEvent::convertTimes(pRunner runner, SICard &sic) const
 {
-  if (sic.convertedTime)
+  assert(sic.convertedTime != ConvertedTimeStatus::Unknown);
+  if (sic.convertedTime == ConvertedTimeStatus::Done)
     return;
 
-  sic.convertedTime = true;
+  if (sic.convertedTime == ConvertedTimeStatus::Hour12) {
+
+    int startTime = ZeroTime + 3600; //Add one hour. Subtracted below
+    if (useLongTimes())
+      startTime = 5 * 3600; // Avoid midnight as default. Prefer morning
+
+    int st = -1;
+    if (runner) {
+      st = runner->getStartTime();
+      if (st > 0) {
+        startTime = (ZeroTime + st) % (3600 * 24);
+      }
+      else {
+        st = -1;
+      }
+    }
+
+    if (st <= -1) {
+      // Fallback for no start time. Take from card. Will be wrong if more than 12 hour after ZeroTime
+      if (sic.StartPunch.Code != -1) {
+        st = sic.StartPunch.Time;
+      }
+      else if (sic.nPunch > 0 && sic.Punch[0].Time >= 0) {
+        st = sic.Punch[0].Time;
+      }
+
+      if (st >= 0) { // Optimize local zero time w.r.t first punch
+        int relT12 = (st - ZeroTime + 3600 * 24) % (3600 * 12);
+        startTime = (ZeroTime + relT12) % (3600 * 24);
+      }
+    }
+    int zt = (startTime + 23 * 3600) % (24 * 3600); // Subtract one hour
+    sic.analyseHour12Time(zt);
+  }
+  sic.convertedTime = ConvertedTimeStatus::Done;
 
   if (sic.CheckPunch.Code!=-1){
     if (sic.CheckPunch.Time<ZeroTime)
@@ -4826,6 +4834,7 @@ void oEvent::analyzeClassResultStatus() const
 void oEvent::generateTestCard(SICard &sic) const
 {
   sic.clear(0);
+  sic.convertedTime == ConvertedTimeStatus::Hour24;
 
   if (Runners.empty())
     return;

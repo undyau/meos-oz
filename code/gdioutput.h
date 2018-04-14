@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -90,6 +90,8 @@ struct FontInfo {
   HFONT bold;
   HFONT italic;
 };
+
+class AutoCompleteInfo;
 
 class Recorder;
 
@@ -280,8 +282,12 @@ protected:
 
   shared_ptr<AnimationData> animationData;
 
-  int defaultCodePage;
+  shared_ptr<AutoCompleteInfo> autoCompleteInfo;
 public:
+
+  AutoCompleteInfo &addAutoComplete(const string &key);
+  void clearAutoComplete(const string &key);
+  bool hasAutoComplete() const { return autoCompleteInfo != nullptr; }
   // Return the bounding dimension of the desktop
   void getVirtualScreenSize(RECT &rc);
 
@@ -317,8 +323,8 @@ public:
   bool isTest() const {return isTestMode;}
   const string &getTag() const {return tag;}
   bool hasTag(const string &t) const {return tag == t;}
-  const wstring &recodeToWide(const string &input) const;
-  const string &recodeToNarrow(const wstring &input) const;
+  static const wstring &recodeToWide(const string &input);
+  static const string &recodeToNarrow(const wstring &input);
   
   static const wstring &widen(const string &input);
   static const string &narrow(const wstring &input);
@@ -635,9 +641,9 @@ public:
   void clearPage(bool autoRefresh, bool keepToolbar = false);
 
   void TabFocus(int direction=1);
-  void Enter();
-  void Escape();
-  bool UpDown(int direction);
+  void enter();
+  void escape();
+  bool upDown(int direction);
   void keyCommand(KeyCommandCode code);
 
   LRESULT ProcessMsg(UINT iMessage, LPARAM lParam, WPARAM wParam);
@@ -745,13 +751,12 @@ public:
   void closeWindow();
 
   void setDBErrorState(bool state);
-  int getCP() const {return defaultCodePage;}
   friend int TablesCB(gdioutput *gdi, int type, void *data);
   friend class Table;
   friend gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x, int max_y);
 
-  gdioutput(const string &tag, double _scale, int defaultCodePage);
-  gdioutput(double _scale, HWND hWndTarget, const PrinterObject &defprn, int defaultCodePage);
+  gdioutput(const string &tag, double _scale);
+  gdioutput(double _scale, HWND hWndTarget, const PrinterObject &defprn);
   virtual ~gdioutput();
 };
 
