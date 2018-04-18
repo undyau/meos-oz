@@ -57,9 +57,9 @@ wstring getMeosFullVersion() {
   wchar_t bf[256];
   wstring maj = getMajorVersion();
   if (getBuildType().empty())
-    sprintf_s(bf, L"Version X#%s.%d, %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getMeosDate().c_str());
+    swprintf_s(bf, L"Version X#%s.%d, %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getMeosDate().c_str());
   else
-    sprintf_s(bf, L"Version X#%s.%d, %s %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getBuildType().c_str(), getMeosDate().c_str());
+    swprintf_s(bf, L"Version X#%s.%d, %s %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getBuildType().c_str(), getMeosDate().c_str());
   return bf;
 }
 

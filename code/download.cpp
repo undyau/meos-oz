@@ -461,15 +461,15 @@ bool Download::httpSendReqEx(HINTERNET hConnect, const wstring &dest,
   return true;
 }
 
-void Download::postData(const string &url, const string &data, ProgressWindow &pw) {
+void Download::postData(const wstring &url, const wstring &data, ProgressWindow &pw) {
   SetLastError(0);
   DWORD_PTR dw = 0;
   URL_COMPONENTS uc;
   memset(&uc, 0, sizeof(uc));
   uc.dwStructSize = sizeof(uc);
-  char host[128];
-  char path[128];
-  char extra[256];
+	wchar_t host[128];
+	wchar_t path[128];
+	wchar_t extra[256];
   uc.lpszExtraInfo = extra;
   uc.dwExtraInfoLength = sizeof(extra);
   uc.lpszHostName = host;
@@ -486,7 +486,7 @@ void Download::postData(const string &url, const string &data, ProgressWindow &p
   HINTERNET hConnect = InternetConnect(hInternet, host, port,
                                        NULL, NULL, INTERNET_SERVICE_HTTP, 0, dw);
   static TCHAR hdrs[] = _T("Content-Type: application/x-www-form-urlencoded");
-	string* str = new string;
+	wstring* str = new wstring;
 	usedBuffers.push_back(str);
 	*str = data;
 	PCTSTR accept[] = {_T("*/*"), NULL};
@@ -498,11 +498,11 @@ void Download::postData(const string &url, const string &data, ProgressWindow &p
 		success = false;
 
 	if (success)
-		hRequest = HttpOpenRequest(hConnect, "POST", uc.lpszUrlPath, NULL, NULL, accept, 0, 1);
+		hRequest = HttpOpenRequest(hConnect, L"POST", uc.lpszUrlPath, NULL, NULL, accept, 0, 1);
 	if (!hRequest)
 		success = false;
 
-	if (success && !HttpSendRequest(hRequest, hdrs, strlen(hdrs), (TCHAR*)str->c_str(), str->size()))
+	if (success && !HttpSendRequest(hRequest, hdrs, _tcslen(hdrs), (TCHAR*)str->c_str(), str->size()))
 		success = false;
 	else {
 		DWORD dwStatus = 0;
@@ -543,10 +543,10 @@ void Download::postData(const string &url, const string &data, ProgressWindow &p
   if (!success) {
  		DWORD ec = GetLastError();
 
-    string error = ec != 0 ? getErrorMessage(ec) : "";
+    wstring error = ec != 0 ? getErrorMessage(ec) : L"";
     if (error.empty())
-      lang.tl("Ett okänt fel inträffade.");
-    throw std::exception(error.c_str());
+      error = lang.tl("Ett okänt fel inträffade.");
+		throw std::exception("Ett okänt fel inträffade.");
   }
 
  }

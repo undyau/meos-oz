@@ -134,7 +134,7 @@ public:
                    vector<SICard> &punches);
 
   int split(char *line, vector<char *> &split, wchar_t sep = L';');
-  int split(wchar_t *line, vector<wchar_t *> &split, , wchar sep = ';');
+  int split(wchar_t *line, vector<wchar_t *> &split,  wchar_t sep = L';');
 
   int iscsv(const wstring &file);
   csvparser();

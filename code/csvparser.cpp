@@ -34,6 +34,8 @@
 #include "importformats.h"
 
 #include "meosexception.h"
+#include <locale>
+#include <codecvt>
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -262,7 +264,9 @@ bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
 		if (sp.size()>8) {
 			nimport++;
 
-      pClub pclub = event.getClubCreate(0, sp[ORclub]);
+			std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+
+      pClub pclub = event.getClubCreate(0, converter.from_bytes(sp[ORclub]));
 
 			if (pclub) {
         pclub->synchronize(true);
@@ -277,7 +281,7 @@ bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
       if (pr==0)
         continue;
 
-      string name = string(sp[ORfirstname])+" "+string(sp[ORsurname]);
+      wstring name = converter.from_bytes(string(sp[ORfirstname])+" "+string(sp[ORsurname]));
       pr->setName(name, false);
       pr->setClubId(pclub ? pclub->getId():0);
 			pr->setCardNo( atoi(sp[ORcard]), false );
@@ -286,14 +290,14 @@ bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
 			pr->setStatus(StatusUnknown, true, false);
 
       if (strlen(sp[ORclass]) > 0) {
-  			pClass pc=event.getClass(sp[ORclass]);
+  			pClass pc=event.getClass(converter.from_bytes(sp[ORclass]));
 
         if (pc) { 
           pc->synchronize();        
           pr->setClassId(pc->getId(), false);
 				}
 				else {
-					pc=event.getClassCreate(-1,sp[ORclass]); 
+					pc=event.getClassCreate(-1, converter.from_bytes(sp[ORclass]));
 				}
 			}
 
@@ -307,14 +311,14 @@ bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
           if (!course) {
             oCourse oc(&event, -1);
             oc.setLength(0);
-            oc.setName(sp[ORcourse]);
+            oc.setName(converter.from_bytes(sp[ORcourse]));
             course = event.addCourse(oc);
             if (course)
               course->synchronize();
           }
           if (course) {
-            if (pr->getClassId() != 0)
-              event.getClass(pr->getClassId())->setCourse(course);
+            if (pr->getClassId(false) != 0)
+              event.getClass(pr->getClassId(false))->setCourse(course);
             else
               pr->setCourseId(course->getId());
           }
@@ -559,7 +563,7 @@ bool csvparser::closeOutput()
 }
 
 
-int csvparser::split(char *line, vector<char *> &split_vector, char sep)
+int csvparser::split(char *line, vector<char *> &split_vector, wchar_t sep)
 {
   split_vector.clear();
   int len=strlen(line);
@@ -598,7 +602,7 @@ int csvparser::split(char *line, vector<char *> &split_vector, char sep)
   return 0;
 }
 
-int csvparser::split(wchar_t *line, vector<wchar_t *> &split_vector)
+int csvparser::split(wchar_t *line, vector<wchar_t *> &split_vector, wchar_t sep)
 {
   split_vector.clear();
   int len=wcslen(line);
@@ -613,7 +617,7 @@ int csvparser::split(wchar_t *line, vector<wchar_t *> &split_vector)
 
     while(line[m])
     {
-      if (!cite && line[m]==';')
+      if (!cite && line[m]==sep)
         line[m]=0;
       else
       {

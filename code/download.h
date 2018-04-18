@@ -67,7 +67,7 @@ public:
 
   void postFile(const wstring &url, const wstring &file, const wstring &fileOut,
                 const vector< pair<wstring, wstring> > &headers, ProgressWindow &pw);
-  void postData(const string &url, const string &data, ProgressWindow &pw);
+  void postData(const wstring &url, const wstring &data, ProgressWindow &pw);
   int processMessages();
   bool successful();
   bool isWorking();
@@ -87,7 +87,7 @@ protected:
 
   friend void SUThread(void *ptr);
 
-	std::vector<string*> usedBuffers;
+	std::vector<wstring*> usedBuffers;
 
 };
 
