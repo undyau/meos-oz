@@ -672,7 +672,7 @@ void oEvent::generatePreReport(gdioutput &gdi) {
 
 void oEvent::generateRunnersPerCourse(gdioutput &gdi)
 {
-	map<string, int> count;
+	map<wstring, int> count;
 	for (oCourseList::iterator it = Courses.begin(); it != Courses.end(); ++it) 
 			count[it->getName()] = 0;
 	for (oRunnerList::iterator it = Runners.begin(); it != Runners.end(); ++it) 
@@ -686,7 +686,7 @@ void oEvent::generateRunnersPerCourse(gdioutput &gdi)
 
   gdi.addString("", yp, xp+200, textRight|fontMedium, lang.tl("kartor"));
 
-	for (map<string, int>::iterator i = count.begin(); i != count.end(); i++)
+	for (map<wstring, int>::iterator i = count.begin(); i != count.end(); i++)
 	{
 		yp += gdi.getLineHeight();
 		gdi.addStringUT(yp, xp, 0, i->first);

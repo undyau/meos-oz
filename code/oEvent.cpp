@@ -3141,8 +3141,8 @@ void oEvent::generateMinuteStartlist(gdioutput &gdi) {
         }
 
         gdi.addStringUT(src_y, x+dx[2], fontMedium, r[0]->getClub(), dx[3]-dx[2]-4);
-        gdi.addStringUT(src_y, x+dx[3], fontMedium, r[0]->getClass());
-		gdi.addStringUT(src_y, x+dx[4], fontMedium, r[0]->getCourseName());
+        gdi.addStringUT(src_y, x+dx[3], fontMedium, r[0]->getClass(false));
+				gdi.addStringUT(src_y, x+dx[4], fontMedium, r[0]->getCourseName());
         y+=lh;
       }
     }

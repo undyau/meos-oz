@@ -10,12 +10,12 @@ public:
 
 
 	bool SSSQuickStart(gdioutput &gdi);
-	void exportCourseOrderedIOFSplits(IOFVersion version, const char *file, bool oldStylePatrolExport, const set<int> &classes, int leg);
+	void exportCourseOrderedIOFSplits(IOFVersion version, const wchar_t *file, bool oldStylePatrolExport, const set<int> &classes, int leg);
 	void uploadSss(gdioutput &gdi);
 	virtual void writeExtraXml(xmlparser &xml);
 	virtual void readExtraXml(const xmlparser &xml);
 	int getSssEventNum() {return SssEventNum;};
-  string getSssSeriesPrefix() {return SssSeriesPrefix;};
+  wstring getSssSeriesPrefix() {return SssSeriesPrefix;};
 	int getIsSydneySummerSeries() {return IsSydneySummerSeries;};
 	bool exportOrCSV(const char *file, bool byClass);
 	bool isRentedCard(int card);
@@ -26,7 +26,7 @@ private:
 	string string_replace(string src, string const& target, string const& repl);
 	bool IsSydneySummerSeries;
 	int SssEventNum;
-  string SssSeriesPrefix;
+  wstring SssSeriesPrefix;
 	std::vector<int> RentedCards;
 	bool LoadedCards;
 };

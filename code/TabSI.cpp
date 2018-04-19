@@ -2417,7 +2417,7 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
                            lang.tl(L",      Prel. placering: ") + placeS;
 
       if (runner->getCourse(false)->hasRogaining())
-		statusline += lang.tl(L",     Poäng: ") + itos(runner->getRogainingPoints(false));
+				statusline += lang.tl(L",     Poäng: ") + itow(runner->getRogainingPoints(false));
 	  else
         statusline += lang.tl(L",     Prel. bomtid: ") + runner->getMissedTimeS();
       gdi.addStringUT(rc.top+6+lh, rc.left+20, 0, statusline);
@@ -2428,10 +2428,10 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
     }
     else {
       wstring msg=L"#" + runner->getName()  + L" (" + cardno + L")\n"+
-          runner->getClub()+L". "+runner->getClass() +
+          runner->getClub()+L". "+runner->getClass(false) +
 					L"\n" + lang.tl("Tid: ") + runner->getRunningTimeS() + lang.tl(", Plats: ") + placeS;
 	  if (runner->getCourse(false)->hasRogaining())
-		msg += lang.tl(", Poäng: ") + itos(runner->getRogainingPoints(false));
+			msg += lang.tl(", Poäng: ") + itow(runner->getRogainingPoints(false));
       gdi.addInfoBox("SIINFO", msg, 10000);
     }
   }
@@ -2544,7 +2544,7 @@ void TabSI::entryCard(gdioutput &gdi, const SICard &sic)
   oExtendedEvent* ev = static_cast<oExtendedEvent*>(oe);
 
   gdi.check("RentCard",ev->isRentedCard(sic.CardNumber));
-  if (showDatabase) {
+  if (showDatabase()) {
     pRunner db_r=oe->dbLookUpByCard(sic.CardNumber);
 
     if (db_r) {
@@ -2560,12 +2560,12 @@ void TabSI::entryCard(gdioutput &gdi, const SICard &sic)
           if (classes.at(i) < min || min == -1)
             min = classes.at(i);
         if (oe->getClass(min)) {  // Want to just match on class, but list contains map count too :(
-          char bf[256];
+          wchar_t bf[256];
           int nmaps = oe->getClass(min)->getNumRemainingMaps(false);
           if (nmaps != numeric_limits<int>::min())
-            sprintf_s(bf, "%s (%d %s)", oe->getClass(min)->getName().c_str(), nmaps, lang.tl("kartor").c_str());
+            swprintf_s(bf, L"%s (%d %s)", oe->getClass(min)->getName().c_str(), nmaps, lang.tl("kartor").c_str());
           else
-            sprintf_s(bf, "%s ( - %s)", oe->getClass(min)->getName().c_str(), lang.tl("kartor").c_str());
+            swprintf_s(bf, L"%s ( - %s)", oe->getClass(min)->getName().c_str(), lang.tl("kartor").c_str());
           gdi.selectItemByData("Class", min);
         }
       }
@@ -2573,7 +2573,7 @@ void TabSI::entryCard(gdioutput &gdi, const SICard &sic)
   }
 
   //Else get name from card
-  if (name.empty() && && !ev->isRentedCard(sic.CardNumber) && (sic.firstName[0] || sic.lastName[0]))
+  if (name.empty() && !ev->isRentedCard(sic.CardNumber) && (sic.firstName[0] || sic.lastName[0]))
     name=wstring(sic.lastName) + L", " + wstring(sic.firstName);
 
   gdi.setText("Name", name);
@@ -2853,7 +2853,7 @@ void TabSI::generateLabel(const pRunner r, gdioutput &gdi)
 {
   vector<int> mp;
   r->evaluateCard(true, mp);
-  gdioutput gdiprint(2.0, gdi.getEncoding(), gdi.getHWND(), labelPrinter);
+  gdioutput gdiprint(2.0, gdi.getHWNDTarget(), labelPrinter);
   r->printLabel(gdiprint);
   //gdiprint.print(labelPrinter, oe, false, true);
   printProtected(labelPrinter, gdi, gdiprint);

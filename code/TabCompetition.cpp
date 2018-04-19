@@ -133,8 +133,7 @@ bool TabCompetition::save(gdioutput &gdi, bool write)
   oe->setName(gdi.getText("Name"));
   oe->setAnnotation(gdi.getText("Annotation"));
   oe->setZeroTime(zt);
-	if (gdi.getText("RentedCards").size() > 0 && 
-		gdi.getText("RentedCards") != oe->getPropertyString("RentedCards","")) {
+	if (gdi.getText("RentedCards").size() > 0)  {
 		oe->setProperty("RentedCards", gdi.getText("RentedCards"));
 		static_cast<oExtendedEvent*>(oe)->loadRentedCardNumbers();
 	}
@@ -214,12 +213,14 @@ void TabCompetition::loadSssUploadPage(gdioutput &gdi)
   gdi.dropLine();
 	gdi.addString("", italicText, "Check the results in the Lists tab before doing the upload");
 	gdi.dropLine();
-  string defaultSssServer = oe->getPropertyString("SssServer", "http://sportident.itsdamp.com/liveresult.php");
+	string tmp = oe->getPropertyString("SssServer", "http://sportident.itsdamp.com/liveresult.php");
+	wstring defaultSssServer;
+	string2Wide(tmp, defaultSssServer);
 
   gdi.fillRight();
-  gdi.addInput("SssServer", defaultSssServer, 30, 0, "Upload server:", "URL of server expecting upload");
-  gdi.addInput("SssSeriesPrefix", static_cast<oExtendedEvent*>(oe)->getSssSeriesPrefix(), 4, 0, "Series");
-  gdi.addInput("SssEventNum", itos(static_cast<oExtendedEvent*>(oe)->getSssEventNum()), 4, 0, "Number within series");
+  gdi.addInput("SssServer", defaultSssServer, 30, 0, L"Upload server:", L"URL of server expecting upload");
+  gdi.addInput("SssSeriesPrefix", static_cast<oExtendedEvent*>(oe)->getSssSeriesPrefix(), 4, 0, L"Series");
+  gdi.addInput("SssEventNum", itow(static_cast<oExtendedEvent*>(oe)->getSssEventNum()), 4, 0, L"Number within series");
   gdi.dropLine(4);
   gdi.popX();
   gdi.addButton("SssUpload", "Upload Results", CompetitionCB);
@@ -2759,7 +2760,7 @@ void TabCompetition::textSizeControl(gdioutput &gdi) const
   else {
     gdi.dropLine(3);
     gdi.setCX(x);
-    gdi.addInput("RentedCards", oe->getPropertyString("RentedCards",""), 36, 0, "Hyrbricka:");
+    gdi.addInput("RentedCards", oe->getPropertyString("RentedCards",L""), 36, 0, L"Hyrbricka:");
     rc.right = gdi.getWidth();//gdi.getCX() + gdi.scaleLength(10);
     rc.bottom = gdi.getCY() + gdi.scaleLength(50);
   }

@@ -1156,16 +1156,16 @@ void IOF30Interface::readEvent(gdioutput &gdi, const xmlobject &xo,
         SYSTEMTIME utc, local;
         convertDateYMS(dateStr, utc, false);
         if (timeStr.size() > 7 && timeStr[2] == ':' && timeStr[5] == ':') { // being lazy
-          utc.wHour = atoi(timeStr.c_str());
-          utc.wMinute = atoi(timeStr.substr(3).c_str());
-          utc.wSecond = atoi(timeStr.substr(6).c_str());
+          utc.wHour = _wtoi(timeStr.c_str());
+          utc.wMinute = _wtoi(timeStr.substr(3).c_str());
+          utc.wSecond = _wtoi(timeStr.substr(6).c_str());
           SystemTimeToTzSpecificLocalTime(0, &utc, &local);
-          char buf[25];
-          sprintf_s(buf, 25, "%d-%02d-%02d", local.wYear, local.wMonth, local.wDay);
-          dateStr = string(buf);
+          wchar_t buf[25];
+          swprintf_s(buf, 25, L"%d-%02d-%02d", local.wYear, local.wMonth, local.wDay);
+          dateStr = wstring(buf);
           oe.setDate(dateStr);
-          sprintf_s(buf, 25, "%02d:%02d:%02d", local.wHour, local.wMinute, local.wSecond);
-          timeStr = string(buf);
+          swprintf_s(buf, 25, L"%02d:%02d:%02d", local.wHour, local.wMinute, local.wSecond);
+          timeStr = wstring(buf);
         }       
       }
       int t = convertAbsoluteTimeISO(timeStr);
@@ -1828,8 +1828,8 @@ pRunner IOF30Interface::readPerson(gdioutput &gdi, const xmlobject &person) {
 		// Runner may already exist, but without a number ?
 		if (pname)
 		{
-			string given, family;
-			r = oe.getRunnerByName(getFirst(pname.getObjectString("Given", given), 2)+" "+pname.getObjectString("Family", family));
+			wstring given, family;
+			r = oe.getRunnerByName(getFirst(pname.getObjectString("Given", given), 2)+L" "+pname.getObjectString("Family", family));
 		}
 	}
 	
@@ -2769,9 +2769,9 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
     }
 
     xml.write("Status", formatStatus(r.getStatus()));
-    if (r.getClassRef()->isRogaining()) {
-        xml.write("Score", "type", "Score", itos(r.getRogainingPoints(true)));
-        xml.write("Score", "type", "Penalty", itos(r.getRogainingReduction()));
+    if (r.getClassRef(false)->isRogaining()) {
+        xml.write("Score", "type", L"Score", itow(r.getRogainingPoints(true)));
+        xml.write("Score", "type", L"Penalty", itow(r.getRogainingReduction()));
     }
 
     int rg = r.getRogainingPoints(false);
@@ -2800,8 +2800,8 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
         xml.write("Position", r.getTotalPlace());
 
       xml.write("Status", formatStatus(stat));
-      if (r.getClassRef()->isRogaining()) {
-        xml.write("Score", "type", "Score", itos(r.getRogainingPoints(true)));
+      if (r.getClassRef(false)->isRogaining()) {
+        xml.write("Score", "type", L"Score", itow(r.getRogainingPoints(true)));
       }
 
       xml.endTag();

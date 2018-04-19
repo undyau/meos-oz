@@ -897,7 +897,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
 			pRunner r=oe->getRunner(runnerId, 0);
 			if(!r) return 0;
 
-      gdioutput gdiprint(2.0, gdi.getEncoding(), gdi.getHWND(), labelPrinter);
+      gdioutput gdiprint(2.0,  gdi.getHWNDTarget(), labelPrinter);
       r->printLabel(gdiprint);
       gdiprint.print(oe, 0, false, true);
       gdiprint.fetchPrinterSettings(labelPrinter);

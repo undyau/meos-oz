@@ -3966,8 +3966,8 @@ void oRunner::printSplits(gdioutput &gdi) const {
   }
   gdi.addStringUT(normal, statInfo);
   oe->calculateResults(oEvent::RTClassResult);
-	if (getPlaceS() != _EmptyString)
-    gdi.addStringUT(fontSmall, lang.tl("Aktuell klassposition") + " in " + getClass() + ": " + getPlaceS());
+	if (getPlaceS().size())
+    gdi.addStringUT(fontSmall, lang.tl("Aktuell klassposition") + L" in " + getClass(false) + L": " + getPlaceS());
   
 
   int cy = gdi.getCY()+4;
@@ -4279,19 +4279,19 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
   gdi.addStringUT(fontSmall, oe->getDate());
   gdi.dropLine(0.5);
   
-  gdi.addStringUT(boldSmall, getName() + " " + getClub());
+  gdi.addStringUT(boldSmall, getName() + L" " + getClub());
   int cy = gdi.getCY();
-  gdi.addStringUT(boldSmall, lang.tl("Poäng: ") + itos(getRogainingPoints(false)));    
+  gdi.addStringUT(boldSmall, lang.tl("Poäng: ") + itow(getRogainingPoints(false)));    
   gdi.addStringUT(cy, gdi.getCX() + ct1, boldSmall, lang.tl("Tid: ") + getRunningTimeS());
 	if (getCard())
 		gdi.addStringUT(fontSmall, lang.tl("SportIdent: ") + getCard()->getCardNoString());
   gdi.dropLine(0.5);
   cy = gdi.getCY();
   gdi.addStringUT(fontSmall, lang.tl("Bana: ") + getCourseName());
-  gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Klass: ") + getClass());
+  gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Klass: ") + getClass(false));
   cy = gdi.getCY();
-  gdi.addStringUT(fontSmall, lang.tl("Gross: ") + itos(getRogainingPoints(false) + getRogainingReduction()));
-  gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Penalty: ") + itos(getRogainingReduction()));
+  gdi.addStringUT(fontSmall, lang.tl("Gross: ") + itow(getRogainingPoints(false) + getRogainingReduction()));
+  gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Penalty: ") + itow(getRogainingReduction()));
   cy = gdi.getCY();
   gdi.addStringUT(fontSmall, lang.tl("Start: ") + getStartTimeS());
   gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Mål: ") + getFinishTimeS());
@@ -4326,11 +4326,11 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
     for (unsigned int i = 0; i < p.size(); i++) {
       if (p[i]->tRogainingIndex>=0) { 
         const pControl c = pc->getControl(p[i]->tRogainingIndex);
-        string point = c ? c->getRogainingPointsS() : "";
+        wstring point = c ? c->getRogainingPointsS() : L"";
         runningTotal += c ? c->getRogainingPoints() : 0;   
         
         if (c->getName().length() > 0) 
-          gdi.addStringUT(cy, cx, fontSmall, c->getName() + " (" + itos(p[i]->getControlNumber()) + ")");
+          gdi.addStringUT(cy, cx, fontSmall, c->getName() + L" (" + itos(p[i]->getControlNumber()) + L")");
         else
           gdi.addStringUT(cy, cx, fontSmall, itos(p[i]->getControlNumber()));
         gdi.addStringUT(cy, cx + c1, fontSmall, point);

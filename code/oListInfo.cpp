@@ -4186,7 +4186,7 @@ void oEvent::generateListInfoAux(oListParam &par, int lineHeight, oListInfo &li,
 
    case ERogainingInd:
       pos.add("place", 25);
-      pos.add("name", li.getMaxCharWidth(this, par.selection, lRunnerCompleteName, "", normalText, 0, true));
+      pos.add("name", li.getMaxCharWidth(this, par.selection, lRunnerCompleteName, L"", normalText, 0, true));
       pos.add("penalty", 50);
       pos.add("points", 50);
       pos.add("status", 50);
@@ -4194,11 +4194,10 @@ void oEvent::generateListInfoAux(oListParam &par, int lineHeight, oListInfo &li,
       li.addHead(oPrintPost(lCmpDate, L"", normalText, 0, 25));
       generateNBestHead(par, li, 25+lh);
 
-      li.addListPost(oPrintPost(lRunnerPlace, "", normalText, pos.get("place"), vspace));
-      li.addListPost(oPrintPost(lRunnerCompleteName, "", normalText, pos.get("name"), vspace));
-      li.addListPost(oPrintPost(lRunnerRogainingPointReduction, "%sp", normalText, pos.get("penalty"), vspace));
-      li.addListPost(oPrintPost(lRunnerRogainingPoint, "%sp", normalText, pos.get("points"), vspace));
-      li.addListPost(oPrintPost(lRunnerTimeStatus, "", normalText, pos.get("status"), vspace));
+      li.addListPost(oPrintPost(lRunnerPlace, L"", normalText, pos.get("place"), vspace));
+      li.addListPost(oPrintPost(lRunnerCompleteName, L"", normalText, pos.get("name"), vspace));
+      li.addListPost(oPrintPost(lRunnerRogainingPointReduction, L"%sp", normalText, pos.get("penalty"), vspace));
+      li.addListPost(oPrintPost(lRunnerRogainingPoint, L"%sp", normalText, pos.get("points"), vspace));
 
       li.setFilter(EFilterHasResult);
       li.setFilter(EFilterExcludeCANCEL);
