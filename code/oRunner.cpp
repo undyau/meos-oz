@@ -4330,9 +4330,9 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
         runningTotal += c ? c->getRogainingPoints() : 0;   
         
         if (c->getName().length() > 0) 
-          gdi.addStringUT(cy, cx, fontSmall, c->getName() + L" (" + itos(p[i]->getControlNumber()) + L")");
+          gdi.addStringUT(cy, cx, fontSmall, c->getName() + L" (" + itow(p[i]->getControlNumber()) + L")");
         else
-          gdi.addStringUT(cy, cx, fontSmall, itos(p[i]->getControlNumber()));
+          gdi.addStringUT(cy, cx, fontSmall, itow(p[i]->getControlNumber()));
         gdi.addStringUT(cy, cx + c1, fontSmall, point);
 
         int st = Card->getSplitTime(getStartTime(), p[i]);
@@ -4349,7 +4349,7 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
         int pt = p[i]->getAdjustedTime();
         st = getStartTime();
         if (st>0 && pt>0 && pt>st) {
-          string punchTime = formatTime(pt-st);
+          wstring punchTime = formatTime(pt-st);
           if (!moreThanHour)
             gdi.addStringUT(cy, cx+c5, fontSmall, punchTime);
           else
@@ -4363,7 +4363,7 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
       }
 
       int cid = p[i]->tMatchControlId;
-      string punchTime; 
+      wstring punchTime; 
       if (p[i]->isFinish()) {
         gdi.addString("", cy, cx, fontSmall, "Mål");
         int sp = getSplitTime(splitTimes.size(), false);
@@ -4388,7 +4388,7 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
         if (index>=0) {
           if (index > lastIndex + 1) {
             int xx = cx;
-            string str = MakeDash("-");
+            wstring str = makeDash(L"-");
             int posy = cy-int(gdi.getLineHeight()*0.4);
             const int endx = cx+c5 + (moreThanHour ? width : 50);
 
@@ -4415,7 +4415,7 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
         }
         else {
           if (!p[i]->isUsed) {
-            gdi.addStringUT(cy, cx, fontSmall, MakeDash("-"));
+            gdi.addStringUT(cy, cx, fontSmall, makeDash(L"-"));
           }
           sprintf_s(bf, "(%d)", p[i]->Type);
           gdi.addStringUT(cy, cx+c1, fontSmall, bf);
@@ -4423,7 +4423,7 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
         if (p[i]->Time > 0)
           gdi.addStringUT(cy, cx+c3, fontSmall, oe->getAbsTime(p[i]->Time + adjust));
         else {
-          string str = MakeDash("-");
+          wstring str = makeDash(L"-");
           gdi.addStringUT(cy, cx+c3, fontSmall, str);
         }
 
@@ -4444,7 +4444,7 @@ void oRunner::printRogainingSplits(gdioutput &gdi) const {
 
   gdi.dropLine();
 
-  vector< pair<string, int> > lines;
+  vector< pair<wstring, int> > lines;
   oe->getExtraLines("SPExtra", lines);
 
   for (size_t k = 0; k < lines.size(); k++) {
@@ -4478,7 +4478,7 @@ void oRunner::printLabel(gdioutput &gdi) const {
 	gdi.addStringUT(getName().length() < 20 ? boldHuge : boldLarge, getName());
 	gdi.dropLine(getName().length() < 20 ? 0.2 : 0.4);
 	cy = gdi.getCY();
-	gdi.addStringUT(cy, cx, boldLarge, getClass());
+	gdi.addStringUT(cy, cx, boldLarge, getClass(false));
 	if (getStatus()==StatusOK)
 			{
 			if (rogaining)
