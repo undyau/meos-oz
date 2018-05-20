@@ -17,13 +17,13 @@ public:
 	int getSssEventNum() {return SssEventNum;};
   wstring getSssSeriesPrefix() {return SssSeriesPrefix;};
 	int getIsSydneySummerSeries() {return IsSydneySummerSeries;};
-	bool exportOrCSV(const char *file, bool byClass);
+	bool exportOrCSV(const wchar_t  *file, bool byClass);
 	bool isRentedCard(int card);
 	void loadRentedCardNumbers();
 
 private:
-	string loadCsvToString(string file);
-	string string_replace(string src, string const& target, string const& repl);
+	wstring loadCsvToString(wstring file);
+	wstring string_replace(wstring src, wstring const& target, wstring const& repl);
 	bool IsSydneySummerSeries;
 	int SssEventNum;
   wstring SssSeriesPrefix;

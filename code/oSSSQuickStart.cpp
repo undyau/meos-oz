@@ -19,7 +19,7 @@ oSSSQuickStart::~oSSSQuickStart(void)
 bool oSSSQuickStart::ConfigureEvent(gdioutput &gdi)
 {
 // retrieve competition from install or web
-string file = getTempFile();
+wstring file = getTempFile();
 if (!GetEventTemplateFromInstall(file))
 	if (!GetEventTemplateFromWeb(file))
 		return false;
@@ -88,30 +88,30 @@ GetSystemTime(&st);
 m_Event.setDate(convertSystemDate(st));
 CustomiseClasses();
 
-AddMeosOzCustomList(string("SSS Receipt Results.xml"));
-AddMeosOzCustomList(string("SSS Results.xml"));
+AddMeosOzCustomList(wstring(L"SSS Receipt Results.xml"));
+AddMeosOzCustomList(wstring(L"SSS Results.xml"));
 
 return true;
 }
 
-void oSSSQuickStart::AddMeosOzCustomList(string a_ReportDef)
+void oSSSQuickStart::AddMeosOzCustomList(wstring a_ReportDef)
 {
-	char path[MAX_PATH];
+	wchar_t path[MAX_PATH];
 	if (getUserFile(path, a_ReportDef.c_str()))
 		{
-		string file(path);
+		wstring file(path);
 		if (!fileExist(path))
 			{
-			char exepath[MAX_PATH];
+			wchar_t exepath[MAX_PATH];
 			if (GetModuleFileName(NULL, exepath, MAX_PATH))
 				{
-				for (int i = strlen(exepath) - 1; i > 1; i--)
+				for (int i = wcslen(exepath) - 1; i > 1; i--)
 					if (exepath[i-1] == '\\')
 						{
 						exepath[i] = '\0';
 						break;
 						}
-				strcat(exepath,a_ReportDef.c_str());
+				wcscat(exepath,a_ReportDef.c_str());
 				if (fileExist(exepath))
 					CopyFile(exepath, path, true);
 				}
@@ -119,13 +119,13 @@ void oSSSQuickStart::AddMeosOzCustomList(string a_ReportDef)
 		}
 	if (fileExist(path))
 		{
-		xmlparser xml(0);
+		xmlparser xml;
 		xml.read(path);
 		xmlobject xlist = xml.getObject(0);
 
 // Check that we don't have the list already
 // Do nothing if we have that list already
-		string listName;
+		wstring listName;
 		xlist.getObjectString("ListName", listName);
 		MetaListContainer &lc = m_Event.getListContainer();
 		if (lc.getNumLists(MetaListContainer::ExternalList) > 0) 
@@ -145,7 +145,7 @@ void oSSSQuickStart::AddMeosOzCustomList(string a_ReportDef)
 		}
 }
 
-bool oSSSQuickStart::GetEventTemplateFromInstall(string& a_File)
+bool oSSSQuickStart::GetEventTemplateFromInstall(wstring& a_File)
 {
 	  TCHAR ownPth[MAX_PATH]; 
 
@@ -153,15 +153,15 @@ bool oSSSQuickStart::GetEventTemplateFromInstall(string& a_File)
     HMODULE hModule = GetModuleHandle(NULL);
     if (hModule != NULL) {
       GetModuleFileName(hModule,ownPth, (sizeof(ownPth)));
-			int pos = strlen(ownPth) - 1;
+			int pos = wcslen(ownPth) - 1;
 			while (ownPth[pos] != '\\' && pos > 0)
 				--pos;
 			if (pos == 0)
 				return false;
 			ownPth[pos] = '\0';
 
-			string templateFile(ownPth);
-			templateFile += "\\sss201230.xml";
+			wstring templateFile(ownPth);
+			templateFile += L"\\sss201230.xml";
 			if (!fileExist(templateFile.c_str()))
 				return false;
 			else
@@ -171,13 +171,13 @@ bool oSSSQuickStart::GetEventTemplateFromInstall(string& a_File)
 			return false;
 }
 
-bool oSSSQuickStart::GetEventTemplateFromWeb(string& a_File)
+bool oSSSQuickStart::GetEventTemplateFromWeb(wstring& a_File)
 {
-  string url = "http://sportident.itsdamp.com/sss201230.xml";
+  wstring url = L"http://sportident.itsdamp.com/sss201230.xml";
 
   Download dwl;
   dwl.initInternet();
-  std::vector<pair<string,string>> headers;
+  std::vector<pair<wstring,wstring>> headers;
 
   try {
     dwl.downloadFile(url, a_File, headers);
@@ -203,9 +203,9 @@ void oSSSQuickStart::CustomiseClasses()
 		{
 		if (it->getName().size() < 4)
 			{
-			string gender = it->getName().substr(it->getName().size()-1,1);
-			if (gender == "W" || gender == "M")
-					it->setSex(gender == "W" ? sFemale : sMale);
+			wstring gender = it->getName().substr(it->getName().size()-1,1);
+			if (gender == L"W" || gender == L"M")
+					it->setSex(gender == L"W" ? sFemale : sMale);
 
 			int s(0);
 			time_t t = time(0);   // get time now
@@ -225,16 +225,16 @@ void oSSSQuickStart::CustomiseClasses()
 					case 'I' : it->setAgeLimit(74 + s, 200 + s);  break;
 					}
 				}
-			else if (it->getName().substr(0,2) == "SV")
+			else if (it->getName().substr(0,2) == L"SV")
 				it->setAgeLimit(55 + s,64 + s);
 			}
 		}
 }
 
 
-bool oSSSQuickStart::LoadCoursesFromFile(string file)
+bool oSSSQuickStart::LoadCoursesFromFile(wstring file)
 {
-  xmlparser xml(0);
+  xmlparser xml;
   xml.read(file);
   xmlobject xo;
 
@@ -263,9 +263,9 @@ bool oSSSQuickStart::LoadCoursesFromFile(string file)
   return true;
 }
 
-bool oSSSQuickStart::LoadControlsFromFile(string file)
+bool oSSSQuickStart::LoadControlsFromFile(wstring file)
 {
-  xmlparser xml(0);
+  xmlparser xml;
   xml.read(file);
   xmlobject xo;
 
@@ -294,9 +294,9 @@ bool oSSSQuickStart::LoadControlsFromFile(string file)
   return true;
 }
 
-bool oSSSQuickStart::LoadClassesFromFile(string file)
+bool oSSSQuickStart::LoadClassesFromFile(wstring file)
 {
-  xmlparser xml(0);
+  xmlparser xml;
   xml.read(file);
   xmlobject xo;
 

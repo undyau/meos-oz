@@ -314,6 +314,7 @@
     <ClCompile Include="oEventResult.cpp" />
     <ClCompile Include="oEventSpeaker.cpp" />
     <ClCompile Include="oEventSQL.cpp" />
+    <ClCompile Include="oExtendedEvent.cpp" />
     <ClCompile Include="oFreeImport.cpp" />
     <ClCompile Include="oFreePunch.cpp" />
     <ClCompile Include="oImportExport.cpp" />
@@ -331,6 +332,7 @@
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='test|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <ClCompile Include="oSSSQuickStart.cpp" />
     <ClCompile Include="oTeam.cpp" />
     <ClCompile Include="oTeamEvent.cpp" />
     <ClCompile Include="parser.cpp" />
@@ -420,9 +422,11 @@
     <ClInclude Include="metalist.h" />
     <ClInclude Include="methodeditor.h" />
     <ClInclude Include="oEventDraw.h" />
+    <ClInclude Include="oExtendedEvent.h" />
     <ClInclude Include="oListInfo.h" />
     <ClInclude Include="onlineinput.h" />
     <ClInclude Include="onlineresults.h" />
+    <ClInclude Include="oSSSQuickStart.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="pdfwriter.h" />
     <ClInclude Include="prefseditor.h" />
