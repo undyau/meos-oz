@@ -681,9 +681,6 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       gdi.dropLine(3);
       gdi.popX();
       gdi.addCheckbox("Clear", "Nollställ databaser", 0, true);
-			gdi.dropLine(3);
-      gdi.popX();
-      gdi.addCheckbox("ShortClubNames", "Shorten Club Names", CompetitionCB, true);
       gdi.dropLine(3);
 
       gdi.popX();
@@ -702,7 +699,6 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       gdi.addString("", 0, "Importerar...");
       bool clear = gdi.isChecked("Clear");
       wstring club = gdi.getText("ClubFile");
-      oe->setShortClubNames(gdi.isChecked("ShortClubNames"));
       wstring cmp = gdi.getText("CmpFile");
       if (club == cmp)
         club = L"";
@@ -1356,9 +1352,6 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       gdi.addCheckbox("EventorDb", "Uppdatera löpardatabasen", CompetitionCB, true);
       gdi.dropLine(3);
       gdi.popX();
-      gdi.addCheckbox("ShortClubNames", "Shorten Club Names", CompetitionCB, true);
-      gdi.dropLine(3);
-      gdi.popX();
       gdi.addButton("Cancel", "Avbryt", CompetitionCB);
       gdi.addButton("EventorNext", "Nästa >>", CompetitionCB);
     }
@@ -1372,7 +1365,6 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
     else if (bi.id == "EventorNext") {
       bool cmp = gdi.isChecked("EventorCmp");
       bool db = gdi.isChecked("EventorDb");
-      oe->setShortClubNames(gdi.isChecked("ShortClubNames"));
       ListBoxInfo lbi;
       gdi.getSelectedItem("EventorSel", lbi);
       const CompetitionInfo *ci = 0;
