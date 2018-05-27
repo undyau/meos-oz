@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -35,8 +35,8 @@ private:
   enum SaveType {NotSaved, SavedInside, SavedFile};
   oEvent *oe;
   DynamicResult *currentResult;
-  string fileNameSource;
-  void setCurrentResult(DynamicResult *lst, const string &src);
+  wstring fileNameSource;
+  void setCurrentResult(DynamicResult *lst, const wstring &src);
   int currentIndex;
   bool dirtyInt;
   bool wasLoadedBuiltIn;
@@ -57,7 +57,7 @@ private:
   bool checkTag(const string &tag, bool throwError) const;
   string uniqueTag(const string &tag) const;
 
-  static string getInternalPath(const string &tag);
+  static wstring getInternalPath(const string &tag);
 
   void saveSettings(gdioutput &gdi);
 

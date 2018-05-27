@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,17 +21,18 @@
 
 ************************************************************************/
 #include "tabbase.h"
+#include "autocompletehandler.h"
 
 struct TeamLineup;
 
 class TabTeam :
-  public TabBase
+  public TabBase, AutoCompleteHandler
 {
 private:
   bool save(gdioutput &gdi, bool dontReloadTeams);
 
-  string lastSearchExpr;
-  stdext::hash_set<int> lastFilter;
+  wstring lastSearchExpr;
+  unordered_set<int> lastFilter;
   DWORD timeToFill;
   int inputId;
   int searchCB(gdioutput &gdi, int type, void *data);
@@ -45,7 +46,7 @@ private:
 
   int shownRunners;
   int shownDistinctRunners;
-  const string &getSearchString() const;
+  const wstring &getSearchString() const;
 
   void fillTeamList(gdioutput &gdi);
   void addToolbar(gdioutput &gdi) const;
@@ -59,13 +60,13 @@ private:
   void doAddTeamMembers(gdioutput &gdi);
 
   void showRunners(gdioutput &gdi, const char *title,
-                   const set< pair<string, int> > &rToList, 
+                   const set< pair<wstring, int> > &rToList, 
                    int limitX, set<int> &usedR);
 
   
   void processChangeRunner(gdioutput &gdi, pTeam t, int leg, pRunner r);
 
-  pRunner findRunner(const string &name, int cardNo) const;
+  pRunner findRunner(const wstring &name, int cardNo) const;
   vector<TeamLineup> teamLineup;
 
   // Returns true if the warning concerns the same team
@@ -73,11 +74,11 @@ private:
 
   void switchRunners(pTeam team, int leg, pRunner r, pRunner oldR);
 
-
 protected:
   void clearCompetitionData();
 
 public:
+  void handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) override;
 
   const char * getTypeStr() const {return "TTeamTab";}
   TabType getType() const {return TTeamTab;}

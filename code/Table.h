@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ struct TableUpdateInfo {
 
 class TableCell
 {
-  string contents;
+  wstring contents;
   RECT absPos;
 
   DWORD id;
@@ -56,21 +56,28 @@ class TableCell
   bool canEdit;
   CellType type;
 
+
   friend class TableRow;
   friend class Table;
   friend int tblSelectionCB(gdioutput *gdi, int type, void *data);
+
+public:
+  void update(CellType t, const wstring &str) {
+    contents = str;
+    type = t;
+  }
 };
 
 class TableRow
 {
 protected:
-  string key;
+  wstring key;
   int intKey;
 
   vector<TableCell> cells;
   int id;
 
-  string *SortString;
+  wstring *SortString;
   int sInt;
 
   int ypos;
@@ -82,6 +89,9 @@ public:
   void setObject(oBase &obj);
   bool operator<(const TableRow &r){return *SortString<*r.SortString;}
   static bool cmpint(const TableRow &r1, const TableRow &r2) {return r1.sInt<r2.sInt;}
+
+  CellType getCellType(int index) const { return cells[index].type; }
+  void updateCell(int index, CellType type, const wstring &str) { return cells[index].update(type, str); }
 
   TableRow(int elem, oBase *object): sInt(0)
   {
@@ -104,10 +114,11 @@ public:
 };
 
 class gdioutput;
+class oDataDefiner;
 
 struct ColInfo
 {
-  char name[64];
+  wchar_t name[64];
   mutable int width;
   int baseWidth;
   bool isnumeric;
@@ -115,7 +126,7 @@ struct ColInfo
   bool formatRight;
   RECT title;
   RECT condition;
-  string filter;
+  wstring filter;
 };
 
 struct TableSortIndex;
@@ -137,7 +148,7 @@ protected:
   int id;
   bool clearOnHide;
   bool commandLock;
-  string tableName;
+  wstring tableName;
   string internalName;
   vector<ColInfo> Titles;
   vector<int> xpos;
@@ -228,7 +239,7 @@ protected:
   bool destroyEditControl(gdioutput &gdi);
 
   void getExportData(int col1, int col2, int row1, int row2,
-                     string &html, string &txt) const;
+                     wstring &html, wstring &txt) const;
 
   // Delete rows in selected range. Return number of rows that could not be removed
   int deleteRows(int row1, int row2);
@@ -244,10 +255,13 @@ protected:
   void getRowRect(int row, RECT &rc) const;
 
   bool compareRow(int indexA, int indexB) const;
-public:
 
-  void setTableText(gdioutput &gdi, int editRow, int editCol, const string &bf);
-  const string &getTableText(gdioutput &gdi, int editRow, int editCol);
+  map<string, const oDataDefiner *> dataDefiners;
+public:
+  void addDataDefiner(const string &key, const oDataDefiner *definer);
+
+  void setTableText(gdioutput &gdi, int editRow, int editCol, const wstring &bf);
+  const wstring &getTableText(gdioutput &gdi, int editRow, int editCol);
 
   int getTableId() const {return id;}
   static void resetTableIds() {uniqueId = 1;}
@@ -264,14 +278,14 @@ public:
   void clearCellSelection(gdioutput *gdi);
 
   /// Return translated table name
-  const string& getTableName() const {return tableName;}
+  const wstring& getTableName() const {return tableName;}
   /// Get the internal identifier of the table
   const string& getInternalName() const {return internalName;}
 
   bool hasAutoSelect() const {return  doAutoSelectColumns;}
 
   void updateDimension(gdioutput &gdi);
-  void selection(gdioutput &gdi, const string &text, int data);
+  void selection(gdioutput &gdi, const wstring &text, int data);
 
   enum {
     CAN_PASTE = 1,
@@ -302,7 +316,7 @@ public:
 
   struct ColSelection {
     ColSelection() : selected(false), index(0) {}
-    string name;
+    wstring name;
     bool selected;
     int index;
   };
@@ -327,7 +341,7 @@ public:
 
   bool keyCommand(gdioutput &gdi, KeyCommandCode code);
   void sort(int col);
-  void filter(int col, const string &filt, bool forceFilter=false);
+  void filter(int col, const wstring &filt, bool forceFilter=false);
 
   int addColumn(const string &Title, int width, bool isnum, bool formatRight = false);
   int addColumnPaddedSort(const string &title, int width, int padding, bool formatRight = false);
@@ -336,13 +350,13 @@ public:
 
   TableRow *getRowById(int rowId);
   void addRow(int rowId, oBase *object);
-  void set(int column, oBase &owner, int id, const string &data,
+  void set(int column, oBase &owner, int id, const wstring &data,
            bool canEdit=true, CellType type=cellEdit);
 
   //Reload a row from data
   void reloadRow(int rowId);
 
-  bool UpDown(gdioutput &gdi, int direction);
+  bool upDown(gdioutput &gdi, int direction);
   bool tabFocus(gdioutput &gdi, int direction);
   bool enter(gdioutput &gdi);
   void escape(gdioutput &gdi);
@@ -351,7 +365,7 @@ public:
   void update();
 
   Table(oEvent *oe_, int rowHeight,
-        const string &name, const string &tname);
+        const wstring &name, const string &tname);
   ~Table(void);
 
   friend struct TableSortIndex;

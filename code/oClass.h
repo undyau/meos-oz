@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,6 +39,8 @@
 class oClass;
 typedef oClass* pClass;
 class oDataInterface;
+
+const int MaxClassId = 1000000;
 
 enum PersonSex;
 
@@ -132,6 +134,7 @@ struct ClassResultInfo {
   int lastStartTime;
 };
 
+class QualificationFinal;
 
 enum ClassType {oClassIndividual=1, oClassPatrol=2,
                 oClassRelay=3, oClassIndividRelay=4};
@@ -145,11 +148,11 @@ class oClass : public oBase
 public:
   enum ClassStatus {Normal, Invalid, InvalidRefund};
 
-  static void getSplitMethods(vector< pair<string, size_t> > &methods);
-  static void getSeedingMethods(vector< pair<string, size_t> > &methods);
+  static void getSplitMethods(vector< pair<wstring, size_t> > &methods);
+  static void getSeedingMethods(vector< pair<wstring, size_t> > &methods);
 
 protected:
-  string Name;
+  wstring Name;
   pCourse Course;
 
   vector< vector<pCourse> > MultiCourse;
@@ -201,12 +204,12 @@ protected:
   // Used to force show of full multi course dialog
   bool tShowMultiDialog;
 
-  static const int dataSize = 256;
+  static const int dataSize = 512;
   int getDISize() const {return dataSize;}
 
-  BYTE oData[256];
-  BYTE oDataOld[256];
-
+  BYTE oData[dataSize];
+  BYTE oDataOld[dataSize];
+  vector< vector<wstring> > oDataStr;
   //Multicourse data
   string codeMultiCourse() const;
   //Fill courseId with id:s of used courses.
@@ -228,10 +231,10 @@ protected:
   void markSQLChanged(int leg, int control);
 
   void addTableRow(Table &table) const;
-  bool inputData(int id, const string &input, int inputId,
-                        string &output, bool noUpdate);
+  bool inputData(int id, const wstring &input, int inputId,
+                        wstring &output, bool noUpdate);
 
-  void fillInput(int id, vector< pair<string, size_t> > &elements, size_t &selected);
+  void fillInput(int id, vector< pair<wstring, size_t> > &elements, size_t &selected);
 
   void exportIOFStart(xmlparser &xml);
 
@@ -258,9 +261,33 @@ protected:
 
   static long long setupForkKey(const vector<int> indices, const vector< vector< vector<int> > > &courseKeys, vector<int> &ws);
 
+  mutable vector<pClass> virtualClasses;
+  pClass parentClass;
+
+  shared_ptr<QualificationFinal> qualificatonFinal;
+
+  void configureInstance(int instance, bool allowCreation) const;
 public:
 
+  /** The master class in a qualification/final scheme. */
+  const pClass getParentClass() const { return parentClass; }
+
+  const QualificationFinal *getQualificationFinal() const { return qualificatonFinal.get(); }
+
+  /** Returns the number of possible final classes.*/
+  int getNumQualificationFinalClasses() const;
+  void loadQualificationFinalScheme(const wstring &fileName);
+
+  void updateFinalClasses(oRunner *causingResult, bool updateStartNumbers);
+
   static void initClassId(oEvent &oe);
+
+  // Return true if forking in the class is locked
+  bool lockedForking() const;
+  void lockedForking(bool locked);
+
+  bool lockedClassAssignment() const;
+  void lockedClassAssignment(bool locked);
 
   // Draw data
   int getDrawFirstStart() const;
@@ -272,6 +299,13 @@ public:
   int getDrawNumReserved() const;
   void setDrawNumReserved(int st);
 
+  enum class DrawSpecified {
+    FixedTime = 1, Vacant = 2, Extra = 4
+  };
+  
+  void setDrawSpecification(const vector<DrawSpecified> &ds);
+  set<DrawSpecified> getDrawSpecification() const;
+
   /** Return an actual linear index for this class. */
   int getLinearIndex(int index, bool isLinear) const;
 
@@ -282,11 +316,11 @@ public:
   void drawSeeded(ClassSeedMethod seed, int leg, int firstStart, int interval, const vector<int> &groups,
                   bool noClubNb, bool reverse, int pairSize);
   /** Returns true if the class is setup so that changeing one runner can effect all others. (Pursuit)*/
-  bool hasClassGlobalDependance() const;
+  bool hasClassGlobalDependence() const;
   // Autoassign new bibs
-  static void extractBibPatterns(oEvent &oe, map<int, pair<string, int> > &patterns);
-  pair<int, string> getNextBib(map<int, pair<string, int> > &patterns); // Version that calculates next free bib from cached data (fast, no gap usage)
-  pair<int, string> oClass::getNextBib(); // Version that calculates next free bib (slow, but reuses gaps)
+  static void extractBibPatterns(oEvent &oe, map<int, pair<wstring, int> > &patterns);
+  pair<int, wstring> getNextBib(map<int, pair<wstring, int> > &patterns); // Version that calculates next free bib from cached data (fast, no gap usage)
+  pair<int, wstring> oClass::getNextBib(); // Version that calculates next free bib (slow, but reuses gaps)
 
   bool usesCourse(const oCourse &crs) const;
   
@@ -295,7 +329,7 @@ public:
 
   bool checkStartMethod();
 
-  static int extractBibPattern(const string &bibInfo, char pattern[32]);
+  static int extractBibPattern(const wstring &bibInfo, wchar_t pattern[32]);
 
   bool isParallel(size_t leg) const {
     if (leg < legInfo.size())
@@ -310,6 +344,9 @@ public:
     else
       return false;
   }
+
+  oClass *getVirtualClass(int instance, bool allowCreation);
+  const oClass *getVirtualClass(int instance) const;
 
   ClassStatus getClassStatus() const;
 
@@ -352,7 +389,7 @@ public:
 
   int getTotalLegLeaderTime(int leg, bool includeInput) const;
 
-  string getInfo() const;
+  wstring getInfo() const;
   // Returns true if the class has a pool of courses
   bool hasCoursePool() const;
   // Set whether to use a pool or not
@@ -374,9 +411,9 @@ public:
   int getStartData(int leg) const;
   int getRestartTime(int leg) const;
   int getRopeTime(int leg) const;
-  string getStartDataS(int leg) const;
-  string getRestartTimeS(int leg) const;
-  string getRopeTimeS(int leg) const;
+  wstring getStartDataS(int leg) const;
+  wstring getRestartTimeS(int leg) const;
+  wstring getRopeTimeS(int leg) const;
 
   // Get the index of the base leg for this leg (=first race of leg's runner)
   int getLegRunner(int leg) const;
@@ -408,7 +445,7 @@ public:
   int getPreceedingLeg(int leg) const;
 
   /// Get a string 1, 2a, etc describing the number of the leg
-  string getLegNumber(int leg) const;
+  wstring getLegNumber(int leg) const;
 
   // Return the number of distinct runners for one
   // "team" in this class.
@@ -419,11 +456,11 @@ public:
   void setStartType(int leg, StartTypes st, bool noThrow);
   void setLegType(int leg, LegTypes lt);
 
-  bool setStartData(int leg, const string &s);
+  bool setStartData(int leg, const wstring &s);
   bool setStartData(int leg, int value);
   
-  void setRestartTime(int leg, const string &t);
-  void setRopeTime(int leg, const string &t);
+  void setRestartTime(int leg, const wstring &t);
+  void setRopeTime(int leg, const wstring &t);
 
   void setNoTiming(bool noResult);
   bool getNoTiming() const;
@@ -437,11 +474,8 @@ public:
   void setDirectResult(bool directResult);
   bool hasDirectResult() const;
 
-
-  string getClassResultStatus() const;
-
   bool isCourseUsed(int Id) const;
-  string getLength(int leg) const;
+  wstring getLength(int leg) const;
 
   // True if the multicourse structure is in use
   bool hasMultiCourse() const {return MultiCourse.size()>0;}
@@ -468,7 +502,7 @@ public:
 
   void setNumStages(int no);
 
-  bool operator<(const oClass &b){return tSortIndex<b.tSortIndex;}
+  bool operator<(const oClass &b) {return tSortIndex<b.tSortIndex || (tSortIndex == b.tSortIndex && Id < b.Id);}
 
   // Get total number of runners running this class.
   // Use checkFirstLeg to only check the number of runners running leg 1.
@@ -477,8 +511,8 @@ public:
   //Get remaining maps for class (or int::minvalue)
   int getNumRemainingMaps(bool recalculate) const;
 
-  const string &getName() const {return Name;}
-  void setName(const string &name);
+  const wstring &getName() const {return Name;}
+  void setName(const wstring &name);
 
   void Set(const xmlobject *xo);
   bool Write(xmlparser &xml);
@@ -511,8 +545,8 @@ public:
   PersonSex getSex() const;
   void setSex(PersonSex sex);
 
-  string getStart() const;
-  void setStart(const string &start);
+  wstring getStart() const;
+  void setStart(const wstring &start);
 
   int getBlock() const;
   void setBlock(int block);
@@ -524,15 +558,18 @@ public:
   BibMode getBibMode() const;
   void setBibMode(BibMode bibMode);
 
-  string getType() const;
-  void setType(const string &type);
+  wstring getType() const;
+  void setType(const wstring &type);
 
   // Get class default fee from competition, depending on type(?)
   // a non-zero fee is changed only if resetFee is true
   void addClassDefaultFee(bool resetFee);
 
   // Get entry fee depending on date and age
-  int getEntryFee(const string &date, int age) const;
+  int getEntryFee(const wstring &date, int age) const;
+
+  /// Get all class fees
+  vector<pair<wstring, size_t>> oClass::getAllFees() const;
 
   // Clear cached data
   void clearCache(bool recalculate);
@@ -567,5 +604,9 @@ public:
   friend class MeosSQL;
   friend class TabSpeaker;
 };
+
+static const oClass::DrawSpecified DrawKeys[4] = { oClass::DrawSpecified::FixedTime,
+                                                   oClass::DrawSpecified::Vacant, 
+                                                   oClass::DrawSpecified::Extra };
 
 #endif // !defined(AFX_OCLASS_H__63E948E3_3C06_4404_8E72_2185582FF30F__INCLUDED_)

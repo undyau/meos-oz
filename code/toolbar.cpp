@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@
 #include "meos_util.h"
 #include "toolbar.h"
 
-const char *szToolClass = "MeOSToolClass";
+const wchar_t *szToolClass = L"MeOSToolClass";
 
 LRESULT CALLBACK ToolProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -116,7 +116,7 @@ void Toolbar::activate(bool active) {
 void Toolbar::addButton(const string &id, int imgList, int icon, const string &tooltip)
 {
   tooltips.push_back(lang.tl(tooltip));
-  TBBUTTON tbButton = { MAKELONG(icon, imgList), btn_id.size() + BASE_ID, TBSTATE_ENABLED,
+  TBBUTTON tbButton = { MAKELONG(icon, imgList), int(btn_id.size()) + BASE_ID, TBSTATE_ENABLED,
                         buttonStyles, {0}, 0, (INT_PTR)tooltips.back().c_str() };
   btn.push_back(tbButton);
   btn_id.push_back(id);
@@ -150,15 +150,15 @@ void registerToolbar(HINSTANCE hInstance)
   RegisterClassEx(&wcex);
 }
 
-void Toolbar::createToolbar(const string &id, const string &title)
+void Toolbar::createToolbar(const string &id, const wstring &title)
 {
   if (id == toolbar_id) {
     show();
     return;
   }
 
-  string t = lang.tl(title);
-  HWND hParent = gdi.getHWND();
+  wstring t = lang.tl(title);
+  HWND hParent = gdi.getHWNDTarget();
   RECT rc;
   GetWindowRect(hParent, &rc);
   if (hwndFloater == 0) {
@@ -281,7 +281,7 @@ LRESULT CALLBACK ToolProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       Toolbar *tb = (Toolbar *)GetWindowLongPtr(hWnd, GWL_USERDATA);
       if (tb) {
         //DefWindowProc(tb->gdi.getHWND(), message, wParam, lParam);
-        SendMessage(tb->gdi.getMain(), message, wParam, lParam);
+        SendMessage(tb->gdi.getHWNDMain(), message, wParam, lParam);
       }
       return DefWindowProc(hWnd, message, wParam, lParam);
     }

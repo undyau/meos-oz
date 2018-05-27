@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,16 +22,17 @@
 ************************************************************************/
 #include "tabbase.h"
 #include "Printer.h"
+#include "autocompletehandler.h"
 
 class Table;
 
 class TabRunner :
-  public TabBase
+  public TabBase, AutoCompleteHandler
 {
 private:
   void addToolbar(gdioutput &gdi);
 
-  const string &getSearchString() const;
+  const wstring &getSearchString() const;
 
   void setCardNo(gdioutput &gdi, int cardNo);
 
@@ -41,8 +42,8 @@ private:
 
   void selectRunner(gdioutput &gdi, pRunner r);
 
-  string lastSearchExpr;
-  stdext::hash_set<int> lastFilter;
+  wstring lastSearchExpr;
+  unordered_set<int> lastFilter;
   DWORD timeToFill;
   int inputId;
   int searchCB(gdioutput &gdi, int type, void *data);
@@ -59,7 +60,7 @@ private:
 
   int cardModeStartY;
   int lastRace;
-  string lastFee;
+  wstring lastFee;
   int runnerId;
   bool ownWindow;
   bool listenToPunches;
@@ -92,11 +93,28 @@ private:
 
   static void autoGrowCourse(gdioutput &gdi);
 
+  void loadEconomy(gdioutput &gdi, oRunner &r);
+
+  class EconomyHandler : public GuiHandler {
+    int runnerId;
+    oEvent *oe;
+    oRunner &getRunner() const;
+  public:
+    void init(oRunner &r);
+    void handle(gdioutput &gdi, BaseInfo &info, GuiEventType type);
+    void save(gdioutput &gdi);
+  };
+
+  shared_ptr<EconomyHandler> ecoHandler;
+  EconomyHandler *getEconomyHandler(oRunner &r);
+
 protected:
   void clearCompetitionData();
-
 public:
-  
+  static pClub extractClub(oEvent *oe, gdioutput &gdi);
+
+  void handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) override;
+
   const char * getTypeStr() const {return "TRunnerTab";}
   TabType getType() const {return TRunnerTab;}
 
@@ -104,6 +122,8 @@ public:
 
   bool loadPage(gdioutput &gdi);
   bool loadPage(gdioutput &gdi, int runnerId);
+
+
 
   TabRunner(oEvent *oe);
   ~TabRunner(void);

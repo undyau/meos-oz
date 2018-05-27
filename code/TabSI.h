@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,11 +24,13 @@
 #include "SportIdent.h"
 #include "Printer.h"
 #include "inthashmap.h"
+#include "autocompletehandler.h"
 
 struct PunchInfo;
 class csvparser;
+struct AutoCompleteRecord;
 
-class TabSI :  public TabBase {
+class TabSI :  public TabBase, AutoCompleteHandler {
   public:
     enum SIMode {
     ModeReadOut,
@@ -67,7 +69,7 @@ private:
   
   vector<PunchInfo> punches;
   vector<SICard> cards;
-  vector<string> filterDate;
+  vector<wstring> filterDate;
 
   int runnerMatchedId;
   bool printErrorShown;
@@ -77,7 +79,7 @@ private:
   SIMode mode;
   int currentAssignIndex;
 
-  void printSIInfo(gdioutput &gdi, const string &port) const;
+  void printSIInfo(gdioutput &gdi, const wstring &port) const;
 
   void assignCard(gdioutput &gdi, const SICard &sic);
   void entryCard(gdioutput &gdi, const SICard &sic);
@@ -86,12 +88,12 @@ private:
   void generateEntryLine(gdioutput &gdi, pRunner r);
   int lastClassId;
   int lastClubId;
-  string lastFee;
+  wstring lastFee;
   int inputId;
 
   void showCheckCardStatus(gdioutput &gdi, const string &cmd);
   
-  string getCardInfo(bool param, vector<int> &count) const;
+  wstring getCardInfo(bool param, vector<int> &count) const;
   // Formatting for card tick off
   bool checkHeader;
   int cardPosX;
@@ -168,23 +170,46 @@ private:
     void handle(gdioutput &gdi, BaseInfo &info, GuiEventType type);
     friend class TabSI;
   };
+
+  class DirectEntryGUI : public GuiHandler {
+    TabSI *tabSI;
+    DirectEntryGUI(const DirectEntryGUI&);
+    DirectEntryGUI &operator=(const DirectEntryGUI&);
+  public:
+
+    void updateFees(gdioutput &gdi, const pClass cls, int age);
+    DirectEntryGUI() : tabSI(0) {}
+    void handle(gdioutput &gdi, BaseInfo &info, GuiEventType type);
+    friend class TabSI;
+  };
+
   EditCardData editCardData;
+  DirectEntryGUI directEntryGUI;
+
+  oClub *extractClub(gdioutput &gdi) const;
+  RunnerWDBEntry *extractRunner(gdioutput &gdi) const;
 
 protected:
   void clearCompetitionData();
 
 public:
 
+  bool showDatabase() const;
+
+  static vector<AutoCompleteRecord> getRunnerAutoCompelete(RunnerDB &db, const vector< pair<RunnerWDBEntry *, int>> &rw, pClub dbClub);
+
+  void handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) override;
+
     // Returns true if a repeated check should be done (there is more to print)
   bool checkpPrintQueue(gdioutput &gdi);
 
   struct StoredStartInfo {
-    string storedName;
-    string storedCardNo;
-    string storedClub;
-    string storedFee;
-    string storedPhone;
-    string storedStartTime;
+    wstring storedName;
+    wstring storedCardNo;
+    wstring storedClub;
+    wstring storedFee;
+    wstring storedPhone;
+    wstring storedStartTime;
     bool allStages;
     bool rentState;
     bool hasPaid;
@@ -211,7 +236,7 @@ public:
 
   int siCB(gdioutput &gdi, int type, void *data);
 
-  void logCard(const SICard &card);
+  void logCard(gdioutput &gdi, const SICard &card);
 
   void setCardNumberField(const string &fieldId) {insertCardNumberField=fieldId;}
 

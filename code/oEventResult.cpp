@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +27,6 @@
 #include <cassert>
 #include <algorithm>
 #include <limits>
-#include <hash_set>
 
 #include "oEvent.h"
 #include "oDataContainer.h"
@@ -48,7 +47,7 @@ void oEvent::calculateSplitResults(int controlIdFrom, int controlIdTo)
 
   for (it=Runners.begin(); it!=Runners.end(); ++it) {
     int st = 0;
-    if (controlIdFrom > 0) {
+    if (controlIdFrom > 0 && controlIdFrom != oPunch::PunchStart) {
       RunnerStatus stat;
       it->getSplitTime(controlIdFrom, stat, st);
       if (stat != StatusOK) {
@@ -57,7 +56,7 @@ void oEvent::calculateSplitResults(int controlIdFrom, int controlIdTo)
         continue;
       }
     }
-    if (controlIdTo == 0) {
+    if (controlIdTo == 0 || controlIdTo == oPunch::PunchFinish) {
       it->tempRT = max(0, it->FinishTime - (st + it->tStartTime) );
       if (it->tempRT > 0)
         it->tempRT += it->getTimeAdjustment();
@@ -80,8 +79,8 @@ void oEvent::calculateSplitResults(int controlIdFrom, int controlIdTo)
   int cTime=0;
 
   for (it=Runners.begin(); it != Runners.end(); ++it){
-    if (it->getClassId()!=cClassId){
-      cClassId=it->getClassId();
+    if (it->getClassId(true)!=cClassId){
+      cClassId=it->getClassId(true);
       cPlace=0;
       vPlace=0;
       cTime=0;
@@ -106,7 +105,7 @@ void oEvent::calculateSplitResults(int controlIdFrom, int controlIdTo)
   }
 }
 
-void oEvent::calculateResults(ResultType resultType) {
+void oEvent::calculateResults(ResultType resultType, bool includePreliminary) {
   const bool totalResults = resultType == RTTotalResult;
   const bool courseResults = resultType == RTCourseResult;
   const bool classCourseResults = resultType == RTClassCourseResult;
@@ -136,7 +135,7 @@ void oEvent::calculateResults(ResultType resultType) {
     // Start new "class"
     if (classCourseResults) {
       const pCourse crs = it->getCourse(false);
-      int crsId = it->getClassId() * 997 + (crs ? crs->getId() : 0);
+      int crsId = it->getClassId(true) * 997 + (crs ? crs->getId() : 0);
       if (crsId != cClassId) {
         cClassId = crsId;
         cPlace=0;
@@ -157,8 +156,8 @@ void oEvent::calculateResults(ResultType resultType) {
         cTime=0;
       }
     }
-    else if (it->getClassId() != cClassId || it->tDuplicateLeg!=cDuplicateLeg || it->tLegEquClass != cLegEquClass) {
-      cClassId=it->getClassId();
+    else if (it->getClassId(true) != cClassId || it->tDuplicateLeg!=cDuplicateLeg || it->tLegEquClass != cLegEquClass) {
+      cClassId=it->getClassId(true);
       useResults = it->Class ? !it->Class->getNoTiming() : false;
       cPlace=0;
       vPlace=0;
@@ -177,7 +176,7 @@ void oEvent::calculateResults(ResultType resultType) {
     else if (!totalResults) {
       int tPlace = 0;
 
-      if (it->tStatus==StatusOK){
+      if (it->tStatus==StatusOK || (includePreliminary && it->tStatus == StatusUnknown && it->FinishTime > 0)){
         cPlace++;
 
         int rt = it->getRunningTime() + it->getNumShortening() * 3600 * 24* 8;
@@ -199,9 +198,10 @@ void oEvent::calculateResults(ResultType resultType) {
         it->tCoursePlace = tPlace;
     }
     else {
-      int tt = it->getTotalRunningTime(it->FinishTime);
+      int tt = it->getTotalRunningTime(it->FinishTime, true);
 
-      if (it->getTotalStatus() == StatusOK && tt>0) {
+      RunnerStatus totStat = it->getTotalStatus();
+      if (totStat == StatusOK || (includePreliminary && totStat == StatusUnknown) && tt>0) {
         cPlace++;
 
         if (tt > cTime)
@@ -220,7 +220,8 @@ void oEvent::calculateResults(ResultType resultType) {
   }
 }
 
-void oEvent::calculateRogainingResults() {
+void oEvent::calculateRogainingResults(const set<int> &classSelection) {
+  const bool all = classSelection.empty();
   sortRunners(ClassPoints);
   oRunnerList::iterator it;
 
@@ -237,8 +238,11 @@ void oEvent::calculateRogainingResults() {
     if (it->isRemoved())
       continue;
 
-    if (it->getClassId()!=cClassId || it->tDuplicateLeg!=cDuplicateLeg) {
-      cClassId = it->getClassId();
+    if (!all && !classSelection.count(it->getClassId(false)))
+      continue;
+
+    if (it->getClassId(true)!=cClassId || it->tDuplicateLeg!=cDuplicateLeg) {
+      cClassId = it->getClassId(true);
       useResults = it->Class ? !it->Class->getNoTiming() : false;
       cPlace = 0;
       vPlace = 0;
@@ -345,7 +349,7 @@ void oEvent::calculateTeamResults(bool multidayTotal)
   }
 }
 
-GeneralResult &oEvent::getGeneralResult(const string &tag, string &sourceFileOut) const {
+GeneralResult &oEvent::getGeneralResult(const string &tag, wstring &sourceFileOut) const {
   for (int i = 0; i < 2; i++) {
     if (i>0)
       loadGeneralResults(false);
@@ -354,8 +358,8 @@ GeneralResult &oEvent::getGeneralResult(const string &tag, string &sourceFileOut
         if (generalResults[k].ptr == 0)
           throw meosException("Internal error");
         sourceFileOut = generalResults[k].fileSource;
-        if (sourceFileOut == "*")
-          sourceFileOut = "";
+        if (sourceFileOut == L"*")
+          sourceFileOut = L"";
 
         return *generalResults[k].ptr;
       }
@@ -366,18 +370,18 @@ GeneralResult &oEvent::getGeneralResult(const string &tag, string &sourceFileOut
 
 void oEvent::loadGeneralResults(bool forceReload) const {
 //  OutputDebugString("Load General Results\n");
-  char bf[260];
-  getUserFile(bf, "");
-  vector<string> res;
-  expandDirectory(bf, "*.rules", res);
-  vector<string> res2;
-  expandDirectory(bf, "*.brules", res2);
+  wchar_t bf[260];
+  getUserFile(bf, L"");
+  vector<wstring> res;
+  expandDirectory(bf, L"*.rules", res);
+  vector<wstring> res2;
+  expandDirectory(bf, L"*.brules", res2);
 
   DynamicResult dr;
-  pair<string, string> err;
+  pair<wstring, wstring> err;
 
   vector<GeneralResultCtr> newGeneralResults;
-  set<string> loaded;
+  set<wstring> loaded;
   set<string> tags;
   set<long long> loadedRes;
   for (size_t k = 0; k < generalResults.size(); k++) {
@@ -418,10 +422,16 @@ void oEvent::loadGeneralResults(bool forceReload) const {
       loadedRes.insert(drp->getHashCode());
       newGeneralResults.push_back(GeneralResultCtr(res2[k], drp));
     }
+    catch (meosException &ex) {
+      if (err.first.empty()) {
+        err.first = res2[k];
+        err.second = ex.wwhat();
+      }
+    }
     catch (std::exception &ex) {
       if (err.first.empty()) {
         err.first = res2[k];
-        err.second = ex.what();
+        err.second = gdibase.widen(ex.what());
       }
     }
   }
@@ -486,28 +496,105 @@ void oEvent::loadGeneralResults(bool forceReload) const {
     if (rmAll[i].res->isReadOnly())
       drp->setReadOnly();
     drp->setAnnotation(rmAll[i].ctr->getListName());
-    string file = "*";
+    wstring file = L"*";
     newGeneralResults.push_back(GeneralResultCtr(file, drp));
   }
 
   swap(newGeneralResults, generalResults);
   if (!err.first.empty())
-    throw meosException("Error loading X (Y)#" + err.first + "#" + err.second);
+    throw meosException(L"Error loading X (Y)#" + err.first + L"#" + err.second);
 }
 
 
-void oEvent::getGeneralResults(bool onlyEditable, vector< pair<int, pair<string, string> > > &tagNameList, bool includeDate) const {
+void oEvent::getGeneralResults(bool onlyEditable, vector< pair<int, pair<string, wstring> > > &tagNameList, bool includeDate) const {
   tagNameList.clear();
   for (size_t k = 0; k < generalResults.size(); k++) {
     if (!onlyEditable || generalResults[k].isDynamic()) {
       tagNameList.push_back(make_pair(100 + k, make_pair(generalResults[k].tag, lang.tl(generalResults[k].name))));
       if (includeDate && generalResults[k].isDynamic()) {
         const DynamicResult &dr = dynamic_cast<const DynamicResult &>(*generalResults[k].ptr);
-        const string &date = dr.getTimeStamp();
+        const wstring &date = gdibase.widen(dr.getTimeStamp());
         if (!date.empty())
-          tagNameList.back().second.second += " [" + date + "]";
+          tagNameList.back().second.second += L" [" + date + L"]";
       }
-
     }
+  }
+}
+
+struct TeamResultContainer {
+  pTeam team;
+  int runningTime;
+  RunnerStatus status;
+  
+  bool operator<(const TeamResultContainer &o) const {
+
+    pClass cls = team->getClassRef(false);
+    pClass ocls = o.team->getClassRef(false);
+
+    if (cls != ocls) {
+      int so = cls ? cls->getSortIndex() : 0;
+      int oso = ocls ? ocls->getSortIndex() : 0;
+      if (so != oso)
+        return so < oso;
+    }
+
+    if (status != o.status)
+      return status < o.status;
+
+    if (runningTime != o.runningTime)
+      return runningTime < o.runningTime;
+
+    return false;
+  }
+};
+
+void oEvent::calculateTeamResultAtControl(const set<int> &classId, int leg, int courseControlId, bool totalResults) {
+  vector<TeamResultContainer> objs;
+  objs.reserve(Teams.size());
+  oSpeakerObject temp;
+  for (auto &t : Teams) {
+    if (t.isRemoved())
+      continue;
+
+    if (!classId.empty() && !classId.count(t.getClassId(false)))
+      continue;
+    temp.reset();
+    t.fillSpeakerObject(leg, courseControlId, -1, totalResults, temp);
+    if (!temp.owner)
+      continue;
+    TeamResultContainer trc;
+    trc.runningTime = temp.runningTime.time;
+    trc.status = temp.status;
+    trc.team = &t;
+    objs.push_back(trc);
+  }
+  
+  sort(objs.begin(), objs.end());
+
+  int cClass = -1;
+  int cPlace = -1;
+  int placeCounter = -1;
+  int cTime = 0;
+  for (size_t i = 0; i < objs.size(); i++) {
+    pTeam team = objs[i].team;
+    int c = team->getClassId(false);
+    if (c != cClass) {
+      cClass = c;
+      placeCounter = 1;
+      cTime = -1;
+    }
+    else {
+      placeCounter++;
+    }
+
+    if (cTime != objs[i].runningTime) {
+      cPlace = placeCounter;
+    }
+
+    team->tmpResult.startTime = team->getStartTime();
+    team->tmpResult.status = objs[i].status;
+    team->tmpResult.runningTime = objs[i].runningTime;
+    team->tmpResult.place = objs[i].status == StatusOK ? cPlace : 0;
+    team->tmpResult.points = 0; // Not supported
   }
 }

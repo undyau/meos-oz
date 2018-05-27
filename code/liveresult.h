@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,12 +38,12 @@ class LiveResult : public GuiHandler {
   int screenSize;
   bool isDuel;
 
-  string baseFont;
+  wstring baseFont;
   void showDefaultView(gdioutput &gdi);
   map<int, pair<int, int> > startFinishTime;
   int showResultList;
   int resYPos;  
-  string getFont(const gdioutput &gdi, double relScale) const;
+  wstring getFont(const gdioutput &gdi, double relScale) const;
   double timerScale;
   struct Result {
     int place;

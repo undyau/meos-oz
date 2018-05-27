@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -292,9 +292,9 @@ public:
 
   void takeVariable(const char*name, vector<int> &val) const;
 
-  void getSymbols(vector< pair<string, size_t> > &symb) const;
+  void getSymbols(vector< pair<wstring, size_t> > &symb) const;
 
-  void getSymbolInfo(int ix, string &name, string &desc) const;
+  void getSymbolInfo(int ix, wstring &name, wstring &desc) const;
 
   void dumpVariables(gdioutput &gdi, int c1, int c2) const;
   void dumpSymbols(gdioutput &gdi, int c1, int c2) const;

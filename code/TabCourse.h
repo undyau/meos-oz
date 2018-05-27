@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -35,11 +35,11 @@ class TabCourse :
   int courseCB(gdioutput &gdi, int type, void *data);
   bool addedCourse;
 
-  string time_limit;
-  string point_limit;
-  string point_reduction;
+  wstring time_limit;
+  wstring point_limit;
+  wstring point_reduction;
 
-  void fillCourseControls(gdioutput &gdi, const string &ctrl);
+  void fillCourseControls(gdioutput &gdi, const wstring &ctrl);
   void fillOtherCourses(gdioutput &gdi, oCourse &crs);
 
   void saveLegLengths(gdioutput &gdi);
@@ -48,10 +48,10 @@ class TabCourse :
 
   DrawMethod getDefaultMethod() const;
 
-  string encodeCourse(const string &in, bool firstStart, bool lastFinish);
-  void refreshCourse(const string &text, gdioutput &gdi);
+  wstring encodeCourse(const wstring &in, bool firstStart, bool lastFinish);
+  void refreshCourse(const wstring &text, gdioutput &gdi);
   
-  const string &formatControl(int id, string &bf) const;
+  const wstring &formatControl(int id, wstring &bf) const;
 
 protected:
   void clearCompetitionData();
@@ -68,7 +68,7 @@ public:
   TabCourse(oEvent *oe);
   ~TabCourse(void);
 
-  static void runCourseImport(gdioutput& gdi, const string &filename,
+  static void runCourseImport(gdioutput& gdi, const wstring &filename,
                               oEvent *oe, bool addClasses);
 
   static void setupCourseImport(gdioutput& gdi, GUICALLBACK cb);

@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -42,8 +42,6 @@ protected:
 
   enum PrincipalSort {None, ClassWise, CourseWise};
 
-  virtual PrincipalSort getPrincipalSort() const {return ClassWise;}
-
   virtual int score(oTeam &team, RunnerStatus st, int time, int points) const;
   virtual RunnerStatus deduceStatus(oTeam &team) const;
   virtual int deduceTime(oTeam &team) const;
@@ -63,6 +61,82 @@ protected:
   int getListParamTimeFromControl() const;
 
 public:
+
+  struct BaseResultContext {
+  private:
+    int leg;
+    bool useModule;
+    pair<int,int> controlId; // Start - finish
+    bool totalResults;
+    mutable map<int, pair<int, int> > resIntervalCache;
+
+    friend class GeneralResult;
+  };
+
+  struct GeneralResultInfo {
+    oAbstractRunner *src;
+    int time;
+    RunnerStatus status;
+    int score;
+    int place;
+
+    int getNumSubresult(const BaseResultContext &context) const;
+    bool getSubResult(const BaseResultContext &context, int ix, GeneralResultInfo &out) const;
+
+    inline bool compareResult(const GeneralResultInfo &o) const {
+      if (status != o.status)
+        return RunnerStatusOrderMap[status] < RunnerStatusOrderMap[o.status];
+
+      if (place != o.place)
+        return place < o.place;
+
+      const wstring &name = src->getName();
+      const wstring &oname = o.src->getName();
+
+      return CompareString(LOCALE_USER_DEFAULT, 0,
+        name.c_str(), name.length(),
+        oname.c_str(), oname.length()) == CSTR_LESS_THAN;
+    }
+
+    bool operator<(const GeneralResultInfo &o) const {
+      pClass cls = src->getClassRef(true);
+      pClass ocls = o.src->getClassRef(true);
+
+      if (cls != ocls) {
+        int so = cls ? cls->getSortIndex() : 0;
+        int oso = ocls ? ocls->getSortIndex() : 0;
+        if (so != oso)
+          return so < oso;
+      
+        // Use id as fallback
+        so = cls ? cls->getId() : 0;
+        oso = ocls ? ocls->getId() : 0;
+        if (so != oso)
+          return so < oso;
+      }
+      return compareResult(o);
+    }
+  };
+
+
+  static void calculateIndividualResults(vector<pRunner> &runners,
+                                         const pair<int, int> &controlId,
+                                         bool totalResults,
+                                         const string &resTag,
+                                         oListInfo::ResultType resType,
+                                         int inputNumber,
+                                         oEvent &oe,
+                                         vector<GeneralResultInfo> &results);
+
+  static shared_ptr<BaseResultContext> calculateTeamResults(vector<pTeam> &teams,
+                                                            int leg,
+                                                            const pair<int, int> &controlId,
+                                                            bool totalResults,
+                                                            const string &resTag,
+                                                            oListInfo::ResultType resType,
+                                                            int inputNumber,
+                                                            oEvent &oe,
+                                                            vector<GeneralResultInfo> &results);
 
   void setContext(const oListParam *context);
   void clearContext();
@@ -132,11 +206,11 @@ private:
   vector<MethodInfo> methods;
   mutable bool isCompiled;
   mutable Parser parser;
-  string name;
+  wstring name;
   string tag;
-  string description;
-  string annotation;
-  mutable string origin;
+  wstring description;
+  wstring annotation;
+  mutable wstring origin;
   string timeStamp;
   bool builtIn;
   mutable bool readOnly;
@@ -161,8 +235,8 @@ public:
 
   long long getHashCode() const;
 
-  void getSymbols(vector< pair<string, size_t> > &symb) const;
-  void getSymbolInfo(int ix, string &name, string &desc) const;
+  void getSymbols(vector< pair<wstring, size_t> > &symb) const;
+  void getSymbolInfo(int ix, wstring &name, wstring &desc) const;
 
   void declareSymbols(DynamicMethods m, bool clear) const;
 
@@ -200,16 +274,16 @@ public:
   void setTag(const string &t) {tag = t;}
   void setBuiltIn() {builtIn = true;}
   bool isBuiltIn() const {return builtIn;}
-  string getName(bool withAnnotation) const;
-  void setName(const string &n) {name = n;}
-  void setAnnotation(const string &a) {annotation = a;}
-  const string &getDescription() const {return description;}
-  void setDescription(const string &n) {description = n;}
+  wstring getName(bool withAnnotation) const;
+  void setName(const wstring &n) {name = n;}
+  void setAnnotation(const wstring &a) {annotation = a;}
+  const wstring &getDescription() const {return description;}
+  void setDescription(const wstring &n) {description = n;}
 
-  void save(const string &file) const;
+  void save(const wstring &file) const;
   void save(xmlparser &xml) const;
 
-  void load(const string &file);
+  void load(const wstring &file);
   void load(const xmlobject &xDef);
 
   void compile(bool forceRecompile) const;

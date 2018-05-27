@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -127,19 +127,23 @@ void DirectSocket::listenDirectSocket() {
 }
 
 void startListeningDirectSocket(void *p) {
-  string error;
+  wstring error;
   try {
     ((DirectSocket*)p)->listenDirectSocket();
   }
+  catch (const meosException &ex) {
+    error = ex.wwhat();
+  }
   catch (std::exception &ex) {
-    error = ex.what();
+    string ne = ex.what();
+    error.insert(error.begin(), ne.begin(), ne.end());
   }
   catch (...) {
-    error = "Unknown error";
+    error = L"Unknown error";
   }
   if (!error.empty()) {
-    error = "Setting up advance information service for punches failed. Punches will be recieved with some seconds delay. Is the network port blocked by an other MeOS session?\n\n" + error;
-    MessageBox(NULL, error.c_str(), "MeOS", MB_OK|MB_ICONSTOP);
+    error = L"Setting up advance information service for punches failed. Punches will be recieved with some seconds delay. Is the network port blocked by an other MeOS session?\n\n" + error;
+    MessageBox(NULL, error.c_str(), L"MeOS", MB_OK|MB_ICONSTOP);
   }
 }
 
@@ -178,6 +182,6 @@ void DirectSocket::sendPunch(SocketPunchInfo &pi) {
   int ret = sendto(sendSocket, (char*)&epi, sizeof(epi), 0, (sockaddr*)&brdcastaddr, len);
 
   if (ret < 0) {
-    OutputDebugString("Error broadcasting to the clients");
+    OutputDebugStringA("Error broadcasting to the clients");
   }
 }

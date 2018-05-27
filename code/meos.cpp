@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -64,7 +64,13 @@
 #include "autotask.h"
 #include "meosexception.h"
 #include "parser.h"
+#include "restserver.h"
+#include "autocomplete.h"
+#include "image.h"
 
+int defaultCodePage = 1252;
+
+Image image;
 gdioutput *gdi_main=0;
 oEvent *gEvent=0;
 SportIdent *gSI=0;
@@ -91,7 +97,7 @@ void Setup(bool overwrite, bool overwriteAll);
 
 // Global Variables:
 HINSTANCE hInst; // current instance
-CHAR szTitle[MAX_LOADSTRING]; // The title bar text
+TCHAR szTitle[MAX_LOADSTRING]; // The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING]; // The title bar text
 TCHAR szWorkSpaceClass[MAX_LOADSTRING]; // The title bar text
 
@@ -103,7 +109,7 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK About(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam);
 void registerToolbar(HINSTANCE hInstance);
-extern const char *szToolClass;
+extern const wchar_t *szToolClass;
 
 HHOOK g_hhk; //- handle to the hook procedure.
 
@@ -146,9 +152,12 @@ void LoadPage(gdioutput &gdi, TabType type) {
 }
 
 // Path to settings file
-static char settings[260];
+static wchar_t settings[260];
 // Startup path
-static char programPath[MAX_PATH];
+static wchar_t programPath[MAX_PATH];
+// Exe path
+static wchar_t exePath[MAX_PATH];
+
 
 void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
   MSG msg;
@@ -161,6 +170,8 @@ void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
   while ( (bRet = GetMessage(&msg, NULL, 0, 0)) != 0 ) {
     if (bRet == -1)
       return;
+    if (gEvent != 0)
+      RestServer::computeRequested(*gEvent);
 
     if (hAccelTable == 0 || !TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
       TranslateMessage(&msg);
@@ -173,13 +184,22 @@ void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
   }
 }
 
+INT_PTR CALLBACK splashDialogProc(
+  _In_ HWND   hwndDlg,
+  _In_ UINT   uMsg,
+  _In_ WPARAM wParam,
+  _In_ LPARAM lParam
+);
+
 int APIENTRY WinMain(HINSTANCE hInstance,
-                     HINSTANCE hPrevInstance,
-                     LPSTR     lpCmdLine,
-                     int       nCmdShow)
+  HINSTANCE hPrevInstance,
+  LPSTR     lpCmdLine,
+  int       nCmdShow)
 {
+  hInst = hInstance; // Store instance handle in our global variable
+
   atexit(dumpLeaks);	//
-  _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
+  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
   if (strstr(lpCmdLine, "-s") != 0) {
     Setup(true, false);
@@ -189,6 +209,14 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     enableTests = true;
   }
 
+  HWND hSplash = nullptr;
+  if (strstr(lpCmdLine, "-nosplash") == 0) {
+    hSplash = CreateDialog(hInstance, MAKEINTRESOURCE(IDD_SPLASH), nullptr, splashDialogProc);
+    ShowWindow(hSplash, SW_SHOW);
+    UpdateWindow(hSplash);
+  }
+
+  DWORD splashStart = GetTickCount();
 
   for (int k = 0; k < 100; k++) {
     RunnerStatusOrderMap[k] = 0;
@@ -198,17 +226,30 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   RunnerStatusOrderMap[StatusMP] = 2;
   RunnerStatusOrderMap[StatusDNF] = 3;
   RunnerStatusOrderMap[StatusDQ] = 4;
-  RunnerStatusOrderMap[StatusDNS] = 5;
-  RunnerStatusOrderMap[StatusUnknown] = 6;
-  RunnerStatusOrderMap[StatusNotCompetiting] = 7;
+  RunnerStatusOrderMap[StatusCANCEL] = 5;
+  RunnerStatusOrderMap[StatusDNS] = 6;
+  RunnerStatusOrderMap[StatusUnknown] = 7;
+  RunnerStatusOrderMap[StatusNotCompetiting] = 8;
 
   lang.init();
   StringCache::getInstance().init();
 
   GetCurrentDirectory(MAX_PATH, programPath);
+  
+  GetModuleFileName(NULL, exePath, MAX_PATH);
+  int lastDiv = -1;
+  for (int i = 0; i < MAX_PATH; i++) {
+    if (exePath[i] == 0)
+      break;
+    if (exePath[i] == '\\' || exePath[i] == '/')
+      lastDiv = i;
+  }
+  if (lastDiv != -1)
+    exePath[lastDiv] = 0;
+  else
+    exePath[0] = 0;
 
-  getUserFile(settings, "meospref.xml");
-
+  getUserFile(settings, L"meoswpref.xml");
   Parser::test();
 
   int rInit = (GetTickCount() / 100);
@@ -218,45 +259,57 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 
   HACCEL hAccelTable;
 
-  gdi_main = new gdioutput("main", 1.0, ANSI);
+  gdi_main = new gdioutput("main", 1.0);
   gdi_extra.push_back(gdi_main);
 
   try {
 	  gEvent = new oExtendedEvent(*gdi_main);
+  }
+  catch (meosException &ex) {
+    gdi_main->alert(wstring(L"Failed to create base event: ") + ex.wwhat());
+    return 0;
   }
   catch (std::exception &ex) {
     gdi_main->alert(string("Failed to create base event: ") + ex.what());
     return 0;
   }
 
-  gEvent->loadProperties(settings);
-
-  lang.get().addLangResource("English", "104");
-  lang.get().addLangResource("Svenska", "103");
-  lang.get().addLangResource("Deutsch", "105");
-  lang.get().addLangResource("Dansk", "106");
-  lang.get().addLangResource("Français", "110");
-  lang.get().addLangResource("Russian (ISO 8859-5)", "107");
-  lang.get().addLangResource("English (ISO 8859-2)", "108");
-  lang.get().addLangResource("English (ISO 8859-8)", "109");
-
-  if (fileExist("extra.lng")) {
-    lang.get().addLangResource("Extraspråk", "extra.lng");
+  if (fileExist(settings)) {
+    gEvent->loadProperties(settings);
   }
   else {
-    char lpath[260];
-    getUserFile(lpath, "extra.lng");
+    wchar_t oldSettings[260];  
+    // Read from older version
+    getUserFile(oldSettings, L"meospref.xml");
+    gEvent->loadProperties(oldSettings);
+  }
+  
+  lang.get().addLangResource(L"English", L"104");
+  lang.get().addLangResource(L"Svenska", L"103");
+  lang.get().addLangResource(L"Deutsch", L"105");
+  lang.get().addLangResource(L"Dansk", L"106");
+  lang.get().addLangResource(L"Français", L"110");
+  lang.get().addLangResource(L"Russian", L"107");
+
+  if (fileExist(L"extra.lng")) {
+    lang.get().addLangResource(L"Extraspråk", L"extra.lng");
+  }
+  else {
+    wchar_t lpath[260];
+    getUserFile(lpath, L"extra.lng");
     if (fileExist(lpath))
-      lang.get().addLangResource("Extraspråk", lpath);
+      lang.get().addLangResource(L"Extraspråk", lpath);
   }
 
-  string defLang = gEvent->getPropertyString("Language", "English");
+  wstring defLang = gEvent->getPropertyString("Language", L"English");
+
+  defaultCodePage = gEvent->getPropertyInt("CodePage", 1252);
 
   // Backward compatibility
-  if (defLang=="103")
-    defLang = "Svenska";
-  else if (defLang=="104")
-    defLang = "English";
+  if (defLang==L"103")
+    defLang = L"Svenska";
+  else if (defLang==L"104")
+    defLang = L"English";
 
   gEvent->setProperty("Language", defLang);
 
@@ -264,58 +317,100 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     lang.get().loadLangResource(defLang);
   }
   catch (std::exception &) {
-    lang.get().loadLangResource("English (ISO 8859-2)");
+    lang.get().loadLangResource(L"English");
   }
 
   try {
-    char listpath[MAX_PATH];
-    getUserFile(listpath, "");
-    vector<string> res;
-    expandDirectory(listpath, "*.lxml", res);
-    expandDirectory(listpath, "*.listdef", res);
-#
+    vector<wstring> res;
 #ifdef _DEBUG
-    expandDirectory(".\\Lists\\", "*.lxml", res);
-    expandDirectory(".\\Lists\\", "*.listdef", res);
+    expandDirectory(L".\\..\\Lists\\", L"*.lxml", res);
+    expandDirectory(L".\\..\\Lists\\", L"*.listdef", res);
 #endif
-    string err;
+    
+    if (exePath[0]) {
+      expandDirectory(exePath, L"*.lxml", res);
+      expandDirectory(exePath, L"*.listdef", res);
+    }
 
+    expandDirectory(programPath, L"*.lxml", res);
+    expandDirectory(programPath, L"*.listdef", res);
+
+    wchar_t listpath[MAX_PATH];
+    getUserFile(listpath, L"");
+    expandDirectory(listpath, L"*.lxml", res);
+    expandDirectory(listpath, L"*.listdef", res);
+
+    wstring err;
+    set<wstring> processed;
     for (size_t k = 0; k<res.size(); k++) {
       try {
-        xmlparser xml(0);
 
-        strcpy_s(listpath, res[k].c_str());
+        wchar_t filename[128];
+        wchar_t ext[32];
+        _wsplitpath_s(res[k].c_str(), NULL, 0, NULL, 0, filename, 128, ext, 32);
+        wstring fullFile = wstring(filename) + ext;
+        if (processed.count(fullFile))
+          continue;
+        processed.insert(fullFile);
+        xmlparser xml;
+
+        wcscpy_s(listpath, res[k].c_str());
         xml.read(listpath);
 
         xmlobject xlist = xml.getObject(0);
         gEvent->getListContainer().load(MetaListContainer::InternalList, xlist, true);
       }
-      catch (std::exception &ex) {
-        string errLoc = "Kunde inte ladda X\n\n(Y)#" + string(listpath) + "#" + lang.tl(ex.what());
+      catch (meosException &ex) {
+        wstring errLoc = L"Kunde inte ladda X\n\n(Y)#" + wstring(listpath) + L"#" + lang.tl(ex.wwhat());
         if (err.empty())
           err = lang.tl(errLoc);
         else
-          err += "\n" + lang.tl(errLoc);
+          err += L"\n" + lang.tl(errLoc);
+      }
+      catch (std::exception &ex) {
+        wstring errLoc = L"Kunde inte ladda X\n\n(Y)#" + wstring(listpath) + L"#" + lang.tl(ex.what());
+        if (err.empty())
+          err = lang.tl(errLoc);
+        else
+          err += L"\n" + lang.tl(errLoc);
       }
     }
     if (!err.empty())
       gdi_main->alert(err);
   }
+  catch (meosException &ex) {
+    gdi_main->alert(ex.wwhat());
+  }
   catch (std::exception &ex) {
     gdi_main->alert(ex.what());
-    //exit(1);
   }
 
-  gEvent->openRunnerDatabase("database");
-  strcpy_s(szTitle, "MeOS");
-  strcpy_s(szWindowClass, "MeosMainClass");
-  strcpy_s(szWorkSpaceClass, "MeosWorkSpace");
+  gEvent->openRunnerDatabase(L"database");
+  wcscpy_s(szTitle, L"MeOS");
+  wcscpy_s(szWindowClass, L"MeosMainClass");
+  wcscpy_s(szWorkSpaceClass, L"MeosWorkSpace");
   MyRegisterClass(hInstance);
   registerToolbar(hInstance);
 
-  string encoding = lang.tl("encoding");
+  string encoding = gdi_main->narrow(lang.tl("encoding"));
+/*FontEncoding interpetEncoding(const string &enc) {
+  if (enc == "RUSSIAN")
+    return Russian;
+  else if (enc == "EASTEUROPE")
+    return EastEurope;
+  else if (enc == "HEBREW")
+    return Hebrew;
+  else
+    return ANSI;
+}*/
+
   gdi_main->setFont(gEvent->getPropertyInt("TextSize", 0),
-                  gEvent->getPropertyString("TextFont", "Arial"), interpetEncoding(encoding));
+                    gEvent->getPropertyString("TextFont", L"Arial"));
+
+  if (hSplash != nullptr) {
+    DWORD startupToc = GetTickCount() - splashStart;
+    Sleep(min<int>(1000, max<int>(0, 700 - startupToc)));
+  }
 
   // Perform application initialization:
   if (!InitInstance (hInstance, nCmdShow)) {
@@ -339,17 +434,13 @@ int APIENTRY WinMain(HINSTANCE hInstance,
       (HINSTANCE) NULL, GetCurrentThreadId());
 
   hAccelTable = LoadAccelerators(hInstance, (LPCTSTR)IDC_MEOS);
-
+    
+  DestroyWindow(hSplash);
+  
   initMySQLCriticalSection(true);
   // Main message loop:
   mainMessageLoop(hAccelTable, 0);
-  /*while (GetMessage(&msg, NULL, 0, 0)) {
-    if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-    }
-  }
-  */
+
   tabAutoRegister(0);
   tabList->clear();
   delete tabList;
@@ -360,7 +451,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 
   for (size_t k = 0; k<gdi_extra.size(); k++) {
     if (gdi_extra[k]) {
-      DestroyWindow(gdi_extra[k]->getHWND());
+      DestroyWindow(gdi_extra[k]->getHWNDMain());
       if (k < gdi_extra.size()) {
         delete gdi_extra[k];
         gdi_extra[k] = 0;
@@ -381,7 +472,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   removeTempFiles();
 
   #ifdef _DEBUG
-    lang.get().debugDump("untranslated.txt", "translated.txt");
+    lang.get().debugDump(L"untranslated.txt", L"translated.txt");
   #endif
 
   StringCache::getInstance().clear();
@@ -437,6 +528,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
   wcex.lpszClassName	= szWorkSpaceClass;
   wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
   RegisterClassEx(&wcex);
+
+  AutoCompleteInfo::registerAutoClass();
 
   return true;
 }
@@ -502,7 +595,7 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
     gdi = gdi_main;
 
 
-  HWND hWnd = gdi ? gdi->getHWND() : 0;
+  HWND hWnd = gdi ? gdi->getHWNDTarget() : 0;
 
   bool ctrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) == 0x8000;
   bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) == 0x8000;
@@ -522,12 +615,15 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
   }
   else if (wParam==VK_RETURN && (lParam & (1<<31))) {
     if (gdi)
-      gdi->Enter();
+      gdi->enter();
   }
   else if (wParam==VK_UP) {
     bool c = false;
     if (gdi  && (lParam & (1<<31)))
-      c = gdi->UpDown(1);
+      c = gdi->upDown(1);
+
+    if (gdi && gdi->hasAutoComplete())
+      return 1;
 
     if (!c  && !(lParam & (1<<31)) && !(gdi && gdi->lockUpDown))
       SendMessage(hWnd, WM_VSCROLL, MAKELONG(SB_LINEUP, 0), 0);
@@ -541,7 +637,10 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
   else if (wParam==VK_DOWN) {
     bool c = false;
     if (gdi && (lParam & (1<<31)))
-      c = gdi->UpDown(-1);
+      c = gdi->upDown(-1);
+
+    if (gdi && gdi->hasAutoComplete())
+      return 1;
 
     if (!c && !(lParam & (1<<31)) && !(gdi && gdi->lockUpDown))
       SendMessage(hWnd, WM_VSCROLL, MAKELONG(SB_LINEDOWN, 0), 0);
@@ -556,7 +655,7 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
   }
   else if (wParam==VK_ESCAPE && (lParam & (1<<31))) {
     if (gdi)
-      gdi->Escape();
+      gdi->escape();
   }
   else if (wParam==VK_F2) {
     ProgressWindow pw(hWnd);
@@ -638,8 +737,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
   HWND hWnd;
 
-  hInst = hInstance; // Store instance handle in our global variable
-  //WS_EX_CONTROLPARENT
   HWND hDskTop=GetDesktopWindow();
   RECT rc;
   GetClientRect(hDskTop, &rc);
@@ -671,7 +768,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
   ShowWindow(hWnd, nCmdShow);
   UpdateWindow(hWnd);
 
-  hWnd = CreateWindowEx(0, szWorkSpaceClass, "WorkSpace", WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,
+  hWnd = CreateWindowEx(0, szWorkSpaceClass, L"WorkSpace", WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,
     50, 200, 200, 100, hWndMain, NULL, hInstance, NULL);
 
   if (!hWnd)
@@ -687,7 +784,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 void destroyExtraWindows() {
   for (size_t k = 1; k<gdi_extra.size(); k++) {
     if (gdi_extra[k]) {
-      DestroyWindow(gdi_extra[k]->getHWND());
+      DestroyWindow(gdi_extra[k]->getHWNDMain());
     }
   }
 }
@@ -702,18 +799,27 @@ string uniqueTag(const char *base) {
   }
 }
 
+vector<string> getExtraWindows() {
+  vector<string> res;
+  for (size_t k = 0; k < gdi_extra.size(); k++) {
+    if (gdi_extra[k])
+      res.push_back(gdi_extra[k]->getTag());
+  }
+  return res;
+}
+
 gdioutput *getExtraWindow(const string &tag, bool toForeGround) {
   for (size_t k = 0; k<gdi_extra.size(); k++) {
     if (gdi_extra[k] && gdi_extra[k]->hasTag(tag)) {
       if (toForeGround)
-        SetForegroundWindow(gdi_extra[k]->getHWND());
+        SetForegroundWindow(gdi_extra[k]->getHWNDMain());
       return gdi_extra[k];
     }
   }
   return 0;
 }
 
-gdioutput *createExtraWindow(const string &tag, const string &title, int max_x, int max_y) {
+gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x, int max_y) {
   if (getExtraWindow(tag, false) != 0)
     throw meosException("Window already exists");
 
@@ -729,7 +835,7 @@ gdioutput *createExtraWindow(const string &tag, const string &title, int max_x, 
 
   for (size_t k = 0; k<gdi_extra.size(); k++) {
     if (gdi_extra[k]) {
-      HWND hWnd = gdi_extra[k]->getHWND();
+      HWND hWnd = gdi_extra[k]->getHWNDTarget();
       RECT rc;
       if (GetWindowRect(hWnd, &rc)) {
         xp = max<int>(rc.left + 16, xp);
@@ -755,9 +861,9 @@ gdioutput *createExtraWindow(const string &tag, const string &title, int max_x, 
 
   ShowWindow(hWnd, SW_SHOWNORMAL);
   UpdateWindow(hWnd);
-  gdioutput *gdi = new gdioutput(tag, 1.0, gdi_main->getEncoding());
+  gdioutput *gdi = new gdioutput(tag, 1.0);
   gdi->setFont(gEvent->getPropertyInt("TextSize", 0),
-               gEvent->getPropertyString("TextFont", "Arial"), gdi_main->getEncoding());
+               gEvent->getPropertyString("TextFont", L"Arial"));
 
   gdi->init(hWnd, hWnd, 0);
   gdi->isTestMode = gdi_main->isTestMode;
@@ -766,6 +872,9 @@ gdioutput *createExtraWindow(const string &tag, const string &title, int max_x, 
       gdi->dbPushDialogAnswer(gdi_main->cmdAnswers.front());
       gdi_main->cmdAnswers.pop_front();
     }
+  }
+  else {
+    gdi->initRecorder(&gdi_main->getRecorder());
   }
   SetWindowLong(hWnd, GWL_USERDATA, gdi_extra.size());
   currentFocusIx = gdi_extra.size();
@@ -885,7 +994,7 @@ void createTabs(bool force, bool onlyMain, bool skipTeam, bool skipSpeaker,
     TCITEMW ti;
     //char bf[256];
     //strcpy_s(bf, lang.tl(it->name).c_str());
-    ti.pszText=(LPWSTR)gdi_main->toWide(lang.tl(it->name)).c_str();
+    ti.pszText=(LPWSTR)lang.tl(it->name).c_str();
     ti.mask=TCIF_TEXT;
     it->setId(id++);
 
@@ -934,7 +1043,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       ic.dwSize=sizeof(ic);
       ic.dwICC=ICC_TAB_CLASSES ;
       InitCommonControlsEx(&ic);
-      hMainTab=CreateWindowEx(0, WC_TABCONTROL, "tabs", WS_CHILD|WS_VISIBLE|WS_CLIPSIBLINGS, 0, 0, 300, 20, hWnd, 0, hInst, 0);
+      hMainTab=CreateWindowEx(0, WC_TABCONTROL, L"tabs", WS_CHILD|WS_VISIBLE|WS_CLIPSIBLINGS, 0, 0, 300, 20, hWnd, 0, hInst, 0);
       createTabs(true, true, false, false, false, false, false, false);
 
       SetTimer(hWnd, 4, 10000, 0); //Connection check
@@ -1030,6 +1139,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 it->loadPage(*gdi_main);
                 gdi_main->getRecorder().record(cmd);
               }
+              catch (meosException &ex) {
+                gdi_main->alert(ex.wwhat());
+              }
               catch(std::exception &ex) {
                 gdi_main->alert(ex.what());
               }
@@ -1057,13 +1169,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       //The card has been read and posted to a synchronized
       //queue by different thread. Read and process this card.
       {
-        SICard sic;
-        while (gSI && gSI->GetCard(sic))
+        SICard sic(ConvertedTimeStatus::Unknown);
+        while (gSI && gSI->getCard(sic))
           InsertSICard(*gdi_main, sic);
         break;
       }
     case WM_USER+1:
-      MessageBox(hWnd, "Kommunikationen med en SI-enhet avbröts.", "SportIdent", MB_OK);
+      MessageBox(hWnd, lang.tl(L"Kommunikationen med en SI-enhet avbröts.").c_str(), L"SportIdent", MB_OK);
       break;
 
     case WM_USER + 3:
@@ -1098,7 +1210,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       break;
 
     case WM_CLOSE:
-      if (!gEvent || gEvent->empty() || gdi_main->ask("Vill du verkligen stänga MeOS?"))
+      if (!gEvent || gEvent->empty() || gdi_main->ask(L"Vill du verkligen stänga MeOS?"))
           DestroyWindow(hWnd);
       break;
 
@@ -1106,19 +1218,30 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       delete gSI;
       gSI=0;
 
+      for (size_t k = 0; k < gdi_extra.size(); k++) {
+        if (gdi_extra[k])
+          gdi_extra[k]->clearPage(false, false);
+      }
+
       if (gEvent) {
         try {
           gEvent->save();
         }
+        catch (meosException &ex) {
+          MessageBox(hWnd, lang.tl(ex.wwhat()).c_str(), L"Fel när tävlingen skulle sparas", MB_OK);
+        }
         catch(std::exception &ex) {
-          MessageBox(hWnd, lang.tl(ex.what()).c_str(), "Fel när tävlingen skulle sparas", MB_OK);
+          MessageBox(hWnd, lang.tl(ex.what()).c_str(), L"Fel när tävlingen skulle sparas", MB_OK);
         }
 
         try {
-          gEvent->saveRunnerDatabase("database", true);
+          gEvent->saveRunnerDatabase(L"database", true);
+        }
+        catch (meosException &ex) {
+          MessageBox(hWnd, lang.tl(ex.wwhat()).c_str(), L"Fel när löpardatabas skulle sparas", MB_OK);
         }
         catch(std::exception &ex) {
-          MessageBox(hWnd, lang.tl(ex.what()).c_str(), "Fel när löpardatabas skulle sparas", MB_OK);
+          MessageBox(hWnd, lang.tl(ex.what()).c_str(), L"Fel när löpardatabas skulle sparas", MB_OK);
         }
 
         if (gEvent)
@@ -1358,6 +1481,10 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
       switch(nScrollCode)
       {
+        case SB_ENDSCROLL:
+          InvalidateRect(hWnd, 0, false);
+          return 0;
+        
         // User clicked shaft left of the scroll box.
         case SB_PAGEUP:
            xInc = -80;
@@ -1470,7 +1597,7 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         scrollVertical(gdi, dy, hWnd);
       }
       else
-        MessageBox(hWnd, "Runtime exception", 0, MB_OK);
+        MessageBox(hWnd, L"Runtime exception", 0, MB_OK);
       break;
 
     case WM_ACTIVATE: {
@@ -1556,13 +1683,13 @@ LRESULT CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 namespace setup {
 const int nFiles=7;
-const char *fileList[nFiles]={"baseclass.xml",
-                               "family.mwd",
-                               "given.mwd",
-                               "club.mwd",
-                               "class.mwd",
-                               "database.clubs",
-                               "database.persons"};
+const wchar_t *fileList[nFiles]={L"baseclass.xml",
+                                 L"wfamily.mwd",
+                                 L"wgiven.mwd",
+                                 L"wclub.mwd",
+                                 L"wclass.mwd",
+                                 L"database.wclubs",
+                                 L"database.wpersons"};
 }
 
 void Setup(bool overwrite, bool overwriteAll)
@@ -1572,27 +1699,27 @@ void Setup(bool overwrite, bool overwriteAll)
     return;
   isSetup=true; //Run at most once.
 
-  vector<pair<string, bool> > toInstall;
+  vector<pair<wstring, bool> > toInstall;
   for(int k=0;k<setup::nFiles;k++) {
-    toInstall.push_back(make_pair(string(setup::fileList[k]), overwriteAll));
+    toInstall.push_back(make_pair(wstring(setup::fileList[k]), overwriteAll));
   }
 
-  char dir[260];
+  wchar_t dir[260];
   GetCurrentDirectory(260, dir);
-  vector<string> dyn;
-  expandDirectory(dir, "*.lxml", dyn);
-  expandDirectory(dir, "*.listdef", dyn);
-  expandDirectory(dir, "*.meos", dyn);
+  vector<wstring> dyn;
+  if (overwrite)
+    expandDirectory(dir, L"*.meos", dyn);
+  
   for (size_t k = 0; k < dyn.size(); k++)
     toInstall.push_back(make_pair(dyn[k], true));
 
-  char bf[260];
+  wchar_t bf[260];
   for(size_t k=0; k<toInstall.size(); k++) {
-    const string src = toInstall[k].first.c_str();
-    char filename[128];
-    char ext[32];
-    _splitpath_s(src.c_str(), NULL, 0, NULL,0, filename, 128, ext, 32);
-    string fullFile = string(filename) + ext;
+    const wstring src = toInstall[k].first;
+    wchar_t filename[128];
+    wchar_t ext[32];
+    _wsplitpath_s(src.c_str(), NULL, 0, NULL,0, filename, 128, ext, 32);
+    wstring fullFile = wstring(filename) + ext;
     
     getUserFile(bf, fullFile.c_str());
     bool canOverwrite = overwrite && toInstall[k].second;
@@ -1602,93 +1729,93 @@ void Setup(bool overwrite, bool overwriteAll)
 
 void exportSetup()
 {
-  char bf[260];
+  wchar_t bf[260];
   for(int k=0;k<setup::nFiles;k++) {
     getUserFile(bf, setup::fileList[k]);
     CopyFile(bf, setup::fileList[k], false);
   }
 }
 
-bool getMeOSFile(char *FileNamePath, const char *FileName) {
-  char Path[MAX_PATH];
+bool getMeOSFile(wchar_t *FileNamePath, const wchar_t *FileName) {
+  wchar_t Path[MAX_PATH];
 
-  strcpy_s(Path, programPath);
-  int i=strlen(Path);
+  wcscpy_s(Path, programPath);
+  int i=wcslen(Path);
   if (Path[i-1]!='\\')
-    strcat_s(Path, MAX_PATH, "\\");
+    wcscat_s(Path, MAX_PATH, L"\\");
 
-  strcat_s(Path, FileName);
-  strcpy_s(FileNamePath, MAX_PATH, Path);
+  wcscat_s(Path, FileName);
+  wcscpy_s(FileNamePath, MAX_PATH, Path);
   return true;
 }
 
 
-bool getUserFile(char *FileNamePath, const char *FileName)
+bool getUserFile(wchar_t *FileNamePath, const wchar_t *FileName)
 {
-  char Path[MAX_PATH];
-  char AppPath[MAX_PATH];
+  wchar_t Path[MAX_PATH];
+  wchar_t AppPath[MAX_PATH];
 
   if (SHGetSpecialFolderPath(hWndMain, Path, CSIDL_APPDATA, 1)!=NOERROR) {
-    int i=strlen(Path);
+    int i=wcslen(Path);
     if (Path[i-1]!='\\')
-      strcat_s(Path, MAX_PATH, "\\");
+      wcscat_s(Path, MAX_PATH, L"\\");
 
-    strcpy_s(AppPath, MAX_PATH, Path);
-    strcat_s(AppPath, MAX_PATH, "Meos\\");
+    wcscpy_s(AppPath, MAX_PATH, Path);
+    wcscat_s(AppPath, MAX_PATH, L"Meos\\");
 
     CreateDirectory(AppPath, NULL);
 
     Setup(false, false);
 
-    strcpy_s(FileNamePath, MAX_PATH, AppPath);
-    strcat_s(FileNamePath, MAX_PATH, FileName);
+    wcscpy_s(FileNamePath, MAX_PATH, AppPath);
+    wcscat_s(FileNamePath, MAX_PATH, FileName);
 
     //return true;
   }
-  else strcpy_s(FileNamePath, MAX_PATH, FileName);
+  else wcscpy_s(FileNamePath, MAX_PATH, FileName);
 
   return true;
 }
 
 
-bool getDesktopFile(char *fileNamePath, const char *fileName, const char *subFolder)
+bool getDesktopFile(wchar_t *fileNamePath, const wchar_t *fileName, const wchar_t *subFolder)
 {
-  char Path[MAX_PATH];
-  char AppPath[MAX_PATH];
+  wchar_t Path[MAX_PATH];
+  wchar_t AppPath[MAX_PATH];
 
   if (SHGetSpecialFolderPath(hWndMain, Path, CSIDL_DESKTOPDIRECTORY, 1)!=NOERROR) {
-    int i=strlen(Path);
+    int i=wcslen(Path);
     if (Path[i-1]!='\\')
-      strcat_s(Path, MAX_PATH, "\\");
+      wcscat_s(Path, MAX_PATH, L"\\");
 
-    strcpy_s(AppPath, MAX_PATH, Path);
-    strcat_s(AppPath, MAX_PATH, "Meos\\");
+    wcscpy_s(AppPath, MAX_PATH, Path);
+    wcscat_s(AppPath, MAX_PATH, L"Meos\\");
 
     CreateDirectory(AppPath, NULL);
 
     if (subFolder) {
-      strcat_s(AppPath, MAX_PATH, subFolder);
-      strcat_s(AppPath, MAX_PATH, "\\");
+      wcscat_s(AppPath, MAX_PATH, subFolder);
+      wcscat_s(AppPath, MAX_PATH, L"\\");
       CreateDirectory(AppPath, NULL);
     }
 
-    strcpy_s(fileNamePath, MAX_PATH, AppPath);
-    strcat_s(fileNamePath, MAX_PATH, fileName);
+    wcscpy_s(fileNamePath, MAX_PATH, AppPath);
+    wcscat_s(fileNamePath, MAX_PATH, fileName);
   }
-  else strcpy_s(fileNamePath, MAX_PATH, fileName);
+  else wcscpy_s(fileNamePath, MAX_PATH, fileName);
 
   return true;
 }
 
-static set<string> tempFiles;
-static string tempPath;
+static set<wstring> tempFiles;
+static wstring tempPath;
 
-string getTempPath() {
-  char tempFile[MAX_PATH];
+wstring getTempPath() {
+  wchar_t tempFile[MAX_PATH];
   if (tempPath.empty()) {
-    char path[MAX_PATH];
+    wchar_t path[MAX_PATH];
     GetTempPath(MAX_PATH, path);
-    GetTempFileName(path, "meos", 0, tempFile);
+    GetTempFileName(path, L"meos", 0, tempFile);
     DeleteFile(tempFile);
     if (CreateDirectory(tempFile, NULL))
       tempPath = tempFile;
@@ -1698,15 +1825,15 @@ string getTempPath() {
   return tempPath;
 }
 
-void registerTempFile(const string &tempFile) {
+void registerTempFile(const wstring &tempFile) {
   tempFiles.insert(tempFile);
 }
 
-string getTempFile() {
+wstring getTempFile() {
   getTempPath();
 
-  char tempFile[MAX_PATH];
-  if (GetTempFileName(tempPath.c_str(), "ix", 0, tempFile)) {
+  wchar_t tempFile[MAX_PATH];
+  if (GetTempFileName(tempPath.c_str(), L"ix", 0, tempFile)) {
     tempFiles.insert(tempFile);
     return tempFile;
   }
@@ -1714,16 +1841,16 @@ string getTempFile() {
     throw std::exception("Failed to create temporary file.");
 }
 
-void removeTempFile(const string &file) {
+void removeTempFile(const wstring &file) {
   DeleteFile(file.c_str());
   tempFiles.erase(file);
 }
 
 void removeTempFiles() {
-  vector<string> dir;
-  for (set<string>::iterator it = tempFiles.begin(); it!= tempFiles.end(); ++it) {
-    char c = *it->rbegin();
-    if (c == '/' || c=='\\')
+  vector<wstring> dir;
+  for (set<wstring>::iterator it = tempFiles.begin(); it!= tempFiles.end(); ++it) {
+    wchar_t c = *it->rbegin();
+    if (c == '/' || c == '\\')
       dir.push_back(*it);
     else
       DeleteFile(it->c_str());
@@ -1744,4 +1871,37 @@ void removeTempFiles() {
     RemoveDirectory(tempPath.c_str());
     tempPath.clear();
   }
+}
+
+INT_PTR CALLBACK splashDialogProc(
+  _In_ HWND   hwndDlg,
+  _In_ UINT   uMsg,
+  _In_ WPARAM wParam,
+  _In_ LPARAM lParam
+) {
+  PAINTSTRUCT ps;
+
+  switch (uMsg) {
+  case WM_INITDIALOG:
+   // SetWindowLong(hwndDlg, GWL_EXSTYLE, GetWindowLong(hwndDlg, GWL_EXSTYLE) | WS_EX_LAYERED);
+    // Make this window 40% alpha
+    //SetLayeredWindowAttributes(hwndDlg, 0, (255 * 60) / 100, LWA_ALPHA);
+    break;
+
+  case WM_PAINT: {
+    HDC hdc = BeginPaint(hwndDlg, &ps);
+    RECT rt;
+    GetClientRect(hwndDlg, &rt);
+    image.loadImage(IDI_SPLASHIMAGE, Image::ImageMethod::MonoAlpha);
+    int h = image.getHeight(IDI_SPLASHIMAGE);
+    int w = image.getWidth(IDI_SPLASHIMAGE);
+    image.drawImage(IDI_SPLASHIMAGE, Image::ImageMethod::MonoAlpha, hdc, (rt.right - w) / 2, (rt.bottom - h) / 2, w, h);
+    EndPaint(hwndDlg, &ps);
+    break;
+  }
+  case WM_ERASEBKGND:
+    return 1;
+  }
+
+  return 0;
 }

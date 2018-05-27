@@ -4,7 +4,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -61,13 +61,13 @@ struct PageInfo {
                    bool invertHeightY,
                    vector<RenderedPage> &pages);
 
-  string pageInfo(const RenderedPage &page) const;
+  wstring pageInfo(const RenderedPage &page) const;
 };
 
 /** A rendered page ready to print. */
 struct RenderedPage {
   int nPage; // This page number
-  string info;
+  wstring info;
   vector<PrintTextInfo> text;
   vector<RectangleInfo> rectangles;
   __int64 checkSum;
@@ -84,8 +84,8 @@ struct PrinterObject {
 
   void freePrinter();
 
-  string Device;
-  string Driver;
+  wstring Device;
+  wstring Driver;
   DEVMODE DevMode;
   set<__int64> printedPages;
   int nPagesPrinted;

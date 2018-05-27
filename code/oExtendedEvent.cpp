@@ -14,9 +14,8 @@ oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
 {
 	IsSydneySummerSeries = 0;
   SssEventNum = 0;
-  SssSeriesPrefix = "sss";
+  SssSeriesPrefix = L"sss";
 	LoadedCards = false;
-	setShortClubNames(false);   // default to behaving like vanilla MEOS
 }
 
 oExtendedEvent::~oExtendedEvent(void)
@@ -28,30 +27,29 @@ bool oExtendedEvent::SSSQuickStart(gdioutput &gdi)
   oSSSQuickStart qs(*this);
 	if (qs.ConfigureEvent(gdi)){
 		IsSydneySummerSeries = true;
-		setShortClubNames(true);
 		return true;
 	}
 	return false;
 }
 
-void oExtendedEvent::exportCourseOrderedIOFSplits(IOFVersion version, const char *file, bool oldStylePatrolExport, const set<int> &classes, int leg)
+void oExtendedEvent::exportCourseOrderedIOFSplits(IOFVersion version, const wchar_t *file, bool oldStylePatrolExport, const set<int> &classes, int leg)
 {
 	// Create new classes names after courses
 	std::map<int, int> courseNewClassXref;
 	std::map<int, int> runnerOldClassXref;
-	std::set<std::string> usedNames;
+	std::set<std::wstring> usedNames;
 
 	for (oClassList::iterator j = Classes.begin(); j != Classes.end(); j++) {
 		usedNames.insert(j->getName());
 	}
 
 	for (oCourseList::iterator j = Courses.begin(); j != Courses.end(); j++) {			
-		std::string name = j->getName();
+		std::wstring name = j->getName();
 		if (usedNames.find(name) != usedNames.end()) {
 				name = lang.tl("Course ") + name;
 			}
 		while (usedNames.find(name) != usedNames.end()) {
-				name = name + "_";
+				name = name + L"_";
 			}
 
 		usedNames.insert(name);
@@ -61,7 +59,7 @@ void oExtendedEvent::exportCourseOrderedIOFSplits(IOFVersion version, const char
 	
 	// Reassign all runners to new classes, saving old ones
 	for (oRunnerList::iterator j = Runners.begin(); j != Runners.end(); j++) {
-		runnerOldClassXref[j->getId()] = j->getClassId();	
+		runnerOldClassXref[j->getId()] = j->getClassId(false);	
 		int id = j->getCourse(false)->getId();
 		j->setClassId(courseNewClassXref[id], true);
 	}
@@ -78,16 +76,6 @@ void oExtendedEvent::exportCourseOrderedIOFSplits(IOFVersion version, const char
 	for (std::map<int, int>::iterator j = courseNewClassXref.begin(); j != courseNewClassXref.end(); j++) {
 		removeClass(j->second);
 	}
-}
-
-bool oEvent::getShortenClubNames()
-{
-  return eventProperties["DoShortenClubNames"] == "1";
-}
-
-void oEvent::setShortClubNames(bool shorten)
-{
-  eventProperties["DoShortenClubNames"] = shorten ? "1" : "0";
 }
 
 void oEvent::calculateCourseRogainingResults()
@@ -157,20 +145,20 @@ void oEvent::calculateCourseRogainingResults()
 void oExtendedEvent::uploadSss(gdioutput &gdi)
 {
 	static int s_counter(0);
-	string url = gdi.getText("SssServer");
+	wstring url = gdi.getText("SssServer");
 	SssEventNum = gdi.getTextNo("SssEventNum", false);
   SssSeriesPrefix = gdi.getText("SssSeriesPrefix",false);
 	if (SssEventNum == 0) {
-		gdi.alert("Invalid event number :" + gdi.getText("SssEventNum"));
+		gdi.alert(L"Invalid event number :" + gdi.getText("SssEventNum"));
 		return;
 		}
 
-	string resultCsv = getTempFile();
-	ProgressWindow pw(hWnd());
+	wstring resultCsv = getTempFile();
+	ProgressWindow pw(gdibase.getHWNDTarget());
 	exportOrCSV(resultCsv.c_str(), false);
-	string data = _T(loadCsvToString(resultCsv));
-	data = string_replace(data, "&","and");
-	data = "Name=" + SssSeriesPrefix + itos(SssEventNum) + "&Title=" + Name + "&Subtitle=" + SssSeriesPrefix + itos(SssEventNum) + "&Data=" + data + "&Serial=" + itos(s_counter++);
+	wstring data = (loadCsvToString(resultCsv));
+	data = string_replace(data, L"&",L"and");
+	data = L"Name=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Title=" + Name + L"&Subtitle=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Data=" + data + L"&Serial=" + to_wstring(s_counter++);
 	Download dwl;
   dwl.initInternet();
 	string result;
@@ -187,7 +175,7 @@ void oExtendedEvent::uploadSss(gdioutput &gdi)
     Sleep(100);
 	}
 	setProperty("SssServer",url);
-	gdi.alert("Completed upload of results to " + url);
+	gdi.alert(L"Completed upload of results to " + url);
 }
 
 void oExtendedEvent::writeExtraXml(xmlparser &xml)
@@ -208,29 +196,29 @@ void oExtendedEvent::readExtraXml(const xmlparser &xml)
 	if(xo) SssEventNum=xo.getInt();
 
 	xo=xml.getObject("SssSeriesPrefix");
-	if(xo) SssSeriesPrefix=xo.get();
+	if(xo) SssSeriesPrefix=xo.getw();
 }
 
-string oExtendedEvent::loadCsvToString(string file)
+wstring oExtendedEvent::loadCsvToString(wstring file)
 {
-	string result;
-	std::ifstream fin;
+	wstring result;
+	std::wifstream fin;
 	fin.open(file.c_str());
 
 	if(!fin.good())
-		return string("");
+		return wstring(L"");
 
-	char bf[1024];
+	wchar_t bf[1024];
 	while (!fin.eof()) {	
 		fin.getline(bf, 1024);
-		string temp(bf);
-		result += temp + "\n";
+		wstring temp(bf);
+		result += temp + L"\n";
 	}
 	
 	return result.substr(0, result.size()-1);
 }
 
-string oExtendedEvent::string_replace(string src, string const& target, string const& repl)
+wstring oExtendedEvent::string_replace(wstring src, wstring const& target, wstring const& repl)
 {
     // handle error situations/trivial cases
 
@@ -296,7 +284,15 @@ string formatOeCsvTime(int rt)
 	return "-";
 }
 
-bool oExtendedEvent::exportOrCSV(const char *file, bool byClass)
+string ws2s(wstring ws)
+	{
+	string s;
+	wide2String(ws, s);
+	return s;
+	}
+
+
+bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
 {
 	csvparser csv;
 
@@ -313,7 +309,9 @@ bool oExtendedEvent::exportOrCSV(const char *file, bool byClass)
 
 	oRunnerList::iterator it;
 
-	csv.OutputRow(lang.tl("Startnr;Bricka;Databas nr.;Efternamn;Förnamn;År;K;Block;ut;Start;Mål;Tid;Status;Klubb nr.;Namn;Ort;Land;Klass nr.;Kort;Lång;Num1;Num2;Num3;Text1;Text2;Text3;Adr. namn;Gata;Rad 2;Post nr.;Ort;Tel;Fax;E-post;Id/Club;Hyrd;Startavgift;Betalt;Bana nr.;Bana;km;Hm;Bana kontroller;Pl"));
+	string s;
+	
+	csv.outputRow(ws2s(lang.tl("Startnr;Bricka;Databas nr.;Efternamn;Förnamn;År;K;Block;ut;Start;Mål;Tid;Status;Klubb nr.;Namn;Ort;Land;Klass nr.;Kort;Lång;Num1;Num2;Num3;Text1;Text2;Text3;Adr. namn;Gata;Rad 2;Post nr.;Ort;Tel;Fax;E-post;Id/Club;Hyrd;Startavgift;Betalt;Bana nr.;Bana;km;Hm;Bana kontroller;Pl")));
 	
 	char bf[256];
 	for(it=Runners.begin(); it != Runners.end(); ++it){	
@@ -324,15 +322,16 @@ bool oExtendedEvent::exportOrCSV(const char *file, bool byClass)
 		row[0]=my_conv_is(it->getId());
 		row[1]=my_conv_is(it->getCardNo());
     row[2]=my_conv_is(int(it->getExtIdentifier()));
-		row[3]=it->getFamilyName();
-		row[4]=it->getGivenName();
+
+		row[3]=ws2s(it->getFamilyName());
+		row[4]=ws2s(it->getGivenName());
 		row[5]=my_conv_is(di.getInt("BirthYear") % 100);
-		row[6]=di.getString("Sex");
+		row[6]=ws2s(di.getString("Sex"));
 		row[8] = "0";  // non-comp
-		row[9]=it->getStartTimeS();
+		row[9]=ws2s(it->getStartTimeS());
 		if(row[9]=="-") row[9]="";
 
-		row[10]=it->getFinishTimeS();
+		row[10]=ws2s(it->getFinishTimeS());
 		if(row[10]=="-") row[10]="";
 
 		row[11]= formatOeCsvTime(it->getRunningTime());
@@ -343,15 +342,15 @@ bool oExtendedEvent::exportOrCSV(const char *file, bool byClass)
 			continue;
 		row[13]=my_conv_is(it->getClubId());
 		
-		row[15]=it->getClub();
-		row[16]=di.getString("Nationality");
-		row[17]=IsSydneySummerSeries && !byClass ? "1" : my_conv_is(it->getClassId());
-		row[18]=it->getClass();
-		row[19]=it->getClass();
+		row[15]=ws2s(it->getClub());
+		row[16]=ws2s(di.getString("Nationality"));
+		row[17]=IsSydneySummerSeries && !byClass ? "1" : my_conv_is(it->getClassId(false));
+		row[18]=ws2s(it->getClass(false));
+		row[19]=ws2s(it->getClass(false));
 		row[20]=my_conv_is(it->getRogainingPoints(false));
 		row[21]=my_conv_is(it->getRogainingReduction()+it->getRogainingPoints(false));
 		row[22]=my_conv_is(it->getRogainingReduction());
-		row[23]=it->getClass();
+		row[23]=ws2s(it->getClass(false));
 
 		row[35]=my_conv_is(di.getInt("CardFee"));
 		row[36]=my_conv_is(di.getInt("Fee"));
@@ -360,9 +359,9 @@ bool oExtendedEvent::exportOrCSV(const char *file, bool byClass)
 		pCourse pc=it->getCourse(false);
 		if(pc){
 			row[38]=my_conv_is(pc->getId());
-			row[24]=pc->getName();
-			row[18]=pc->getName();
-			row[39]=pc->getName();
+			row[24]=ws2s(pc->getName());
+			row[18]=ws2s(pc->getName());
+			row[39]=ws2s(pc->getName());
 			if(pc->getLength()>0){
 				sprintf_s(bf, "%d.%d", pc->getLength()/1000, pc->getLength()%1000);
 				row[40]=bf;
@@ -372,10 +371,10 @@ bool oExtendedEvent::exportOrCSV(const char *file, bool byClass)
 			row[41]=my_conv_is(pc->getDI().getInt("Climb"));
 			row[42]=my_conv_is(pc->getNumControls());
 		}
-  row[43] = it->getPlaceS();
-	row[44] = it->getStartTimeS();
+  row[43] = ws2s(it->getPlaceS());
+	row[44] = ws2s(it->getStartTimeS());
 	if(row[44]=="-") row[44]="";
-	row[45]=it->getFinishTimeS();
+	row[45]=ws2s(it->getFinishTimeS());
 	if(row[45]=="-") row[45]="";
 
 
@@ -398,7 +397,7 @@ bool oExtendedEvent::exportOrCSV(const char *file, bool byClass)
       }
 		row[42]=my_conv_is(j);
 		}
-	csv.OutputRow(row);
+	csv.outputRow(row);
 	}
 
 	csv.closeOutput();

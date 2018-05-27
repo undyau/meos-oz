@@ -7,7 +7,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -60,20 +60,20 @@ private:
   bool success;
   void initThread();
 
-  bool httpSendReqEx(HINTERNET hConnect, const string &dest, const vector< pair<string, string> > &headers,
-                     const string &upFile, const string &outFile, ProgressWindow &pw, int &errroCode) const;
+  bool httpSendReqEx(HINTERNET hConnect, const wstring &dest, const vector< pair<wstring, wstring> > &headers,
+                     const wstring &upFile, const wstring &outFile, ProgressWindow &pw, int &errroCode) const;
 
 public:
 
-  void postFile(const string &url, const string &file, const string &fileOut,
-                const vector< pair<string, string> > &headers, ProgressWindow &pw);
-  void postData(const string &url, const string &data, ProgressWindow &pw);
+  void postFile(const wstring &url, const wstring &file, const wstring &fileOut,
+                const vector< pair<wstring, wstring> > &headers, ProgressWindow &pw);
+  void postData(const wstring &url, const wstring &data, ProgressWindow &pw);
   int processMessages();
   bool successful();
   bool isWorking();
   void setBytesToDownload(DWORD btd);
   void endDownload();
-  void downloadFile(const string &url, const string &file, const vector< pair<string, string> > &headers);
+  void downloadFile(const wstring &url, const wstring &file, const vector< pair<wstring, wstring> > &headers);
   void initInternet();
   void shutDown();
   bool createDownloadThread();
@@ -87,7 +87,7 @@ protected:
 
   friend void SUThread(void *ptr);
 
-	std::vector<string*> usedBuffers;
+	std::vector<wstring*> usedBuffers;
 
 };
 

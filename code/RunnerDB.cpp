@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,6 +39,10 @@
 
 #include "oEvent.h"
 
+extern gdioutput *gdi_main;
+
+int RunnerDB::cellEntryIndex = -1;
+
 RunnerDB::RunnerDB(oEvent *oe_): oe(oe_)
 {
   loadedFromServer = false;
@@ -58,21 +62,96 @@ RunnerDBEntry::RunnerDBEntry()
   memset(this, 0, sizeof(RunnerDBEntry));
 }
 
+RunnerWDBEntry::RunnerWDBEntry()
+{
+  name[0] = 0;
+}
+
+void RunnerWDBEntry::initName() const {
+  if (name[0] == 0) {
+    memset(name, 0, sizeof(wchar_t) * baseNameLength);
+    const RunnerDBEntry &db = dbe();
+    if (db.isUTF()) {
+      int len = strlen(db.name);
+      len = min(len+1, baseNameLengthUTF-1);
+      int wlen = MultiByteToWideChar(CP_UTF8, 0, db.name, len, name, baseNameLength);
+      if (wlen == 0)
+        wlen = baseNameLength;
+      name[wlen-1] = 0;
+    }
+    else {
+      const wstring &wn = gdi_main->recodeToWide(db.name);
+      wcsncpy_s(name, wn.c_str(), baseNameLength-1);
+    }
+  }
+}
+
+void RunnerWDBEntry::recode(const RunnerDBEntry &dest) const {
+  initName();
+  RunnerDBEntry &d = const_cast<RunnerDBEntry &>(dest);
+  const int blen = min<int>(wcslen(name)+1, baseNameLength);
+  int res = WideCharToMultiByte(CP_UTF8, 0, name, blen, d.name, baseNameLengthUTF-1, 0, 0);
+  assert(res < baseNameLengthUTF);
+  if (res == 0 && blen > 0)
+    res = baseNameLengthUTF-1;
+  d.name[res] = 0;
+  d.setUTF();
+}
+
 RunnerDBEntryV1::RunnerDBEntryV1()
 {
   memset(this, 0, sizeof(RunnerDBEntryV1));
 }
 
-
-void RunnerDBEntry::getName(string &n) const
+RunnerDBEntryV2::RunnerDBEntryV2()
 {
+  memset(this, 0, sizeof(RunnerDBEntryV2));
+}
+
+RunnerDBEntryV3::RunnerDBEntryV3()
+{
+  memset(this, 0, sizeof(RunnerDBEntryV3));
+}
+
+void RunnerWDBEntry::getName(wstring &n) const
+{
+  initName();
   n=name;
 }
 
-void RunnerDBEntry::setName(const char *n)
+const wchar_t *RunnerWDBEntry::getNameCstr() const {
+  initName();
+  return name;
+}
+
+void RunnerWDBEntry::setName(const wchar_t *n)
 {
-  memcpy(name, n, min<int>(strlen(n)+1, baseNameLength));
+  const int blen = min<int>(wcslen(n)+1, baseNameLength);
+  memset(name, 0, sizeof(wchar_t) * baseNameLength);
+  memcpy(name, n, sizeof(wchar_t) * blen);
   name[baseNameLength-1]=0;
+
+  RunnerDBEntry &d = dbe();
+  int res = WideCharToMultiByte(CP_UTF8, 0, name, blen, d.name, baseNameLengthUTF-1, 0, 0);
+  d.setUTF();
+  assert(res < baseNameLengthUTF);
+  if (res == 0 && blen > 0) {
+    res = baseNameLengthUTF-1;
+    d.name[res] = 0;
+    name[0] = 0;
+    initName();
+  }
+  d.name[res] = 0;
+}
+
+void RunnerWDBEntry::setNameUTF(const char *n)
+{
+  const int blen = min<int>(strlen(n)+1, baseNameLength);
+  RunnerDBEntry &d = dbe();
+  memcpy(d.name, n, blen);
+  d.name[baseNameLength-1]=0;
+  d.setUTF();
+  name[0] = 0;
 }
 
 string RunnerDBEntry::getNationality() const
@@ -95,46 +174,115 @@ string RunnerDBEntry::getSex() const
   n[0] = sex;
   return n;
 }
-string RunnerDBEntry::getGivenName() const
+
+
+wstring RunnerWDBEntry::getNationality() const
 {
+  const RunnerDBEntry &d = dbe();
+  if (d.national[0] < 30)
+    return _EmptyWString;
+
+  wstring n(L"   ");
+  n[0] = d.national[0];
+  n[1] = d.national[1];
+  n[2] = d.national[2];
+  return n;
+}
+
+wstring RunnerWDBEntry::getSex() const
+{
+  if (dbe().sex == 0)
+    return _EmptyWString;
+  wstring n(L"W");
+  n[0] = dbe().sex;
+  return n;
+}
+
+wstring RunnerWDBEntry::getGivenName() const
+{
+  initName();
   return ::getGivenName(name);
 }
 
-string RunnerDBEntry::getFamilyName() const
+wstring RunnerWDBEntry::getFamilyName() const
 {
+  initName();
   return ::getFamilyName(name);
 }
 
-__int64 RunnerDBEntry::getExtId() const
+__int64 RunnerWDBEntry::getExtId() const
 {
-  return extId;
+  return dbe().extId;
 }
 
-void RunnerDBEntry::setExtId(__int64 id)
+void RunnerWDBEntry::setExtId(__int64 id)
 {
-  extId = id;
+  dbe().extId = id;
 }
 
-void RunnerDBEntry::init(const RunnerDBEntryV1 &dbe)
+void RunnerDBEntryV2::init(const RunnerDBEntryV1 &dbe)
 {
   memcpy(this, &dbe, sizeof(RunnerDBEntryV1));
   extId = 0;
 }
 
-
-RunnerDBEntry *RunnerDB::addRunner(const char *name,
-                                   __int64 extId,
-                                   int club, int card)
+void RunnerDBEntry::init(const RunnerDBEntryV2 &dbe)
 {
-  rdb.push_back(RunnerDBEntry());
-  RunnerDBEntry &e=rdb.back();
-  e.cardNo = card;
-  e.clubNo = club;
-  e.setName(name);
-  e.extId = extId;
+  memcpy(name, dbe.name, 32);
 
-  if (!check(e) ) {
+  cardNo = dbe.cardNo;
+  clubNo = dbe.clubNo;
+  national[0] = dbe.national[0];
+  national[1] = dbe.national[1];
+  national[2] = dbe.national[2];
+  sex = dbe.sex;
+  birthYear = dbe.birthYear;
+  reserved = dbe.reserved;
+  extId = dbe.extId;
+}
+
+void RunnerDBEntry::init(const RunnerDBEntryV3 &dbe)
+{
+  memcpy(name, dbe.name, 56);
+
+  cardNo = dbe.cardNo;
+  clubNo = dbe.clubNo;
+  national[0] = dbe.national[0];
+  national[1] = dbe.national[1];
+  national[2] = dbe.national[2];
+  sex = dbe.sex;
+  birthYear = dbe.birthYear;
+  reserved = dbe.reserved;
+  extId = dbe.extId;
+}
+
+
+
+void RunnerWDBEntry::init(RunnerDB *p, size_t ixin) {
+  owner = p;
+  ix = ixin;
+}
+  
+RunnerWDBEntry *RunnerDB::addRunner(const wchar_t *name,
+                                    __int64 extId,
+                                    int club, int card)
+{
+  assert(rdb.size() == rwdb.size());
+  rdb.push_back(RunnerDBEntry());
+  rwdb.push_back(RunnerWDBEntry());
+  rwdb.back().init(this, rdb.size()-1);
+
+  RunnerWDBEntry &e=rwdb.back();
+  RunnerDBEntry &en=rdb.back();
+  
+  en.cardNo = card;
+  en.clubNo = club;
+  e.setName(name);
+  en.extId = extId;
+
+  if (!check(en) ) {
     rdb.pop_back();
+    rwdb.pop_back();
     return 0;
   } else {
     if (card>0)
@@ -142,20 +290,55 @@ RunnerDBEntry *RunnerDB::addRunner(const char *name,
     if (!idhash.empty())
       idhash[extId] = rdb.size()-1;
     if (!nhash.empty())
-      nhash.insert(pair<string, int>(canonizeName(e.name), rdb.size()-1));
+      nhash.insert(pair<wstring, int>(canonizeName(e.name), rdb.size()-1));
+  }
+  return &e;
+}
+
+
+RunnerWDBEntry *RunnerDB::addRunner(const char *nameUTF,
+                                    __int64 extId,
+                                    int club, int card)
+{
+  assert(rdb.size() == rwdb.size());
+  rdb.push_back(RunnerDBEntry());
+  rwdb.push_back(RunnerWDBEntry());
+  rwdb.back().init(this, rdb.size()-1);
+
+  RunnerWDBEntry &e=rwdb.back();
+  RunnerDBEntry &en=rdb.back();
+  
+  en.cardNo = card;
+  en.clubNo = club;
+  e.setNameUTF(nameUTF);
+  en.extId = extId;
+
+  if (!check(en) ) {
+    rdb.pop_back();
+    rwdb.pop_back();
+    return 0;
+  } else {
+    if (card>0)
+      rhash[card]=rdb.size()-1;
+    if (!idhash.empty())
+      idhash[extId] = rdb.size()-1;
+    if (!nhash.empty()) {
+      wstring wn;
+      e.getName(wn);
+      nhash.insert(pair<wstring, int>(canonizeName(wn.c_str()), rdb.size()-1));
+    }
   }
   return &e;
 }
 
 int RunnerDB::addClub(oClub &c, bool createNewId) {
-  //map<int,int>::iterator it = chash.find(c.getId());
-  //if (it == chash.end()) {
   if (createNewId) {
     oDBClubEntry ce(c, cdb.size(), this);
     cdb.push_back(ce);
     int b = 0;
     while(++b<0xFFFF) {
-      int newId = 10000 + rand() & 0xFFFF;
+      int off = (rand() & 0xFFFF);
+      int newId = 10000 + off;
       int dummy;
       if (!chash.lookup(newId, dummy)) {
         cdb.back().Id = newId;
@@ -230,6 +413,7 @@ void RunnerDB::importClub(oClub &club, bool matchName)
 void RunnerDB::compactifyClubs()
 {
   chash.clear();
+  clubHash.clear();
   freeCIx = 0;
 
   map<int, int> clubmap;
@@ -240,7 +424,7 @@ void RunnerDB::compactifyClubs()
     oDBClubEntry &ref = cdb[k];
     vector<int> compacted;
     for (size_t j=k+1;j<cdb.size(); j++) {
-      if (_stricmp(ref.getName().c_str(),
+      if (_wcsicmp(ref.getName().c_str(),
               cdb[j].getName().c_str())==0)
         compacted.push_back(j);
     }
@@ -265,27 +449,27 @@ void RunnerDB::compactifyClubs()
   }
 }
 
-RunnerDBEntry *RunnerDB::getRunnerByCard(int card) const
+RunnerWDBEntry *RunnerDB::getRunnerByCard(int card) const
 {
   if (card == 0)
     return 0;
 
   int value;
   if (rhash.lookup(card, value))
-    return (RunnerDBEntry *)&rdb[value];
+    return (RunnerWDBEntry *)&rwdb[value];
 
   return 0;
 }
 
-RunnerDBEntry *RunnerDB::getRunnerByIndex(size_t index) const {
+RunnerWDBEntry *RunnerDB::getRunnerByIndex(size_t index) const {
   if (index >= rdb.size())
     throw meosException("Index out of bounds");
 
-  return (RunnerDBEntry *)&rdb[index];
+  return (RunnerWDBEntry *)&rwdb[index];
 }
 
 
-RunnerDBEntry *RunnerDB::getRunnerById(__int64 extId) const
+RunnerWDBEntry *RunnerDB::getRunnerById(__int64 extId) const
 {
   if (extId == 0)
     return 0;
@@ -295,21 +479,21 @@ RunnerDBEntry *RunnerDB::getRunnerById(__int64 extId) const
   int value;
 
   if (idhash.lookup(extId, value))
-    return (RunnerDBEntry *)&rdb[value];
+    return (RunnerWDBEntry *)&rwdb[value];
 
   return 0;
 }
 
-RunnerDBEntry *RunnerDB::getRunnerByName(const string &name, int clubId,
-                                         int expectedBirthYear) const
+RunnerWDBEntry *RunnerDB::getRunnerByName(const wstring &name, int clubId,
+                                          int expectedBirthYear) const
 {
   if (expectedBirthYear>0 && expectedBirthYear<100)
     expectedBirthYear = extendYear(expectedBirthYear);
 
   setupNameHash();
   vector<int> ix;
-  string cname(canonizeName(name.c_str()));
-  multimap<string, int>::const_iterator it = nhash.find(cname);
+  wstring cname(canonizeName(name.c_str()));
+  multimap<wstring, int>::const_iterator it = nhash.find(cname);
 
   while (it != nhash.end() && cname == it->first) {
     ix.push_back(it->second);
@@ -321,7 +505,7 @@ RunnerDBEntry *RunnerDB::getRunnerByName(const string &name, int clubId,
 
   if (clubId == 0) {
     if (ix.size() == 1)
-      return (RunnerDBEntry *)&rdb[ix[0]];
+      return (RunnerWDBEntry *)&rwdb[ix[0]];
     else
       return 0; // Not uniquely defined.
   }
@@ -335,19 +519,19 @@ RunnerDBEntry *RunnerDB::getRunnerByName(const string &name, int clubId,
   if (ix2.empty())
     return 0;
   else if (ix2.size() == 1)
-    return (RunnerDBEntry *)&rdb[ix2[0]];
+    return (RunnerWDBEntry *)&rwdb[ix2[0]];
   else if (expectedBirthYear > 0) {
     int bestMatch = 0;
     int bestYear = 0;
     for (size_t k = 0;k<ix2.size(); k++) {
-      const RunnerDBEntry &re = rdb[ix2[k]];
-      if (abs(re.birthYear-expectedBirthYear) < abs(bestYear-expectedBirthYear)) {
+      const RunnerWDBEntry &re = rwdb[ix2[k]];
+      if (abs(re.dbe().birthYear-expectedBirthYear) < abs(bestYear-expectedBirthYear)) {
         bestMatch = ix2[k];
-        bestYear = re.birthYear;
+        bestYear = re.dbe().birthYear;
       }
     }
     if (bestYear>0)
-      return (RunnerDBEntry *)&rdb[bestMatch];
+      return (RunnerWDBEntry *)&rwdb[bestMatch];
   }
 
   return 0;
@@ -370,8 +554,10 @@ void RunnerDB::setupNameHash() const
     return;
 
   for (size_t k=0; k<rdb.size(); k++) {
-    if (!rdb[k].isRemoved())
-      nhash.insert(pair<string, int>(canonizeName(rdb[k].name), k));
+    if (!rdb[k].isRemoved()) {
+      rwdb[k].initName();
+      nhash.insert(pair<wstring, int>(canonizeName(rwdb[k].name), k));
+    }
   }
 }
 
@@ -380,13 +566,13 @@ void RunnerDB::setupCNHash() const
   if (!cnhash.empty())
     return;
 
-  vector<string> split;
+  vector<wstring> split;
   for (size_t k=0; k<cdb.size(); k++) {
     if (cdb[k].isRemoved())
       continue;
     canonizeSplitName(cdb[k].getName(), split);
     for (size_t j = 0; j<split.size(); j++)
-      cnhash.insert(pair<string, int>(split[j], k));
+      cnhash.insert(pair<wstring, int>(split[j], k));
   }
 }
 
@@ -396,16 +582,16 @@ static bool isVowel(int c) {
          c=='å' || c=='ä' || c=='ö';
 }
 
-void RunnerDB::canonizeSplitName(const string &name, vector<string> &split)
+void RunnerDB::canonizeSplitName(const wstring &name, vector<wstring> &split)
 {
   split.clear();
-  const char *cname = name.c_str();
+  const wchar_t *cname = name.c_str();
   int k = 0;
   for (k=0; cname[k]; k++)
     if (cname[k] != ' ')
       break;
 
-  char out[128];
+  wchar_t out[128];
   int outp;
   while (cname[k]) {
     outp = 0;
@@ -439,7 +625,7 @@ void RunnerDB::canonizeSplitName(const string &name, vector<string> &split)
   }
 }
 
-bool RunnerDB::getClub(int clubId, string &club) const
+bool RunnerDB::getClub(int clubId, wstring &club) const
 {
   //map<int,int>::const_iterator it = chash.find(clubId);
 
@@ -453,11 +639,7 @@ bool RunnerDB::getClub(int clubId, string &club) const
   return false;
 }
 
-oClub *RunnerDB::getClub(int clubId) const
-{
-  //map<int,int>::const_iterator it = chash.find(clubId);
-
-  //if (it!=chash.end())
+oClub *RunnerDB::getClub(int clubId) const {
   int value;
   if (chash.lookup(clubId, value))
     return pClub(&cdb[value]);
@@ -465,16 +647,16 @@ oClub *RunnerDB::getClub(int clubId) const
   return 0;
 }
 
-oClub *RunnerDB::getClub(const string &name) const
+oClub *RunnerDB::getClub(const wstring &name) const
 {
   setupCNHash();
-  vector<string> names;
+  vector<wstring> names;
   canonizeSplitName(name, names);
   vector< vector<int> > ix(names.size());
   set<int> iset;
 
   for (size_t k = 0; k<names.size(); k++) {
-    multimap<string, int>::const_iterator it = cnhash.find(names[k]);
+    multimap<wstring, int>::const_iterator it = cnhash.find(names[k]);
 
     while (it != cnhash.end() && names[k] == it->first) {
       ix[k].push_back(it->second);
@@ -504,15 +686,15 @@ oClub *RunnerDB::getClub(const string &name) const
   // Exact compare
   for (set<int>::iterator it = iset.begin(); it != iset.end(); ++it) {
     pClub pc = pClub(&cdb[*it]);
-    if (_stricmp(pc->getName().c_str(), name.c_str())==0)
+    if (_wcsicmp(pc->getName().c_str(), name.c_str())==0)
       return pc;
   }
 
-  string cname = canonizeName(name.c_str());
+  wstring cname = canonizeName(name.c_str());
   // Looser compare
   for (set<int>::iterator it = iset.begin(); it != iset.end(); ++it) {
     pClub pc = pClub(&cdb[*it]);
-    if (strcmp(canonizeName(pc->getName().c_str()), cname.c_str()) == 0 )
+    if (wcscmp(canonizeName(pc->getName().c_str()), cname.c_str()) == 0 )
       return pc;
   }
 
@@ -542,11 +724,11 @@ oClub *RunnerDB::getClub(const string &name) const
   return 0;
 }
 
-void RunnerDB::saveClubs(const char *file)
+void RunnerDB::saveClubs(const wstring &file)
 {
-  xmlparser xml(0);
+  xmlparser xml;
 
-  xml.openOutputT(file, true, "meosclubs");
+  xml.openOutputT(file.c_str(), true, "meosclubs");
 
   vector<oDBClubEntry>::iterator it;
 
@@ -595,14 +777,14 @@ void RunnerDB::setDataDate(const string &date)
      dataTime = 0;
 }
 
-void RunnerDB::saveRunners(const char *file)
+void RunnerDB::saveRunners(const wstring &file)
 {
   int f=-1;
-  _sopen_s(&f, file, _O_BINARY|_O_CREAT|_O_TRUNC|_O_WRONLY,
+  _wsopen_s(&f, file.c_str(), _O_BINARY|_O_CREAT|_O_TRUNC|_O_WRONLY,
             _SH_DENYWR, _S_IREAD|_S_IWRITE);
 
   if (f!=-1) {
-    int version = 5460002;
+    int version = 5460004;
     _write(f, &version, 4);
     _write(f, &dataDate, 4);
     _write(f, &dataTime, 4);
@@ -613,9 +795,9 @@ void RunnerDB::saveRunners(const char *file)
   else throw std::exception("Could not save runner database.");
 }
 
-void RunnerDB::loadClubs(const char *file)
+void RunnerDB::loadClubs(const wstring &file)
 {
-  xmlparser xml(0);
+  xmlparser xml;
 
   xml.read(file);
 
@@ -640,10 +822,13 @@ void RunnerDB::loadClubs(const char *file)
         oDBClubEntry c(oe, cdb.size(), this);
         c.set(*it);
         int value;
+        if (c.getId() == 0)
+          continue;
         //if (chash.find(c.getId()) == chash.end()) {
         if (!chash.lookup(c.getId(), value)) {
           chash[c.getId()]=cdb.size();
           cdb.push_back(c);
+          freeCIx = max(c.getId()+1, freeCIx);;
         }
       }
     }
@@ -652,7 +837,7 @@ void RunnerDB::loadClubs(const char *file)
   bool checkClubs = false;
 
   if (checkClubs) {
-    vector<string> problems;
+    vector<wstring> problems;
 
     for (size_t k=0; k<cdb.size(); k++) {
       pClub pc = &cdb[k];
@@ -660,17 +845,17 @@ void RunnerDB::loadClubs(const char *file)
       if (!pc2)
         problems.push_back(pc->getName());
       else if (pc != pc2)
-        problems.push_back(pc->getName() + "-" + pc2->getName());
+        problems.push_back(pc->getName() + L"-" + pc2->getName());
     }
     problems.begin();
   }
 }
 
-void RunnerDB::loadRunners(const char *file)
+void RunnerDB::loadRunners(const wstring &file)
 {
-  string ex=string("Bad runner database. ")+file;
+  wstring ex = L"Bad runner database. " + file;
   int f=-1;
-  _sopen_s(&f, file, _O_BINARY|_O_RDONLY,
+  _wsopen_s(&f, file.c_str(), _O_BINARY|_O_RDONLY,
             _SH_DENYWR, _S_IREAD|_S_IWRITE);
 
   if (f!=-1) {
@@ -678,32 +863,83 @@ void RunnerDB::loadRunners(const char *file)
     loadedFromServer = false;
 
     int len = _filelength(f);
-    if ( (len%sizeof(RunnerDBEntryV1) != 0) && (len % sizeof(RunnerDBEntry) != 12)) {
+    if ( (len%sizeof(RunnerDBEntryV1) != 0) && (len % sizeof(RunnerDBEntryV3) != 12) && (len % sizeof(RunnerDBEntry) != 12)) {
       _close(f);
       return;//Failed
     }
     int nentry = 0;
 
-    if (len % sizeof(RunnerDBEntry) == 12) {
-      nentry = (len-12) / sizeof(RunnerDBEntry);
+    int version;
+    version = 0;
+    dataDate = 0;
+    dataTime = 0;
 
-      rdb.resize(nentry);
-      if (rdb.empty()) {
-         _close(f);
-        return;
-      }
-      int version;
+    if (len % sizeof(RunnerDBEntry) == 12 || len % sizeof(RunnerDBEntryV2) == 12 || len % sizeof(RunnerDBEntryV3) == 12) {
       _read(f, &version, 4);
       _read(f, &dataDate, 4);
       _read(f, &dataTime, 4);
-      _read(f, &rdb[0], len-12);
-      _close(f);
-      for (int k=0;k<nentry;k++) {
+    }
+
+    if (version == 5460002 || version == 5460003 || version == 5460004) {
+
+      bool migrateV2 = false;
+      bool migrateV3 = false;
+
+      if (version == 5460002) {
+        migrateV2 = true;
+        nentry = (len - 12) / sizeof(RunnerDBEntryV2);
+      }
+      else if (version == 5460003) {
+        nentry = (len - 12) / sizeof(RunnerDBEntryV3);
+        migrateV3 = true;
+      }
+      else if (version == 5460004) {
+        nentry = (len - 12) / sizeof(RunnerDBEntry);
+      }
+
+      rdb.resize(nentry);
+      if (rdb.empty()) {
+        _close(f);
+        return;
+      }
+      rwdb.resize(rdb.size());
+
+      if (!migrateV2 && !migrateV3) {
+        _read(f, &rdb[0], len - 12);
+        _close(f);
+      }
+      else if (migrateV2) {
+        vector<RunnerDBEntryV2> rdbV2(nentry);
+        _read(f, &rdbV2[0], len - 12);
+        _close(f);
+
+        for (int k = 0; k < nentry; k++) {
+          rdb[k].init(rdbV2[k]);
+          rwdb[k].init(this, k);
+          if (!check(rdb[k]))
+            throw meosException(ex);
+        }
+      }
+      else if (migrateV3) {
+        vector<RunnerDBEntryV3> rdbV3(nentry);
+        _read(f, &rdbV3[0], len - 12);
+        _close(f);
+
+        for (int k = 0; k < nentry; k++) {
+          rdb[k].init(rdbV3[k]);
+          rwdb[k].init(this, k);
+          if (!check(rdb[k]))
+            throw meosException(ex);
+        }
+      }
+
+      for (int k = 0; k < nentry; k++) {
+        rwdb[k].init(this, k);
         if (!check(rdb[k]))
-          throw std::exception(ex.c_str());
+          throw meosException(ex);
       }
     }
-    else {
+    else { //V1
       dataDate = 0;
       dataTime = 0;
 
@@ -715,13 +951,17 @@ void RunnerDB::loadRunners(const char *file)
         return;
       }
       vector<RunnerDBEntryV1> rdbV1(nentry);
-
+      _lseek(f, 0, SEEK_SET);
       _read(f, &rdbV1[0], len);
       _close(f);
+      rwdb.resize(rdb.size());
+      RunnerDBEntryV2 tmp;
       for (int k=0;k<nentry;k++) {
-        rdb[k].init(rdbV1[k]);
+        tmp.init(rdbV1[k]);
+        rdb[k].init(tmp);
+        rwdb[k].init(this, k);
         if (!check(rdb[k]))
-          throw std::exception(ex.c_str());
+          throw meosException(ex);
       }
     }
 
@@ -738,13 +978,13 @@ void RunnerDB::loadRunners(const char *file)
       }
     }
   }
-  else throw std::exception(ex.c_str());
+  else throw meosException(ex);
 }
 
 bool RunnerDB::check(const RunnerDBEntry &rde) const
 {
   if (rde.cardNo<0 || rde.cardNo>99999999
-           || rde.name[baseNameLength-1]!=0 || rde.clubNo<0)
+           || rde.name[baseNameLengthUTF-1]!=0 || rde.clubNo<0)
     return false;
   return true;
 }
@@ -752,9 +992,9 @@ bool RunnerDB::check(const RunnerDBEntry &rde) const
 void RunnerDB::updateAdd(const oRunner &r, map<int, int> &clubIdMap)
 {
   if (r.getExtIdentifier() > 0) {
-    RunnerDBEntry *dbe = getRunnerById(int(r.getExtIdentifier()));
+    RunnerWDBEntry *dbe = getRunnerById(int(r.getExtIdentifier()));
     if (dbe) {
-      dbe->cardNo = r.CardNo;
+      dbe->dbe().cardNo = r.CardNo;
       return; // Do not change too much in runner from national database
     }
   }
@@ -790,29 +1030,46 @@ void RunnerDB::updateAdd(const oRunner &r, map<int, int> &clubIdMap)
     }
   }
 
-  RunnerDBEntry *dbe = getRunnerByCard(r.getCardNo());
+  RunnerWDBEntry *dbe = getRunnerByCard(r.getCardNo());
 
-  if (dbe == 0) {
+  if (dbe == nullptr) {
+    // Lookup by name
+    setupNameHash();
+    vector<int> ix;
+    wstring cname(canonizeName(r.getName().c_str()));
+    auto it = nhash.find(cname);
+
+    while (it != nhash.end() && cname == it->first) {
+      auto &dbr = rwdb[it->second];
+      if (dbr.dbe().clubNo == localClubId) {
+        dbe = &dbr;
+        break;
+      }
+      ++it;
+    }
+  }
+
+  if (dbe == nullptr) {
     dbe = addRunner(r.getName().c_str(), 0, localClubId, r.getCardNo());
     if (dbe)
-      dbe->birthYear = r.getDCI().getInt("BirthYear");
+      dbe->dbe().birthYear = r.getDCI().getInt("BirthYear");
   }
   else {
     if (dbe->getExtId() == 0) { // Only update entries not in national db.
       dbe->setName(r.getName().c_str());
-      dbe->clubNo = localClubId;
-      dbe->birthYear = r.getDCI().getInt("BirthYear");
+      dbe->dbe().clubNo = localClubId;
+      dbe->dbe().birthYear = r.getDCI().getInt("BirthYear");
     }
   }
 }
 
-void RunnerDB::getAllNames(vector<string> &givenName, vector<string> &familyName)
+void RunnerDB::getAllNames(vector<wstring> &givenName, vector<wstring> &familyName)
 {
   givenName.reserve(rdb.size());
   familyName.reserve(rdb.size());
-  for (size_t k=0;k<rdb.size(); k++) {
-    string gname(rdb[k].getGivenName());
-    string fname(rdb[k].getFamilyName());
+  for (size_t k=0;k<rwdb.size(); k++) {
+    wstring gname(rwdb[k].getGivenName());
+    wstring fname(rwdb[k].getFamilyName());
     if (!gname.empty())
       givenName.push_back(gname);
     if (!fname.empty())
@@ -826,6 +1083,7 @@ void RunnerDB::clearClubs()
   clearRunners(); // Runners refer to clubs. Clear runners
   cnhash.clear();
   chash.clear();
+  clubHash.clear(); // Autocomplete
   freeCIx = 0;
   cdb.clear();
   if (clubTable)
@@ -838,16 +1096,35 @@ void RunnerDB::clearRunners()
   nhash.clear();
   idhash.clear();
   rhash.clear();
+  runnerHash.clear(); // Autocomplete
+  runnerHashByClub.clear(); // Autocomplete
   rdb.clear();
+  rwdb.clear();
   if (runnerTable)
     runnerTable->clear();
 }
 
-const vector<oDBClubEntry> &RunnerDB::getClubDB() const {
+const vector<oDBClubEntry> &RunnerDB::getClubDB(bool checkProblems) const {
+  if (checkProblems) {
+    for (size_t k = 0; k < cdb.size(); k++) {
+      int v = -1;
+      if (cdb[k].isRemoved())
+        continue;
+
+      // Mark id duplacates as removed
+      if (!chash.lookup(cdb[k].getId(), v) || v != k) {
+        const_cast<oDBClubEntry &>(cdb[k]).Removed = true;
+      }
+    }
+  }
   return cdb;
 }
 
-const vector<RunnerDBEntry> &RunnerDB::getRunnerDB() const {
+const vector<RunnerWDBEntry> &RunnerDB::getRunnerDB() const {
+  return rwdb;
+}
+
+const vector<RunnerDBEntry> &RunnerDB::getRunnerDBN() const {
   return rdb;
 }
 
@@ -858,7 +1135,7 @@ void RunnerDB::prepareLoadFromServer(int nrunner, int nclub) {
   rdb.reserve(nrunner);
 }
 
-void RunnerDB::fillClubs(vector< pair<string, size_t> > &out) const {
+void RunnerDB::fillClubs(vector< pair<wstring, size_t> > &out) const {
   out.reserve(cdb.size());
   for (size_t k = 0; k<cdb.size(); k++) {
     if (!cdb[k].isRemoved()) {
@@ -929,7 +1206,7 @@ void RunnerDB::releaseTables() {
 Table *RunnerDB::getRunnerTB()//Table mode
 {
   if (runnerTable == 0) {
-    Table *table=new Table(oe, 20, "Löpardatabasen", "runnerdb");
+    Table *table=new Table(oe, 20, L"Löpardatabasen", "runnerdb");
 
     table->addColumn("Index", 70, true, true);
     table->addColumn("Id", 70, true, true);
@@ -982,11 +1259,27 @@ void RunnerDB::refreshClubTableData(Table &table) {
 }
 
 void RunnerDB::refreshRunnerTableData(Table &table) {
+  oe->getDBRunnersInEvent(runnerInEvent); //XXX
   for (size_t k = 0; k<oRDB.size(); k++){
     if (!oRDB[k].isRemoved()) {
       TableRow *row = table.getRowById(oRDB[k].getIndex() + 1);
-      if (row)
+      if (row) {
         row->setObject(oRDB[k]);
+        
+        oClass *val = 0;
+        bool found = false;
+
+        if (rdb[k].extId != 0)
+          found = runnerInEvent.lookup(rdb[k].extId, val);
+
+
+        if (found && row->getCellType(cellEntryIndex) == cellAction) {
+          row->updateCell(cellEntryIndex, cellEdit, val->getName());
+        }
+        else if (!found && row->getCellType(cellEntryIndex) == cellEdit) {
+          row->updateCell(cellEntryIndex, cellAction, L"@+");
+        }
+      }
     }
   }
 }
@@ -996,7 +1289,7 @@ Table *RunnerDB::getClubTB()//Table mode
   bool canEdit = !oe->isClient();
 
   if (clubTable == 0) {
-    Table *table = new Table(oe, 20, "Klubbdatabasen", "clubdb");
+    Table *table = new Table(oe, 20, L"Klubbdatabasen", "clubdb");
 
     table->addColumn("Id", 70, true, true);
     table->addColumn("Ändrad", 70, false);
@@ -1034,44 +1327,48 @@ void oDBRunnerEntry::addTableRow(Table &table) const {
   if (!db)
     throw meosException("Not initialized");
 
-  RunnerDBEntry &r = db->rdb[index];
+  RunnerWDBEntry &r = db->rwdb[index];
+  RunnerDBEntry &rn = r.dbe();
+  
   int row = 0;
-  table.set(row++, it, TID_INDEX, itos(index+1), false, cellEdit);
+  table.set(row++, it, TID_INDEX, itow(index+1), false, cellEdit);
 
-  char bf[16];
-  oBase::converExtIdentifierString(r.extId, bf);
+  wchar_t bf[16];
+  oBase::converExtIdentifierString(rn.extId, bf);
   table.set(row++, it, TID_ID, bf, false, cellEdit);
+  r.initName();
   table.set(row++, it, TID_NAME, r.name, canEdit, cellEdit);
 
-  const pClub pc = db->getClub(r.clubNo);
+  const pClub pc = db->getClub(rn.clubNo);
   if (pc)
     table.set(row++, it, TID_CLUB, pc->getName(), canEdit, cellSelection);
   else
-    table.set(row++, it, TID_CLUB, "", canEdit, cellSelection);
+    table.set(row++, it, TID_CLUB, L"", canEdit, cellSelection);
 
-  table.set(row++, it, TID_CARD, r.cardNo > 0 ? itos(r.cardNo) : "", canEdit, cellEdit);
-  char nat[4] = {r.national[0],r.national[1],r.national[2], 0};
+  table.set(row++, it, TID_CARD, rn.cardNo > 0 ? itow(rn.cardNo) : L"", canEdit, cellEdit);
+  wchar_t nat[4] = {wchar_t(rn.national[0]), wchar_t(rn.national[1]), wchar_t(rn.national[2]), 0};
 
   table.set(row++, it, TID_NATIONAL, nat, canEdit, cellEdit);
-  char sex[2] = {r.sex, 0};
+  wchar_t sex[2] = {wchar_t(rn.sex), 0};
   table.set(row++, it, TID_SEX, sex, canEdit, cellEdit);
-  table.set(row++, it, TID_YEAR, itos(r.birthYear), canEdit, cellEdit);
+  table.set(row++, it, TID_YEAR, itow(rn.birthYear), canEdit, cellEdit);
 
   oClass *val = 0;
   bool found = false;
 
-  if (r.extId != 0)
-    found = db->runnerInEvent.lookup(r.extId, val);
+  if (rn.extId != 0)
+    found = db->runnerInEvent.lookup(rn.extId, val);
 
   if (canEdit)
     table.setTableProp(Table::CAN_DELETE|Table::CAN_INSERT|Table::CAN_PASTE);
   else
     table.setTableProp(0);
 
+  RunnerDB::cellEntryIndex = row;
   if (!found)
-    table.set(row++, it, TID_ENTER, "@+", false, cellAction);
+    table.set(row++, it, TID_ENTER, L"@+", false, cellAction);
   else
-    table.set(row++, it, TID_ENTER, val ? val->getName() : "", false, cellEdit);
+    table.set(row++, it, TID_ENTER, val ? val->getName() : L"", false, cellEdit);
 }
 
 const RunnerDBEntry &oDBRunnerEntry::getRunner() const {
@@ -1080,72 +1377,77 @@ const RunnerDBEntry &oDBRunnerEntry::getRunner() const {
   return db->rdb[index];
 }
 
-bool oDBRunnerEntry::inputData(int id, const string &input,
-                           int inputId, string &output, bool noUpdate)
+bool oDBRunnerEntry::inputData(int id, const wstring &input,
+                           int inputId, wstring &output, bool noUpdate)
 {
   if (!db)
     throw meosException("Not initialized");
-  RunnerDBEntry &r = db->rdb[index];
+  RunnerWDBEntry &r = db->rwdb[index];
+  RunnerDBEntry &rd = db->rdb[index];
 
   switch(id) {
     case TID_NAME:
       r.setName(input.c_str());
       r.getName(output);
       db->nhash.clear();
+      db->runnerHash.clear();
+      db->runnerHashByClub.clear();
       return true;
     case TID_CARD:
-      db->rhash.remove(r.cardNo);
-      r.cardNo = atoi(input.c_str());
-      db->rhash.insert(r.cardNo, index);
-      if (r.cardNo)
-        output = itos(r.cardNo);
+      db->rhash.remove(rd.cardNo);
+      rd.cardNo = _wtoi(input.c_str());
+      db->rhash.insert(rd.cardNo, index);
+      if (rd.cardNo)
+        output = itow(rd.cardNo);
       else
-        output = "";
+        output = L"";
       return true;
     case TID_NATIONAL:
       if (input.empty()) {
-        r.national[0] = 0;
-        r.national[1] = 0;
-        r.national[2] = 0;
+        rd.national[0] = 0;
+        rd.national[1] = 0;
+        rd.national[2] = 0;
       }
-      else if (input.size() >= 2)
-        memcpy(r.national, input.c_str(), 3);
-
+      else if (input.size() >= 2) {
+        for (size_t i = 0; i < 3; i++) {
+          rd.national[i] = i < input.size() ? input[i] : 0; 
+        }
+      }
       output = r.getNationality();
       break;
     case TID_SEX:
-      r.sex = input[0];
+      rd.sex = char(input[0]);
       output = r.getSex();
       break;
     case TID_YEAR:
-      r.birthYear = short(atoi(input.c_str()));
-      output = itos(r.getBirthYear());
+      rd.birthYear = short(_wtoi(input.c_str()));
+      output = itow(r.getBirthYear());
       break;
 
     case TID_CLUB:
-      r.clubNo = inputId;
+      rd.clubNo = inputId;
       output = input;
       break;
   }
   return false;
 }
 
-void oDBRunnerEntry::fillInput(int id, vector< pair<string, size_t> > &out, size_t &selected)
+void oDBRunnerEntry::fillInput(int id, vector< pair<wstring, size_t> > &out, size_t &selected)
 {
   RunnerDBEntry &r = db->rdb[index];
   if (id==TID_CLUB) {
     db->fillClubs(out);
-    out.push_back(make_pair("-", 0));
+    out.push_back(make_pair(L"-", 0));
     selected = r.clubNo;
   }
 }
 
 void oDBRunnerEntry::remove() {
-  RunnerDBEntry &r = db->rdb[index];
+  RunnerWDBEntry &r = db->rwdb[index];
   r.remove();
-  db->idhash.remove(r.extId);
-  string cname(canonizeName(r.name));
-  multimap<string, int>::const_iterator it = db->nhash.find(cname);
+  db->idhash.remove(r.dbe().extId);
+  wstring cname(canonizeName(r.name));
+  multimap<wstring, int>::const_iterator it = db->nhash.find(cname);
 
   while (it != db->nhash.end() && cname == it->first) {
     if (it->second == index) {
@@ -1155,10 +1457,10 @@ void oDBRunnerEntry::remove() {
     ++it;
   }
 
-  if (r.cardNo > 0) {
+  if (r.dbe().cardNo > 0) {
     int ix = -1;
-    if (db->rhash.lookup(r.cardNo, ix) && ix == index) {
-      db->rhash.remove(r.cardNo);
+    if (db->rhash.lookup(r.dbe().cardNo, ix) && ix == index) {
+      db->rhash.remove(r.dbe().cardNo);
     }
   }
 }
@@ -1169,6 +1471,9 @@ bool oDBRunnerEntry::canRemove() const {
 
 oDBRunnerEntry *RunnerDB::addRunner() {
   rdb.push_back(RunnerDBEntry());
+  rwdb.push_back(RunnerWDBEntry());
+  rwdb.back().init(this, rdb.size() -1);
+
   oRDB.push_back(oDBRunnerEntry(oe));
   oRDB.back().init(this, rdb.size() - 1);
 
@@ -1208,10 +1513,10 @@ void oDBClubEntry::remove() {
   Removed = true;
   db->chash.remove(getId());
 
-  vector<string> split;
+  vector<wstring> split;
   db->canonizeSplitName(getName(), split);
   for (size_t j = 0; j<split.size(); j++) {
-    multimap<string, int>::const_iterator it = db->cnhash.find(split[j]);
+    multimap<wstring, int>::const_iterator it = db->cnhash.find(split[j]);
     while (it != db->cnhash.end() && split[j] == it->first) {
       if (it->second == index) {
         db->cnhash.erase(it);
@@ -1230,3 +1535,280 @@ int oDBClubEntry::getTableId() const {
   return index + 1;
 }
   
+// Link to narrow DB Entry
+const RunnerDBEntry &RunnerWDBEntry::dbe() const {
+  return owner->rdb[ix];
+}
+
+// Link to narrow DB Entry
+RunnerDBEntry &RunnerWDBEntry::dbe() {
+  return owner->rdb[ix];
+}
+
+
+void RunnerDB::ClubNodeHash::match(RunnerDB &db, set< pair<int, int> > &ix, const vector<wstring> &key, const wstring &skey) const {
+  for (size_t k = 0; k < index.size(); k++) {
+    int x = index[k];
+    if (db.cdb[x].isRemoved())
+      continue;
+    const wstring &n = db.cdb[x].getCanonizedName();
+    int nMatch = 0;
+    for (size_t k = 0; k < key.size(); k++) {
+      const wchar_t *str = wcsstr(n.c_str(), key[k].c_str());
+      if (str != nullptr)
+        nMatch++;
+    }
+    if (wcsstr(db.cdb[x].getCanonizedNameExact().c_str(), skey.c_str()) != nullptr)
+      nMatch += 3;
+
+    if (nMatch > 0)
+      ix.insert(make_pair(nMatch, x));
+  }
+}
+
+void RunnerDB::ClubNodeHash::setupHash(const wstring &key, int keyOffset, int ix) {
+  index.push_back(ix);
+}
+
+void RunnerDB::RunnerClubNodeHash::setupHash(const wchar_t *key, int keyOffset, int ix) {
+  index.push_back(ix);
+}
+  
+void RunnerDB::RunnerClubNodeHash::match(RunnerDB &db, set< pair<int, int> > &ix, const vector<wstring> &key) const {
+  wchar_t bf[256];
+  for (size_t k = 0; k < index.size(); k++) {
+    int x = index[k];
+    if (db.rdb[x].isRemoved())
+      continue;
+    const wchar_t *n = db.rwdb[x].getNameCstr();
+    int i = 0, di = 0;
+    while (n[i]) {
+      if (n[i] == ',') {
+        i++;
+        continue;
+      }
+      bf[di++] = toLowerStripped(n[i++]);
+    }
+    bf[di] = 0;
+    int nMatch = 0;
+    for (size_t k = 0; k < key.size(); k++) {
+      const wchar_t *ref = key[k].c_str();
+      const wchar_t *str = wcsstr(bf, ref);
+      int add = 0;
+      if (str == bf || (str != nullptr && (iswspace(str[-1]) || str[-1]=='-'))) {
+        //Beginning of string or beginning of word
+        int len = 0;
+        while (str[len] && !iswspace(str[len]))
+          len++;
+
+        if (wcsncmp(ref, str, max<int>(len, key[k].length())) == 0)
+          add = 3; // Points for full  name
+        else
+          add = 2; // Points for matching beginning of name
+
+        /*if (k > 0 && k + 1 == key.size()) {
+          add *= 2; // Last is full string
+        }*/
+      }
+      else if (str != nullptr && key[k].length() > 3) { // Inner part of name
+        add = 1;
+      }
+      if (nMatch > 1 && add > 1)
+        nMatch = 10 * nMatch + add;
+      else
+        nMatch += add;
+    }
+    
+    if (nMatch > 0)
+      ix.insert(make_pair(nMatch, x));
+  }
+}
+
+void RunnerDB::RunnerNodeHash::setupHash(const wchar_t *key, int keyOffset, int ix) {
+  index.push_back(ix);
+}
+
+void RunnerDB::RunnerNodeHash::match(RunnerDB &db, set< pair<int, int> > &ix, const vector<wstring> &key) const {
+  RunnerDB::RunnerClubNodeHash::match(db, ix, key);
+}
+
+
+void RunnerDB::setupAutoCompleteHash(AutoHashMode mode) {
+  vector<wstring> names;
+
+  if (mode == AutoHashMode::Clubs) {
+    if (!clubHash.empty())
+      return;
+
+    for (size_t k = 0; k < cdb.size(); k++) {
+      auto &c = cdb[k];
+      canonizeSplitName(c.getName(), names);
+      wstring ccn, ccne;
+      ccne = canonizeName(c.getName().c_str());
+      for (size_t j = 0; j < names.size(); j++) {
+        const wstring &n = names[j];
+        if (j > 0)
+          ccn.append(L" ");
+        ccn += n;
+        int ikey = keyFromString(n, 0);
+        clubHash[ikey].setupHash(n, 2, k);
+      }
+      c.setCanonizedName(std::move(ccn), std::move(ccne));
+    }
+  }
+  else if (mode == AutoHashMode::RunnerClub) {
+    if (!runnerHashByClub.empty())
+      return;
+    for (size_t k = 0; k < rwdb.size(); k++) {
+      int key = rwdb[k].dbe().clubNo;
+      if (key > 0) {
+        runnerHashByClub[key].setupHash(rwdb[k].getNameCstr(), 2, k);
+      }
+    }
+  }
+  else if (mode == AutoHashMode::Runners) {
+    if (!runnerHash.empty())
+      return;
+    wstring tn;
+    wchar_t bf[256];
+    vector<int> ps;
+    for (size_t k = 0; k < rwdb.size(); k++) {
+      auto &r = rwdb[k];
+      const wchar_t *name = r.getNameCstr();
+      int ix = 0, iy = 0;
+      ps.resize(1, 0);
+      while (name[ix]) {
+        if (name[ix] != ',') {
+          if (name[ix] == '-' || name[ix] == ' ') {
+            bf[iy] = 0;
+            ps.push_back(iy+1);
+          }
+          else 
+            bf[iy] = toLowerStripped(name[ix]);
+          iy++;
+        }
+        ix++;
+      }
+      bf[iy] = 0;
+      for (int j : ps) {
+        if (j < iy) {
+          int ikey = keyFromString(bf + j);
+          runnerHash[ikey].setupHash(bf, 2, k);
+        }
+      }
+    }
+  }
+}
+
+vector<pClub> RunnerDB::getClubSuggestions(const wstring &key, int limit) {
+  setupAutoCompleteHash(AutoHashMode::Clubs);
+  set<pair<int, int>> ix;
+  vector<wstring> nn;
+  wstring cankey = canonizeName(key.c_str());
+  canonizeSplitName(key, nn);
+  for (wstring &part : nn) {
+    int ikey = keyFromString(part, 0);
+    auto res = clubHash.find(ikey);
+    if (res != clubHash.end()) {
+      res->second.match(*this, ix, nn, cankey);
+    }
+  }
+  vector<pClub> ret;
+  vector< pair<int, int> > outOrder;
+  outOrder.reserve(ix.size());
+  for (const pair<int, int> &x : ix) {
+    const wstring &name = cdb[x.second].getCanonizedNameExact();
+  
+    double sd = stringDistanceAssymetric(name, cankey);
+    outOrder.emplace_back(-(int(10000.0*(10 * x.first - sd))), x.second);
+  }
+
+  sort(outOrder.begin(), outOrder.end());
+  
+  for (const pair<int, int> &x : outOrder) {
+    ret.push_back(&cdb[x.second]);
+    if (ret.size() > size_t(limit))
+      break;
+  }
+  return ret;
+}
+
+vector<pair<RunnerWDBEntry *, int>> RunnerDB::getRunnerSuggestions(const wstring &key, int clubId, int limit) {
+  if (clubId > 0)
+    setupAutoCompleteHash(AutoHashMode::RunnerClub);
+  else
+    setupAutoCompleteHash(AutoHashMode::Runners);
+
+  vector< pair<int, int> > outOrder;
+  set<pair<int, int>> ix;
+  wchar_t bf[256];
+  int iy = 0;
+  for (size_t k = 0; k < key.length(); k++) {
+    if (key[k] != ',') {
+
+      if (key[k] == '-')
+        bf[k] = ' ';
+      else
+        bf[k] = toLowerStripped(key[k]);
+
+      iy++;
+      if (iy >= 255) {
+        break;
+      }
+    }
+  }
+  bf[iy] = 0;
+  wstring cankey = trim(bf);
+  vector<pair<RunnerWDBEntry *, int>> ret;
+  vector<wstring> nameParts;
+  split(cankey, L" ", nameParts);
+//  if (nameParts.size() > 1)
+//    nameParts.push_back(cankey);
+
+  if (clubId > 0) {
+    auto res = runnerHashByClub.find(clubId);
+    if (res != runnerHashByClub.end()) {
+      res->second.match(*this, ix, nameParts);
+    }
+  }
+  else {
+    int np = nameParts.size();
+    if (np > 1)
+      np--;// Last is full string.
+    for (int k = 0; k < np; k++) {
+      wstring &part = nameParts[k];
+      int ikey = keyFromString(part, 0);
+      auto res = runnerHash.find(ikey);
+      if (res != runnerHash.end())
+        res->second.match(*this, ix, nameParts);
+    }
+    
+  }
+  if (ix.empty())
+    return ret;
+
+  outOrder.reserve(ix.size());
+  wstring tname;
+  int maxP = 0;
+  for (auto itr = ix.rbegin(); itr != ix.rend(); ++itr) {
+    auto &x = *itr;
+    maxP = max(maxP, x.first);
+    if (x.first <= (maxP - 10) || (outOrder.size() > size_t(limit) &&  x.first < maxP))
+      break;
+    const wchar_t *name = rwdb[x.second].getNameCstr();
+    const wchar_t *cname = canonizeName(name);
+    tname = cname;
+    double sd = stringDistanceAssymetric(tname, cankey);
+    outOrder.emplace_back(-(int(10000.0*(10 * x.first - sd))), x.second);
+  }
+
+  // Fine-sort on string distance
+  sort(outOrder.begin(), outOrder.end());
+
+  for (const pair<int, int> &x : outOrder) {
+    ret.emplace_back(&rwdb[x.second], x.second);
+    if (ret.size() > size_t(limit))
+      break;
+  }
+  return ret;
+}

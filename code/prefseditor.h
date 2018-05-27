@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2017 Melin Software HB
+    Copyright (C) 2009-2018 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -37,8 +37,8 @@ private:
 
   int userCB(gdioutput &gdi, int type, const BaseInfo &data);
 
-  string codeValue(const string &in, PropertyType p) const;
-  GDICOLOR selectColor(const string &val, PropertyType p) const;
+  wstring codeValue(const wstring &in, PropertyType p) const;
+  GDICOLOR selectColor(const wstring &val, PropertyType p) const;
 
 public:
   void handle(gdioutput &gdi, BaseInfo &info, GuiEventType type);
