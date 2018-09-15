@@ -1392,7 +1392,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
         gdi.addItem("StartType", lang.tl("Lottad startlista"), SMDrawn);
         gdi.addItem("StartType", lang.tl("Fria starttider"), SMFree);
         gdi.addItem("StartType", lang.tl("Jag sköter lottning själv"), SMCustom);
-				gdi.selectItemByData("StartType", SMCustom);
+        gdi.selectItemByData("StartType", SMCustom);
         gdi.fillDown();
         gdi.popX();
         gdi.dropLine(3);
@@ -1747,6 +1747,13 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
     else if (bi.id=="DoFreeImport") {
       fi.addEntries(oe, entries);
       entryText.clear();
+
+      // Update qualification/final
+      vector<pClass> cls;
+      oe->getClasses(cls, false);
+      for (pClass c : cls) {
+        c->updateFinalClasses(0, false);
+      }
       loadPage(gdi);
     }
     else if (bi.id=="Startlist") {
@@ -2423,7 +2430,8 @@ void TabCompetition::loadAboutPage(gdioutput &gdi) const
                         "\n\nDanish Translation by Michael Leth Jess and Chris Bagge"
                         "\n\nRussian Translation by Paul A. Kazakov and Albert Salihov"
                         "\n\nOriginal French Translation by Jerome Monclard"
-                        "\n\nAdaption to French conditions and extended translation by Pierre Gaufillet");
+                        "\n\nAdaption to French conditions and extended translation by Pierre Gaufillet"
+                        "\n\nCzech Translation by Marek Kustka");
 
   gdi.dropLine();
   gdi.addString("", 0, "Det här programmet levereras utan någon som helst garanti. Programmet är ");
@@ -2433,7 +2441,8 @@ void TabCompetition::loadAboutPage(gdioutput &gdi) const
   gdi.dropLine();
   gdi.addString("", 1, "Vi stöder MeOS");
   vector<wstring> supp;
-  getSupporters(supp);
+  vector<wstring> developSupp;
+  getSupporters(supp, developSupp);
   for (size_t k = 0; k<supp.size(); k++)
     gdi.addStringUT(0, supp[k]);
 
@@ -2563,7 +2572,7 @@ bool TabCompetition::loadPage(gdioutput &gdi)
     gdi.dropLine(1.2);
     gdi.addCheckbox("LongTimes", "Aktivera stöd för tider över 24 timmar", CompetitionCB, oe->useLongTimes());
 
-    if (oe->isClient()) {
+    if (false && oe->isClient()) {
       gdi.popX();
       gdi.disableInput("ZeroTime");
       gdi.disableInput("LongTimes");
@@ -3558,6 +3567,13 @@ TabCompetition::FlowOperation TabCompetition::saveEntries(gdioutput &gdi, bool r
     if (gdi.ask(L"ask:convert_to_patrol")) {
       oTeam::convertClassWithReferenceToPatrol(*oe, clsWithRef);
     }
+  }
+
+  // Update qualification/final
+  vector<pClass> cls;
+  oe->getClasses(cls, false);
+  for (pClass c : cls) {
+    c->updateFinalClasses(0, false);
   }
 
   return FlowContinue;

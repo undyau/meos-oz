@@ -661,6 +661,7 @@ bool oClass::addStageCourse(int iStage, pCourse pc)
   return false;
 }
 
+
 void oClass::clearStageCourses(int stage) {
   if (size_t(stage) < MultiCourse.size())
     MultiCourse[stage].clear();
@@ -1903,6 +1904,16 @@ public:
     int baseRes;
     if (r.getInputStatus() == StatusOK) {
       int t = r.getInputPlace();
+      
+      if (t == 0) {
+        const oRunner *rr = dynamic_cast<const oRunner *>(&r);
+        if (rr && rr->getTeam() && rr->getLegNumber() > 0) {
+          const pRunner rPrev = rr->getTeam()->getRunner(rr->getLegNumber() - 1);
+          if (rPrev && rPrev->getStatus() == StatusOK)
+            t = rPrev->getPlace();
+        }
+      }
+      
       if (t > 0)
         baseRes = t;
       else
@@ -3929,9 +3940,12 @@ void oClass::drawSeeded(ClassSeedMethod seed, int leg, int firstStart,
   vector<pRunner> r;
   oe->getRunners(Id, 0, r, true);
   vector< pair<int, int> > seedIx;
-
+  if (seed == SeedResult) {
+    oe->reEvaluateAll(set<int>(), true);
+    oe->calculateResults(oEvent::ResultType::RTClassResult, false);
+  }
   for (size_t k = 0; k < r.size(); k++) {
-    if (r[k]->tLeg != leg)
+    if (r[k]->tLeg != leg && leg != -1)
       continue;
 
     pair<int,int> sx;
@@ -4006,17 +4020,21 @@ void oClass::drawSeeded(ClassSeedMethod seed, int leg, int firstStart,
   }
   
   if (noClubNb) {
+    set<int> pushed_back;
     for (size_t k = 1; k < startOrder.size(); k++) {
       int idMe = startOrder[k]->getClubId();
       if (idMe != 0 && idMe == startOrder[k-1]->getClubId()) {
         // Make sure the runner with worst ranking is moved back. (Swedish SM rules)
-        if (startOrder[k-1]->getRanking() > startOrder[k]->getRanking())
+        bool skipRank = pushed_back.count(startOrder[k - 1]->getId()) != 0;
+        if (!skipRank &&  startOrder[k-1]->getRanking() > startOrder[k]->getRanking())
           swap(startOrder[k-1], startOrder[k]);
+        pushed_back.insert(startOrder[k]->getId());
 
         vector<pair<int, pRunner> > rqueue;
         rqueue.push_back(make_pair(k, startOrder[k]));
         for (size_t j = k + 1; j < startOrder.size(); j++) {
           if (idMe != startOrder[j]->getClubId()) {
+            pushed_back.insert(startOrder[j]->getId());
             swap(startOrder[j], startOrder[k]); // k-1 now has a non-club nb behind
             rqueue.push_back(make_pair(j, pRunner(0)));
             // Shift the queue
@@ -4210,9 +4228,9 @@ oClass *oClass::getVirtualClass(int instance, bool allowCreation) {
   return this; // Fallback
 }
 
-const oClass *oClass::getVirtualClass(int instance) const {
+const pClass oClass::getVirtualClass(int instance) const {
   if (instance == 0)
-    return this;
+    return pClass(this);
   if (parentClass)
     return parentClass->getVirtualClass(instance);
 
@@ -4220,7 +4238,7 @@ const oClass *oClass::getVirtualClass(int instance) const {
     return virtualClasses[instance];
 
   if (instance >= getNumQualificationFinalClasses())
-    return this; // Invalid
+    return pClass(this); // Invalid
   virtualClasses.resize(getNumQualificationFinalClasses());
 
   int virtId = Id + instance * MaxClassId;
@@ -4232,7 +4250,7 @@ const oClass *oClass::getVirtualClass(int instance) const {
   configureInstance(instance, false);
   if (virtualClasses[instance])
     return virtualClasses[instance];
-  return this; // Fallback
+  return pClass(this); // Fallback
 }
 
 void oClass::configureInstance(int instance, bool allowCreation) const {

@@ -107,7 +107,9 @@ protected:
                               wstring &processedTime, wstring &date);
 
 public:
-  //void parse(const wstring &file, list< vector<string> > &dataOutput);
+
+  static void convertUTF(const wstring &file);
+
   void parse(const wstring &file, list< vector<wstring> > &dataOutput);
 
   void importTeamLineup(const wstring &file,
