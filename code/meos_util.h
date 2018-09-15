@@ -160,7 +160,7 @@ wstring getMeosFullVersion();
 wstring getMajorVersion();
 wstring getMeosCompectVersion();
 
-void getSupporters(vector<wstring> &supp);
+void getSupporters(vector<wstring> &supp, vector<wstring> developSupp);
 
 int countWords(const wchar_t *p);
 

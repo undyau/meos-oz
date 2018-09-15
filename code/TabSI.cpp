@@ -1682,7 +1682,6 @@ bool TabSI::loadPage(gdioutput &gdi) {
   gdi.dropLine(2);
   gdi.setRestorePoint("SIPageLoaded");
 
-  if (mode==ModeReadOut) {
   if (mode == ModeReadOut) {
     gdi.addButton("Import", "Importera från fil...", SportIdentCB);
 
