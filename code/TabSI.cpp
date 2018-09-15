@@ -894,7 +894,7 @@ int TabSI::siCB(gdioutput &gdi, int type, void *data)
           }
         }
         int birthYear = 0;
-        r->updateFromDB(name, clubId, lbi.data, cardNo, birthYear);
+        r->updateFromDB(name, clubId, lbi.data, cardNo, birthYear, false);
         r->setName(name, true);
         r->setClubId(clubId);
         r->setClassId(lbi.data, true);
@@ -1607,17 +1607,6 @@ bool TabSI::loadPage(gdioutput &gdi) {
 
     gdi.addInput("C" + itos(i+1), itow(c), 3, 0, L"#C" + itow(i+1));
   }
-  /*
-  gdi.addInput("C1", "33", 5, 0, "#C1");
-  gdi.addInput("C2", "34", 5, 0, "#C2");
-  gdi.addInput("C3", "45", 5, 0, "#C3");
-  gdi.addInput("C4", "50", 5, 0, "#C4");
-  gdi.addInput("C5", "61", 5, 0, "#C5");
-  gdi.addInput("C6", "62", 5, 0, "#C6");
-  gdi.addInput("C7", "67", 5, 0, "#C7");
-
-  gdi.addInput("C8", "100", 5, 0, "#C8");
-  */
   
   gdi.dropLine();
   gdi.addButton("Save", "Bricka", SportIdentCB);
@@ -1694,6 +1683,7 @@ bool TabSI::loadPage(gdioutput &gdi) {
   gdi.setRestorePoint("SIPageLoaded");
 
   if (mode==ModeReadOut) {
+  if (mode == ModeReadOut) {
     gdi.addButton("Import", "Importera från fil...", SportIdentCB);
 
     gdi.setRestorePoint("Help");
@@ -1704,7 +1694,7 @@ bool TabSI::loadPage(gdioutput &gdi) {
 
     gdi.dropLine();
   }
-  else if (mode==ModeAssignCards) {
+  else if (mode == ModeAssignCards) {
     gdi.dropLine(1);
     showAssignCard(gdi, true);
   }
@@ -2422,7 +2412,7 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
         statusline += lang.tl(L",     Prel. bomtid: ") + runner->getMissedTimeS();
       gdi.addStringUT(rc.top+6+lh, rc.left+20, 0, statusline);
 
-      if (runner->getDI().getInt("CardFee") != 0)
+      if (runner->isHiredCard())
         rentCardInfo(gdi, rc.right-rc.left);
       gdi.scrollToBottom();
     }
@@ -2459,7 +2449,7 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
 
       gdi.addStringUT(rc.top+6+lh, rc.left+20, 0, msg);
 
-      if (runner->getDI().getInt("CardFee") != 0)
+      if (runner->isHiredCard())
         rentCardInfo(gdi, rc.right-rc.left);
 
       gdi.scrollToBottom();
@@ -3100,6 +3090,10 @@ void TabSI::showModeCardData(gdioutput &gdi) {
     gdi.addButton("CreateCompetition", "Create Competition", SportIdentCB);
     if (savedCards.empty())
       gdi.disableInput("CreateCompetition");
+
+#ifdef _DEBUG
+    gdi.addButton("Import", "Importera från fil...", SportIdentCB);
+#endif
   }
   gdi.dropLine(3);
   gdi.popX();
@@ -3196,7 +3190,7 @@ void TabSI::printCard(gdioutput &gdi, int cardId, bool forPrinter) const {
     name = wstring(c.firstName) + L" " + c.lastName;
     clubName = c.club;
   }
-  else {
+  else if (useDatabase) {
     const RunnerWDBEntry *r = oe->getRunnerDatabase().getRunnerByCard(c.CardNumber);
     if (r) {
       r->getName(name);
@@ -3356,12 +3350,6 @@ void TabSI::createCompetitionFromCards(gdioutput &gdi) {
     cards.push_back(p);
   }
 
-  zeroTime -= 3600;
-  if (zeroTime < 0)
-    zeroTime += 3600 * 24;
-  zeroTime -= zeroTime % 1800;
-  oe->setZeroTime(formatTime(zeroTime));
-
   int course = 0;
   for (size_t k = 0; k < cards.size(); k++) {
     if (!hashCount.count(cards[k].first))
@@ -3391,13 +3379,20 @@ void TabSI::createCompetitionFromCards(gdioutput &gdi) {
 
     if (abs(dist) > 3) {
       pCourse pc = oe->addCourse(lang.tl("Bana ") + itow(++course));
-      for (unsigned j = 0; j < cards[k].second->nPunch; k++) {
+      for (unsigned j = 0; j < cards[k].second->nPunch; j++) {
         pc->addControl(cards[k].second->Punch[j].Code);
       }
       oe->addClass(lang.tl(L"Klass ") + itow(course), pc->getId());
       hashCount.erase(cards[k].first);
     }
   }
+
+  // Define a new zero time
+  zeroTime -= 3600;
+  if (zeroTime < 0)
+    zeroTime += 3600 * 24;
+  zeroTime -= zeroTime % 1800;
+  oe->setZeroTime(formatTime(zeroTime));
 
   // Add competitors
   for (size_t k = 0; k < cards.size(); k++) {
@@ -3574,8 +3569,8 @@ void TabSI::showCheckCardStatus(gdioutput &gdi, const string &cmd) {
             checkedCardFlags[cno] == CNFRentAndNotRent) {
           int yp = gdi.getCY();
           wstring cp = r[k]->getCompleteIdentification();
-          bool rent = r[k]->getDI().getInt("CardFee") != 0;
-          wstring info = rent ? (L" (" + lang.tl("Hyrd") + L")") : L"";
+          bool hire = r[k]->isHiredCard();
+          wstring info = hire ? (L" (" + lang.tl("Hyrd") + L")") : L"";
           gdi.addStringUT(yp, cx, 0, itow(cno) + info);
           gdi.addStringUT(yp, cx + col2, 0, cp);
         }

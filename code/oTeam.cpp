@@ -314,7 +314,7 @@ void oTeam::setRunnerInternal(int k, pRunner r)
   if (Runners[k]) {
     Runners[k]->tInTeam = this;
     Runners[k]->tLeg = k;
-    if (Class && Class->getLegType(k) != LTGroup)
+    if (Class && (Runners[k]->Class==nullptr || Class->getLegType(k) != LTGroup))
       Runners[k]->setClassId(getClassId(false), false);
   }
   updateChanged();
@@ -931,6 +931,8 @@ bool oTeam::apply(bool sync, pRunner source, bool setTmpOnly) {
 
     if (Runners[i]) {
       pClass actualClass = Runners[i]->getClassRef(true);
+      if (actualClass == nullptr)
+        actualClass = Class;
       if (Runners[i]->tInTeam && Runners[i]->tInTeam!=this) {
         Runners[i]->tInTeam->correctRemove(Runners[i]);
       }
@@ -2255,4 +2257,27 @@ int oTeam::getRogainingPatrolReduction() const {
 int oTeam::getRogainingPatrolOvertime() const {
   getRogainingPatrolPoints(false);
   return tTeamPatrolRogainingAndVersion.second.overtime;
+}
+
+void oTeam::setClub(const wstring &clubName) {
+  oAbstractRunner::setClub(clubName);
+  propagateClub();
+}
+
+pClub oTeam::setClubId(int clubId) {
+  oAbstractRunner::setClubId(clubId);
+  propagateClub();
+  return Club;
+}
+
+void oTeam::propagateClub() {
+  
+  if (Class && Class->getNumDistinctRunners() == 1) {
+    for (pRunner r : Runners) {
+      if (r && r->Club != Club) {
+        r->Club = Club;
+        r->updateChanged();
+      }
+    }
+  }
 }
