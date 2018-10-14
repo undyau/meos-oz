@@ -1797,7 +1797,7 @@ void MetaList::initSymbols() {
     orderToSymbol[CourseStartTime] = "CourseStartTime";
     orderToSymbol[ClassTeamLeg] = "ClassTeamLeg";
     orderToSymbol[Custom] = "CustomSort";
-		orderToSymbol[CoursePoints] = "CoursePoints";
+    orderToSymbol[CoursePoints] = "CoursePoints";
 
     for (map<SortOrder, string>::iterator it = orderToSymbol.begin();
       it != orderToSymbol.end(); ++it) {

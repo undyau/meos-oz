@@ -9,9 +9,9 @@ AppId={{5A8ACFDC-9E0A-4B59-9D8F-4013251EB156}
 AppName=MEOS-OZ
 AppVersion=3.5.916.0
 AppPublisher=undy
-AppPublisherURL=http://sourceforge.net/projects/meosoz/
-AppSupportURL=http://sourceforge.net/projects/meosoz/
-AppUpdatesURL=http://sourceforge.net/projects/meosoz/
+AppPublisherURL=https://github.com/undyau/meos-oz
+AppSupportURL=https://github.com/undyau/meos-oz
+AppUpdatesURL=https://github.com/undyau/meos-oz
 DefaultDirName={pf}\MEOS-OZ
 DefaultGroupName=MEOS-OZ
 LicenseFile=license.txt
@@ -33,11 +33,12 @@ Source: "libmySQL.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "license.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.meos"; DestDir: "{app}"; Flags: ignoreversion
+Source: "*.brules"; DestDir: "{app}"; Flags: ignoreversion
 Source: "mysqlpp.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "thirdpartylicense.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "baseclass.xml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "database.clubs"; DestDir: "{app}"; Flags: ignoreversion
-Source: "database.persons"; DestDir: "{app}"; Flags: ignoreversion
+Source: "database.wclubs"; DestDir: "{app}"; Flags: ignoreversion
+Source: "database.wpersons"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.lxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.listdef"; DestDir: "{app}"; Flags: ignoreversion
 Source: "ind_courseresult.lxml"; DestDir: "{app}"; Flags: ignoreversion

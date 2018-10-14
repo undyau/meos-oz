@@ -2239,17 +2239,15 @@ wstring oEvent::getAbsDateTimeISO(DWORD time, bool includeDate, bool useGMT) con
       timeS = bf + getTimeZoneString();
     }
 
-    if (extraDay == 0 ) {
-      dateS = Date;
-    }
-    else {
-      SYSTEMTIME st;
-      convertDateYMS(Date, st, false);
+		//AS : always normalise time in case user has entered date as (say) 2018-10-3
+		SYSTEMTIME st;
+		convertDateYMS(Date, st, false);
+		if (extraDay != 0) {
       __int64 sec = SystemTimeToInt64Second(st);
       sec = sec + (extraDay * 3600 * 24);
       st = Int64SecondToSystemTime(sec);
-      dateS = convertSystemDate(st);
-    }
+			}
+		dateS = convertSystemDate(st);
   }
 
   if (includeDate)

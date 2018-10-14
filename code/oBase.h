@@ -67,7 +67,7 @@ enum SortOrder {ClassStartTime,
                 CourseStartTime,
                 SortByEntryTime,
                 Custom,
-								CoursePoints,
+                CoursePoints,
                 SortEnumLastItem};
 
 class oBase

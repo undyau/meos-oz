@@ -1663,7 +1663,7 @@ bool TabSI::loadPage(gdioutput &gdi) {
     gdi.addCheckbox("Database", "Använd löpardatabasen", SportIdentCB, useDatabase);
 
   gdi.addCheckbox("PrintSplits", "Sträcktidsutskrift[check]", SportIdentCB, printSplits);
-	gdi.addCheckbox("PrintLabels", "Skriva ut etiketter", SportIdentCB, !!oe->getDCI().getInt("PrintLabels"));
+  gdi.addCheckbox("PrintLabels", "Skriva ut etiketter", SportIdentCB, !!oe->getDCI().getInt("PrintLabels"));
   if (!oe->empty()) {
     gdi.addCheckbox("StartInfo", "Startbevis", SportIdentCB, printStartInfo, "Skriv ut startbevis för deltagaren");
     if (mode != ModeEntry)
@@ -1702,7 +1702,7 @@ bool TabSI::loadPage(gdioutput &gdi) {
     generateEntryLine(gdi, 0);
     gdi.disableInput("Interactive");
     gdi.disableInput("PrintSplits");
-		gdi.disableInput("PrintLabels");
+    gdi.disableInput("PrintLabels");
     gdi.disableInput("UseManualInput");
   }
   else if (mode == ModeCardData) {
@@ -2406,7 +2406,7 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
                            lang.tl(L",      Prel. placering: ") + placeS;
 
       if (runner->getCourse(false)->hasRogaining())
-				statusline += lang.tl(L",     Poäng: ") + itow(runner->getRogainingPoints(false));
+        statusline += lang.tl(L",     Poäng: ") + itow(runner->getRogainingPoints(false));
 	  else
         statusline += lang.tl(L",     Prel. bomtid: ") + runner->getMissedTimeS();
       gdi.addStringUT(rc.top+6+lh, rc.left+20, 0, statusline);
@@ -2470,8 +2470,8 @@ bool TabSI::processCard(gdioutput &gdi, pRunner runner, const SICard &csic, bool
     generateSplits(runner, gdi);
 
   // Print labels
-	if (oe->getDCI().getInt("PrintLabels"))
-		generateLabel(runner, gdi);
+  if (oe->getDCI().getInt("PrintLabels"))
+    generateLabel(runner, gdi);
 
   activeSIC.clear(&csic);
 
