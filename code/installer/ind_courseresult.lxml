@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 
 
-<MeOSListDefinition>
+<MeOSListDefinition version="3.5">
 <ListName>Resultat per bana</ListName>
 <Tag>courseresult</Tag>
 <SortOrder>CourseResult</SortOrder>
 <ListType>Runner</ListType>
 <Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
 <Head>
 <Line>
 <Block Type="CmpName">

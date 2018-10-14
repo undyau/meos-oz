@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.5">
+<ListName>Patrol Team Rogaining</ListName>
+<Tag>patrol_team_rogaining</Tag>
+<UID>A-7941583486858019635B1030030353</UID>
+<SortOrder>CustomSort</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<ResultModule>ms-patrol-rogaining</ResultModule>
+<MeOSResultCalculationSet>
+<Name>Patrol Rogaining</Name>
+<Tag>ms-patrol-rogaining</Tag>
+<Description>Rogaining results for a patrol</Description>
+<Origin>Rogaining patrol (2018-01-18)</Origin>
+<Date>2018-01-23 06:50:52</Date>
+<Rule name="RunnerPoints">
+<Method>OutputNumbers[0] = PointReduction;&#13;&#10;return Points;</Method>
+</Rule>
+<Rule name="TeamPoints">
+<Method>OutputTimes[0] = PatrolRogainingOvertime;&#13;&#10;OutputNumbers[0] = PatrolRogainingReduction;&#13;&#10;return PatrolRogainingScore;</Method>
+</Rule>
+<Rule name="TeamScore">
+<Method>if (Status==StatusOK)&#13;&#10;  return Time - 1000000 * Points;&#13;&#10;else&#13;&#10;  return 100000+Status;&#13;&#10;</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<HideLegSelection>1</HideLegSelection>
+<Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
+<SubFilter name="FilterResult"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="3">arial</ListFont>
+<SubListFont scale="120" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Poäng</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Övertid</Text>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Avdrag</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamPlace">
+<ResultModule>ms-patrol-rogaining</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+<BlockWidth>20</BlockWidth>
+</Block>
+<Block Type="TeamRogainingPoint">
+<Align BlockAlign="true">Poäng</Align>
+<Font>Bold</Font>
+<TextAdjust>Center</TextAdjust>
+</Block>
+<Block Type="TeamTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="ResultModuleTimeTeam">
+<ResultModule>ms-patrol-rogaining</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="true">Övertid</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="ResultModuleNumberTeam">
+<ResultModule>ms-patrol-rogaining</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="true">Avdrag</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="RunnerName">
+<Text>  X</Text>
+<Align BlockAlign="true">TeamName</Align>
+</Block>
+<Block Type="RunnerRogainingPoint">
+<Text>  X</Text>
+<Align BlockAlign="true">TeamRogainingPoint</Align>
+<BlockWidth>5</BlockWidth>
+<TextAdjust>Center</TextAdjust>
+</Block>
+<Block Type="RunnerTime">
+<Text>  X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerRogainingOvertime">
+<Align BlockAlign="true">Övertid</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>ms-patrol-rogaining</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="true">Avdrag</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

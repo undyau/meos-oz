@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSResultCalculationSet>
+<Name>Individual Rogaining</Name>
+<Tag>rogaining</Tag>
+<Description>Individual standard rogaining results.</Description>
+<Origin>Melin Software HB</Origin>
+<Date>2017-11-16 07:10:20</Date>
+<Rule name="RunnerScore">
+<Method>if (Status==StatusOK)&#13;&#10;  return Time - Points*100000;&#13;&#10;else&#13;&#10;  return Status + 100000;</Method>
+</Rule>
+</MeOSResultCalculationSet>

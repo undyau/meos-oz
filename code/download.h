@@ -87,7 +87,7 @@ protected:
 
   friend void SUThread(void *ptr);
 
-	std::vector<wstring*> usedBuffers;
+	std::vector<string*> usedBuffers;
 
 };
 

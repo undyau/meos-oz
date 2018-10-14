@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 
 
-<MeOSListDefinition version="3.3">
+<MeOSListDefinition version="3.5">
 <ListName>Stafettresultat, sträcka</ListName>
 <Tag>legresult</Tag>
 
@@ -9,6 +9,7 @@
 <ListType>Team</ListType>
 <SubListType>Runner</SubListType>
 <Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
 <SubFilter name="FilterResult"/>
 <SubFilter name="FilterSameParallelNotFirst"/>
 <HeadFont scale="100" above="0">arial</HeadFont>

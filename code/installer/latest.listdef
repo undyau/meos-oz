@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 
-<MeOSListDefinition version="3.3">
+<MeOSListDefinition version="3.5">
 <ListName>Latest Results</ListName>
 <Tag>latestresult</Tag>
 <SortOrder>FinishTimeReverse</SortOrder>
@@ -10,6 +10,7 @@
 <SupportFrom>1</SupportFrom>
 <SupportTo>1</SupportTo>
 <Filter name="FilterPrelResult"/>
+<Filter name="FilterNoCancel"/>
 <HeadFont scale="200" above="0">arial</HeadFont>
 <SubHeadFont scale="150" above="0">arial</SubHeadFont>
 <ListFont scale="150" above="0">arial</ListFont>

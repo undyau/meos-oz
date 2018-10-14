@@ -1,3 +1,6 @@
+  14 October 2018 3.5.916.0
+	Merge with MEOS 3.5.916
+
   23 March 2018 3.4.717.7
 - XML results export for IOF XML 2.0.3 had broken split times
 - Use Eventor provided shortnames for club short names

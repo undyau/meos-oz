@@ -10,6 +10,7 @@
 <ResultModule>result-ms-4A5B-66C8-1</ResultModule>
 <MeOSResultCalculationSet>
 <Name>Team Rogaining Collect Points</Name>
+<Description>Rogaining results for a team, where each team member collects points individually</Description>
 <Tag>result-ms-4A5B-66C8-1</Tag>
 <Origin>Lagrogaining (2015-01-21)</Origin>
 <Date>2015-03-25 07:17:19</Date>

@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 
 
-<MeOSListDefinition>
+<MeOSListDefinition version="3.5">
 <ListName>Narrow Results</ListName>
 <UID>A1953845972770663068B776784610</UID>
 <SortOrder>ClassResult</SortOrder>
 <ListType>Runner</ListType>
 <SubListType>Punches</SubListType>
 <Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
 <HeadFont scale="100"></HeadFont>
 <SubHeadFont scale="100"></SubHeadFont>
 <ListFont scale="100"></ListFont>

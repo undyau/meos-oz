@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.5">
+<ListName>Startlista, banvis</ListName>
+<Tag>startbycourse</Tag>
+<SortOrder>CourseStartTime</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Startlista - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="CourseName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="CourseLength">
+<Text>X meter</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassStartName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerStart">
+<Align BlockAlign="true">CourseName</Align>
+</Block>
+<Block Type="ClassName">
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="RunnerBib">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">CourseLength</Align>
+</Block>
+<Block Type="ClubName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerCard">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

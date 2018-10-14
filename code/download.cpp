@@ -486,9 +486,11 @@ void Download::postData(const wstring &url, const wstring &data, ProgressWindow 
   HINTERNET hConnect = InternetConnect(hInternet, host, port,
                                        NULL, NULL, INTERNET_SERVICE_HTTP, 0, dw);
   static TCHAR hdrs[] = _T("Content-Type: application/x-www-form-urlencoded");
-	wstring* str = new wstring;
+
+	string* str = new string;
 	usedBuffers.push_back(str);
-	*str = data;
+	wide2String(data, *str); // Create a std::string version of the data
+
 	PCTSTR accept[] = {_T("*/*"), NULL};
 
 	HINTERNET hRequest(NULL);

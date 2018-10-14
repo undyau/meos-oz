@@ -502,6 +502,8 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="bmp00001.bmp" />
+    <Image Include="meos.png" />
+    <Image Include="title.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

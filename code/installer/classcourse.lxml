@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 
 
-<MeOSListDefinition>
-<ListName>classcourseresult</ListName>
-<ListName>Resultat för klass per bana</ListName>
-<Tag>courseresult</Tag>
+<MeOSListDefinition version="3.5">
+<ListName>Resultat banvis per klass</ListName>
+<Tag>classcourseresult</Tag>
 <SortOrder>ClassCourseResult</SortOrder>
 <ListType>Runner</ListType>
 <SubListType>None</SubListType>
 <Filter name="FilterResult"/>
-<HeadFont scale="100"></HeadFont>
-<SubHeadFont scale="100"></SubHeadFont>
-<ListFont scale="100"></ListFont>
-<SubListFont scale="100"></SubListFont>
+<Filter name="FilterNoCancel"/>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="100" above="0"/>
+<SubListFont scale="100" above="0"/>
 <Head>
 <Line>
 <Block Type="CmpName">
@@ -50,7 +50,7 @@
 <Block Type="ClubName">
 <Align BlockAlign="true">None</Align>
 </Block>
-<Block Type="RunnerTotalTimeStatus">
+<Block Type="RunnerTimeStatus">
 <Align BlockAlign="true">None</Align>
 </Block>
 <Block Type="RunnerClassCourseTimeAfter">

@@ -1,18 +1,19 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.2">
+<MeOSListDefinition version="3.5">
 <ListName>Stafettresultat</ListName>
 <Tag>relaytotalresult</Tag>
 <SortOrder>ClassResult</SortOrder>
 <ListType>Team</ListType>
 <SubListType>Runner</SubListType>
 <Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
 <SubFilter name="FilterPrelResult"/>
-<HeadFont scale="100"></HeadFont>
-<SubHeadFont scale="100"></SubHeadFont>
-<ListFont scale="110"></ListFont>
-<SubListFont scale="100"></SubListFont>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="110" above="0"/>
+<SubListFont scale="100" above="0"/>
 <Head>
 <Line>
 <Block Type="CmpName">

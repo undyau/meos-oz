@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.5">
+<ListName>First to finish</ListName>
+<Tag>firsttofinish</Tag>
+<SortOrder>CustomSort</SortOrder>
+<ListType>RunnerGlobal</ListType>
+<SubListType>None</SubListType>
+<ResultModule>result-by-finish-time</ResultModule>
+<MeOSResultCalculationSet>
+<Name>Finish order</Name>
+<Tag>result-by-finish-time</Tag>
+<Description>Individual result by finish time.</Description>
+<Date>2018-04-10 17:33:37</Date>
+<Rule name="RunnerTime">
+<Method>Finish</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterPrelResult"/>
+<Filter name="FilterNoCancel"/>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="100" above="0"/>
+<SubListFont scale="100" above="0"/>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Namn</Text>
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Klubb</Text>
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Starttid</Text>
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Mål</Text>
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="PatrolNameNames">
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">Namn</Align>
+</Block>
+<Block Type="PatrolClubNameNames">
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">Klubb</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="RunnerStart">
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerFinish">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTimeAfter">
+<ResultModule>result-by-finish-time</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>
