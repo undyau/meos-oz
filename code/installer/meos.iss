@@ -46,6 +46,7 @@ Source: "sss201230.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "classcourse.lxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Receipt Results.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Results.xml"; DestDir: "{app}"; Flags: ignoreversion
+Source: "vc_redist.x86.exe"; DestDir: {tmp}; Flags: deleteafterinstall
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -53,6 +54,33 @@ Name: "{group}\MEOS-OZ"; Filename: "{app}\meos.exe"
 Name: "{commondesktop}\MEOS-OZ"; Filename: "{app}\meos.exe"; Tasks: desktopicon
 
 [Run]
+Filename: "{tmp}\vc_redist.x86.exe"; Check: VCRedistNeedsInstall
 Filename: "{app}\meos.exe"; Parameters: "-s"
 Filename: "{app}\meos.exe"; Description: "{cm:LaunchProgram,MEOS-OZ}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function VCRedistNeedsInstall: Boolean;
+ // Function for Inno Setup Compiler
+ // Returns True if same or later Microsoft Visual C++ 2015 Redistributable is installed, otherwise False.
+ var
+  major: Cardinal;
+  minor: Cardinal;
+  bld: Cardinal;
+  rbld: Cardinal;
+  key: String;
+ begin
+  Result := True;
+  key := 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
+  if RegQueryDWordValue(HKEY_LOCAL_MACHINE, key, 'Major', major) then begin
+    if RegQueryDWordValue(HKEY_LOCAL_MACHINE, key, 'Minor', minor) then begin
+      if RegQueryDWordValue(HKEY_LOCAL_MACHINE, key, 'Bld', bld) then begin
+        if RegQueryDWordValue(HKEY_LOCAL_MACHINE, key, 'RBld', rbld) then begin
+            Log('VC 2015 Redist Major is: ' + IntToStr(major) + ' Minor is: ' + IntToStr(minor) + ' Bld is: ' + IntToStr(bld) + ' Rbld is: ' + IntToStr(rbld));
+            // Version info was found. Return true if major is not 14 - should be if we get here
+            Result := (major <> 14)
+        end;
+      end;
+    end;
+  end;
+ end;
 
