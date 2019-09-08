@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -61,7 +61,6 @@ oFreePunch::~oFreePunch(void)
 bool oFreePunch::Write(xmlparser &xml)
 {
   if (Removed) return true;
-
   xml.startTag("Punch");
   xml.write("CardNo", CardNo);
   xml.write("Time", Time);
@@ -158,6 +157,7 @@ Table *oEvent::getPunchesTB()//Table mode
     table->addColumn("Tid", 70, false);
     table->addColumn("Löpare", 170, false);
     table->addColumn("Lag", 170, false);
+    table->addColumn("Klass", 170, false);
     tables["punch"] = table;
     table->addOwnership();
   }
@@ -173,16 +173,14 @@ void oEvent::generatePunchTableData(Table &table, oFreePunch *addPunch)
     return;
   }
 
-  synchronizeList(oLPunchId);
+  synchronizeList({ oListId::oLPunchId, oListId::oLRunnerId });
   oFreePunchList::iterator it;
-  oe->setupCardHash(false);
   table.reserve(punches.size());
   for (it = punches.begin(); it != punches.end(); ++it){
-    if (!it->isRemoved()){
+    if (!it->isRemoved() && !it->isHiredCard()){
       it->addTableRow(table);
     }
   }
-  oe->setupCardHash(true);
 }
 
 void oFreePunch::addTableRow(Table &table) const {
@@ -196,7 +194,7 @@ void oFreePunch::addTableRow(Table &table) const {
   table.set(row++, it, TID_TIME, getTime(), true, cellEdit);
   pRunner r = 0;
   if (CardNo > 0)
-    r = oe->getRunnerByCardNo(CardNo, Time, false);
+    r = oe->getRunnerByCardNo(CardNo, Time, oEvent::CardLookupProperty::Any);
 
   table.set(row++, it, TID_RUNNER, r ? r->getName() : L"?", false, cellEdit);
 
@@ -204,6 +202,8 @@ void oFreePunch::addTableRow(Table &table) const {
     table.set(row++, it, TID_TEAM, r->getTeam()->getName(), false, cellEdit);
   else
     table.set(row++, it, TID_TEAM, L"", false, cellEdit);
+
+  table.set(row++, it, TID_CLASSNAME, r ? r->getClass(true) : L"", false, cellEdit);
 }
 
 bool oFreePunch::inputData(int id, const wstring &input,
@@ -291,7 +291,7 @@ void oFreePunch::rehashPunches(oEvent &oe, int cardNo, pFreePunch newPunch) {
     // Rehash all punches. Ignore cardNo and newPunch (will be included automatically)
     fp.reserve(oe.punches.size());
     for (oFreePunchList::iterator pit = oe.punches.begin(); pit != oe.punches.end(); ++pit) {
-      if (pit->isRemoved())
+      if (pit->isRemoved() || pit->isHiredCard())
         continue;
       fp.push_back(&(*pit));
     }
@@ -334,7 +334,7 @@ void oFreePunch::rehashPunches(oEvent &oe, int cardNo, pFreePunch newPunch) {
     it->second.erase(res.first, res.second);
   }
 
-  if (newPunch)
+  if (newPunch && !newPunch->isHiredCard())
     fp.push_back(newPunch);
 
   sort(fp.begin(), fp.end(), FreePunchComp());
@@ -364,7 +364,7 @@ int oFreePunch::getControlIdFromHash(int hash, bool courseControlId) {
 
 int oEvent::getControlIdFromPunch(int time, int type, int card,
                                   bool markClassChanged, oFreePunch &punch) {
-  pRunner r = getRunnerByCardNo(card, time);
+  pRunner r = getRunnerByCardNo(card, time, oEvent::CardLookupProperty::Any);
   punch.tRunnerId = -1;
   punch.tMatchControlId = type;
   if (r!=0) {
@@ -442,7 +442,6 @@ bool oEvent::isInPunchHash(int card, int code, int time) {
   return readPunchHash.count(make_pair(p1, p2)) > 0;
 }
 
-
 pFreePunch oEvent::addFreePunch(int time, int type, int card, bool updateStartFinish) {
   if (time > 0 && isInPunchHash(card, type, time))
     return 0;
@@ -450,6 +449,7 @@ pFreePunch oEvent::addFreePunch(int time, int type, int card, bool updateStartFi
 
   punches.push_back(ofp);
   pFreePunch fp=&punches.back();
+  fp->addToEvent();
   oFreePunch::rehashPunches(*this, card, fp);
   insertIntoPunchHash(card, type, time);
 
@@ -468,38 +468,50 @@ pFreePunch oEvent::addFreePunch(int time, int type, int card, bool updateStartFi
 
   fp->updateChanged();
   fp->synchronize();
+  pRunner tr = fp->getTiedRunner();
 
-  // Update start/finish time
-  if (updateStartFinish && type == oPunch::PunchStart || type == oPunch::PunchFinish) {
-    pRunner tr = fp->getTiedRunner();
-    if (tr && tr->getStatus() == StatusUnknown && time > 0) {
-      tr->synchronize();
-      if (type == oPunch::PunchStart) {
-        if (tr->getClassRef(false) && !tr->getClassRef(true)->ignoreStartPunch())
-          tr->setStartTime(time, true, false);
-      }
-      else
-        tr->setFinishTime(time);
-
-      // Direct result
-      if (type == oPunch::PunchFinish && tr->getClassRef(false) && tr->getClassRef(true)->hasDirectResult()) {
-        if (tr->getCourse(false) == 0 && tr->getCard() == 0) {
-          tr->setStatus(StatusOK, true, false, true);
-        }
-        else if (tr->getCourse(false) != 0 && tr->getCard() == 0) {
-          pCard card = allocateCard(tr);
-          card->setupFromRadioPunches(*tr);
-          vector<int> mp;
-          card->synchronize();
-          tr->addPunches(card, mp);
-        }
+  if (tr != nullptr) {
+    // Update start/finish time
+    if (updateStartFinish) {
+      int startType = oPunch::PunchStart;
+      int finishType = oPunch::PunchFinish;
+      pCourse pCrs = tr->getCourse(false);
+      if (pCrs) {
+        startType = pCrs->getStartPunchType();
+        finishType = pCrs->getFinishPunchType();
       }
 
-      tr->synchronize(true);
+      if (type == startType || type == finishType) {
+        if (tr->getStatus() == StatusUnknown && time > 0) {
+          tr->synchronize();
+          if (type == startType) {
+            if (tr->getClassRef(false) && !tr->getClassRef(true)->ignoreStartPunch())
+              tr->setStartTime(time, true, false);
+          }
+          else
+            tr->setFinishTime(time);
+
+          // Direct result
+          if (type == finishType && tr->getClassRef(false) && tr->getClassRef(true)->hasDirectResult()) {
+            if (tr->getCourse(false) == 0 && tr->getCard() == 0) {
+              tr->setStatus(StatusOK, true, false, true);
+            }
+            else if (tr->getCourse(false) != 0 && tr->getCard() == 0) {
+              pCard card = allocateCard(tr);
+              card->setupFromRadioPunches(*tr);
+              vector<int> mp;
+              card->synchronize();
+              tr->addPunches(card, mp);
+            }
+          }
+
+          tr->synchronize(true);
+        }
+      }
     }
-  }
-  if (fp->getTiedRunner())
+
     pushDirectChange();
+  }
   return fp;
 }
 
@@ -507,6 +519,7 @@ pFreePunch oEvent::addFreePunch(oFreePunch &fp) {
   insertIntoPunchHash(fp.CardNo, fp.Type, fp.Time);
   punches.push_back(fp);
   pFreePunch fpz=&punches.back();
+  fpz->addToEvent();
   oFreePunch::rehashPunches(*this, fp.CardNo, fpz);
 
   if (!fpz->existInDB() && HasDBConnection) {
@@ -601,45 +614,37 @@ pFreePunch oEvent::getPunch(int runnerId, int courseControlId, int card) const
   return 0;
 }
 
-void oEvent::getPunchesForRunner(int runnerId, vector<pFreePunch> &runnerPunches) const {
+void oEvent::getPunchesForRunner(int runnerId, bool doSort, vector<pFreePunch> &runnerPunches) const {
   runnerPunches.clear();
   pRunner r = getRunner(runnerId, 0);
   if (r == 0)
     return;
+  
+  //Lazy setup
+  oFreePunch::rehashPunches(*oe, 0, 0);
 
-  // Get times for when other runners used this card
-  vector< pair<int, int> > times;
+  int card = r->getCardNo();
+  if (card == 0)
+    return;
 
-  for (oRunnerList::const_iterator it = Runners.begin(); it != Runners.end(); ++it) {
-    if (it->Id == runnerId)
-      continue;
-    if (it->Card && it->CardNo == r->CardNo) {
-      pair<int, int> t = it->Card->getTimeRange();
-      if (it->getStartTime() > 0)
-        t.first = min(it->getStartTime(), t.first);
-
-      if (it->getFinishTime() > 0)
-        t.second = max(it->getFinishTime(), t.second);
-
-      times.push_back(t);
-    }
-  }
-
-  for (oFreePunchList::const_iterator it = punches.begin(); it != punches.end(); ++it) {
-    if (it->CardNo == r->CardNo) {
-      bool other = false;
-      int t = it->Time;
-      for (size_t k = 0; k<times.size(); k++) {
-        if (t >= times[k].first && t <= times[k].second)
-          other = true;
+  for (auto &it1 :punchIndex) {
+    const oEvent::PunchIndexType &cIndex = it1.second;
+    pair<oEvent::PunchConstIterator, oEvent::PunchConstIterator> res = cIndex.equal_range(card);
+    oEvent::PunchConstIterator pIter = res.first;
+    while (pIter != res.second) {
+      pFreePunch punch = pIter->second;
+      if (!punch->isRemoved()) {
+        assert(punch && punch->CardNo == card);
+        if (punch->tRunnerId == runnerId || runnerId == 0)
+          runnerPunches.push_back(punch);
+        ++pIter;
       }
-
-      if (!other)
-        runnerPunches.push_back(pFreePunch(&*it));
     }
   }
-
-  // XXX Advance punches...
+  
+  if (doSort) {
+    sort(runnerPunches.begin(), runnerPunches.end(), [](const oPunch *p1, const oPunch *p2)->bool {return p1->Time < p2->Time; });
+  }
 }
 
 
@@ -717,4 +722,76 @@ void oFreePunch::changedObject() {
   pRunner r = getTiedRunner();
   if (r && tMatchControlId>0)
     r->markClassChanged(tMatchControlId);
+}
+
+bool oEvent::hasHiredCardData() {
+  synchronizeList(oListId::oLPunchId);
+  isHiredCard(0); 
+  return !hiredCardHash.empty(); 
+}
+
+bool oEvent::isHiredCard(int cardNo) const {
+  if (tHiredCardHashDataRevision != dataRevision) {
+    hiredCardHash.clear();
+    for (auto &p : punches) {
+      if (!p.isRemoved() && p.isHiredCard())
+        hiredCardHash.insert(p.getCardNo());
+    }
+    tHiredCardHashDataRevision = dataRevision;
+  }
+  return hiredCardHash.count(cardNo) > 0;
+}
+
+void oEvent::setHiredCard(int cardNo, bool flag) {
+  if (cardNo <= 0)
+    return;
+
+  if (isHiredCard(cardNo) != flag) {
+    if (flag) {
+      addFreePunch(0, oPunch::HiredCard, cardNo, false);
+      hiredCardHash.insert(cardNo);
+      tHiredCardHashDataRevision = dataRevision;
+    }
+    else {
+      hiredCardHash.erase(cardNo);
+      for (auto it = punches.begin(); it != punches.end();) {
+        if (!it->isRemoved() && it->isHiredCard() && it->CardNo == cardNo) {
+          if (HasDBConnection)
+            msRemove(&*it);
+
+          auto toErase = it;
+          ++it;
+          punches.erase(toErase);
+        }
+        else {
+          ++it;
+        }
+      }
+      tHiredCardHashDataRevision = dataRevision;
+    }
+  }
+}
+
+vector<int> oEvent::getHiredCards() const {
+  isHiredCard(0); // Update hash
+  vector<int> r(hiredCardHash.begin(), hiredCardHash.end());
+  return r;
+}
+
+void oEvent::clearHiredCards() {
+  vector<int> toRemove;
+  for (auto it = punches.begin(); it != punches.end();) {
+    if (!it->isRemoved() && it->isHiredCard()) {
+      if (HasDBConnection)
+        msRemove(&*it);
+
+      auto toErase = it;
+      ++it;
+      punches.erase(toErase);
+    }
+    else {
+      ++it;
+    }
+  }
+  hiredCardHash.clear();
 }

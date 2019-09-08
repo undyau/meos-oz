@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,12 +27,17 @@
 #include "meos_util.h"
 #include "progress.h"
 #include "meosexception.h"
-
+#include <winsock2.h>
+#include <iphlpapi.h>
+#include <cassert>
 #include <sys/stat.h>
 #include <io.h>
 #include <fcntl.h>
 
 #include <process.h>
+
+#pragma comment(lib, "IPHLPAPI.lib")
+#define INET_ADDRSTRLEN 16
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -62,8 +67,8 @@ Download::~Download()
   if (hInternet)
     InternetCloseHandle(hInternet);
 
-	for (unsigned int i = 0 ; i < usedBuffers.size(); i++)
-		delete usedBuffers[i];
+  for (unsigned int i = 0 ; i < usedBuffers.size(); i++)
+    delete usedBuffers[i];
 }
 
 void __cdecl SUThread(void *ptr)
@@ -290,7 +295,8 @@ void Download::postFile(const wstring &url, const wstring &file, const wstring &
 
   InternetCrackUrl(url.c_str(), url.length(), ICU_ESCAPE, &uc);
   int port = INTERNET_DEFAULT_HTTP_PORT;
-  if (uc.nScheme == INTERNET_SCHEME_HTTPS)
+  bool https = uc.nScheme == INTERNET_SCHEME_HTTPS;
+  if (https)
     port = INTERNET_DEFAULT_HTTPS_PORT;
   else if (uc.nPort>0)
     port = uc.nPort;
@@ -299,7 +305,7 @@ void Download::postFile(const wstring &url, const wstring &file, const wstring &
   bool vsuccess = false;
   int errorCode = 0;
   try {
-    vsuccess = httpSendReqEx(hConnect, path, headers, file, fileOut, pw, errorCode);
+    vsuccess = httpSendReqEx(hConnect, https, path, headers, file, fileOut, pw, errorCode);
   }
   catch (std::exception &) {
     InternetCloseHandle(hConnect);
@@ -318,7 +324,7 @@ void Download::postFile(const wstring &url, const wstring &file, const wstring &
   }
  }
 
-bool Download::httpSendReqEx(HINTERNET hConnect, const wstring &dest,
+bool Download::httpSendReqEx(HINTERNET hConnect, bool https, const wstring &dest,
                              const vector< pair<wstring, wstring> > &headers,
                              const wstring &upFile, const wstring &outFile, 
                              ProgressWindow &pw, 
@@ -327,8 +333,19 @@ bool Download::httpSendReqEx(HINTERNET hConnect, const wstring &dest,
   INTERNET_BUFFERS BufferIn;
   memset(&BufferIn, 0, sizeof(BufferIn));
   BufferIn.dwStructSize = sizeof( INTERNET_BUFFERS );
+  TCHAR szAccept[] = L"*/*";
+  LPCTSTR AcceptTypes[2] = { 0, 0 };
+  AcceptTypes[0] = szAccept;
+  DWORD flags = INTERNET_FLAG_NO_CACHE_WRITE |
+    INTERNET_FLAG_IGNORE_CERT_DATE_INVALID |
+    INTERNET_FLAG_IGNORE_CERT_CN_INVALID |
+    INTERNET_FLAG_KEEP_CONNECTION;
 
-  HINTERNET hRequest = HttpOpenRequest (hConnect, L"POST", dest.c_str(), NULL, NULL, NULL, INTERNET_FLAG_NO_CACHE_WRITE, 0);
+  if (https)
+    flags |= INTERNET_FLAG_SECURE;
+
+  HINTERNET hRequest = HttpOpenRequest (hConnect, L"POST", dest.c_str(), HTTP_VERSION, NULL, AcceptTypes,
+                                        flags, 0);
 
   DWORD dwBytesRead = 0;
   DWORD dwBytesWritten = 0;
@@ -399,12 +416,15 @@ bool Download::httpSendReqEx(HINTERNET hConnect, const wstring &dest,
       DWORD error = GetLastError();
       errorCode = error;
       if (error == ERROR_INTERNET_FORCE_RETRY)
-        retry--;
-      else if (error == ERROR_INTERNET_TIMEOUT) {
-        throw std::exception("Fick inget svar i tid (ERROR_INTERNET_TIMEOUT)");
-      }
+        retry--;      
       else {
         InternetCloseHandle(hRequest);
+        if (error == ERROR_INTERNET_TIMEOUT) {
+          throw std::exception("Fick inget svar i tid (ERROR_INTERNET_TIMEOUT)");
+        }
+        else if (error == ERROR_INTERNET_CONNECTION_RESET) {
+          throw std::exception("Inget svar (ERROR_INTERNET_CONNECTION_RESET)");
+        }
         return false;
       }
     }
@@ -459,6 +479,127 @@ bool Download::httpSendReqEx(HINTERNET hConnect, const wstring &dest,
 
   InternetCloseHandle(hRequest);
   return true;
+}
+
+
+void ListIpAddresses(vector<string>& ipAddrs)
+{
+  ipAddrs.clear();
+  IP_ADAPTER_ADDRESSES* adapter_addresses(NULL);
+  IP_ADAPTER_ADDRESSES* adapter(NULL);
+  const int KB = 1024;
+  // Start with a 16 KB buffer and resize if needed -
+  // multiple attempts in case interfaces change while
+  // we are in the middle of querying them.
+  DWORD adapter_addresses_buffer_size = 16 * 1024;
+  for (int attempts = 0; attempts != 3; ++attempts)
+  {
+    adapter_addresses = (IP_ADAPTER_ADDRESSES*)malloc(adapter_addresses_buffer_size);
+    assert(adapter_addresses);
+
+    DWORD error = ::GetAdaptersAddresses(
+      AF_UNSPEC,
+      GAA_FLAG_SKIP_ANYCAST |
+      GAA_FLAG_SKIP_MULTICAST |
+      GAA_FLAG_SKIP_DNS_SERVER |
+      GAA_FLAG_SKIP_FRIENDLY_NAME,
+      NULL,
+      adapter_addresses,
+      &adapter_addresses_buffer_size);
+
+    if (ERROR_SUCCESS == error) {
+      // We're done here, people!
+      break;
+    }
+    else if (ERROR_BUFFER_OVERFLOW == error)
+    {
+      // Try again with the new size
+      free(adapter_addresses);
+      adapter_addresses = NULL;
+
+      continue;
+    }
+    else {
+      // Unexpected error code - log and throw
+      free(adapter_addresses);
+      adapter_addresses = NULL;
+
+      return;
+    }
+  }
+
+  // Iterate through all of the adapters
+  for (adapter = adapter_addresses; NULL != adapter; adapter = adapter->Next)
+  {
+    // Skip loopback adapters
+    if (IF_TYPE_SOFTWARE_LOOPBACK == adapter->IfType)
+    {
+      continue;
+    }
+
+    // Parse all IPv4 and IPv6 addresses
+    for (
+      IP_ADAPTER_UNICAST_ADDRESS* address = adapter->FirstUnicastAddress;
+      NULL != address;
+      address = address->Next)
+    {
+      auto family = address->Address.lpSockaddr->sa_family;
+      if (AF_INET == family)
+      {
+        // IPv4
+        SOCKADDR_IN* ipv4 = reinterpret_cast<SOCKADDR_IN*>(address->Address.lpSockaddr);
+
+        char str_buffer[INET_ADDRSTRLEN] = { 0 };
+        //inet_ntop(AF_INET, &(ipv4->sin_addr), str_buffer, INET_ADDRSTRLEN);
+        auto &id = ipv4->sin_addr.S_un.S_un_b;
+        if (id.s_b1 == 169 && id.s_b2 == 254)
+          continue; // Not usable
+        sprintf_s(str_buffer, "%u.%u.%u.%u", id.s_b1, id.s_b2, id.s_b3, id.s_b4);
+        ipAddrs.emplace_back(str_buffer);
+      }
+      else if (AF_INET6 == family)
+      {/*
+        // IPv6
+        SOCKADDR_IN6* ipv6 = reinterpret_cast<SOCKADDR_IN6*>(address->Address.lpSockaddr);
+
+        char str_buffer[INET6_ADDRSTRLEN] = { 0 };
+        inet_ntop(AF_INET6, &(ipv6->sin6_addr), str_buffer, INET6_ADDRSTRLEN);
+
+        std::string ipv6_str(str_buffer);
+
+        // Detect and skip non-external addresses
+        bool is_link_local(false);
+        bool is_special_use(false);
+
+        if (0 == ipv6_str.find("fe"))
+        {
+          char c = ipv6_str[2];
+          if (c == '8' || c == '9' || c == 'a' || c == 'b')
+          {
+            is_link_local = true;
+          }
+        }
+        else if (0 == ipv6_str.find("2001:0:"))
+        {
+          is_special_use = true;
+        }
+
+        if (!(is_link_local || is_special_use))
+        {
+          ipAddrs.mIpv6.push_back(ipv6_str);
+        }*/
+      }
+      else
+      {
+        // Skip all other types of addresses
+        continue;
+      }
+    }
+  }
+
+  // Cleanup
+  free(adapter_addresses);
+  adapter_addresses = NULL;
 }
 
 void Download::postData(const wstring &url, const wstring &data, ProgressWindow &pw) {

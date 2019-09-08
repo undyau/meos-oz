@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -65,38 +65,43 @@ csvparser::~csvparser()
 
 }
 
-int csvparser::iscsv(const wstring &file)
-{
-  fin.open(file);
+csvparser::CSV csvparser::iscsv(const wstring &file) {
+  ifstream fin(file);
 
   if (!fin.good())
-    return false;
+    return CSV::NoCSV;
 
   char bf[2048];
-  fin.getline(bf, 2048);
-
-  while(fin.good() && strlen(bf)<3)
+  bool isCSVType = false;
+  while (fin.good() && !isCSVType) {
     fin.getline(bf, 2048);
+    isCSVType = strlen(bf) >= 3;
+  }
 
   fin.close();
 
   vector<char *> sp;
   split(bf, sp);
+  if (sp.size() > 0) {
+    string sp0 = sp[0];
+    if (sp0.find("<?xml") != string::npos)
+      return CSV::NoCSV;
+  }
 
   if (sp.size()==1 && strcmp(sp[0], "RAIDDATA")==0)
-    return 3;
+    return CSV::RAID;
 
-	if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)
-		return 99; //Ór
+  if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)
+   return CSV::OR; //Órreturn CSV::OR; //Ór
 
-  if (sp.size()<5)//No csv
-    return 0;
+  if (sp.size()<2)//No csv
+    return CSV::NoCSV;
 
   if (_stricmp(sp[1], "Descr")==0 || _stricmp(sp[1], "Namn")==0
       || _stricmp(sp[1], "Descr.")==0 || _stricmp(sp[1], "Navn")==0) //OS-fil (SWE/ENG)??
-    return 2;
-  else return 1; //OE?!
-}
+    return CSV::OS;
+  else return CSV::OE; //OE?!
+  }
 
 RunnerStatus ConvertOEStatus(int i)
 {
@@ -131,20 +136,13 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
 
   enum {OSRsname=0, OSRfname=1, OSRyb=2, OSRsex=3, OSRstart=4,
     OSRfinish=5, OSRstatus=7, OSRcard=8, OSRrentcard=9};
-  /*
-  fin.open(file);
-
-  if (!fin.good())
-    return false;
-
-  char bf[1024];
-  fin.getline(bf, 1024);
-  */
+  
   nimport=0;
   list< vector<wstring> > allLines;
   parse(file, allLines);
-  //vector<wchar_t *> sp;
   list< vector<wstring> >::iterator it = allLines.begin();
+
+  set<wstring> matchedClasses;
   // Skip first line
   while (++it != allLines.end()) {
     //fin.getline(bf, 1024);
@@ -166,7 +164,7 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
 
       //Create class with this class number...
       int ClassId=wtoi(sp[OSclassno]);
-      event.getClassCreate(ClassId, sp[OSclass]);
+      event.getClassCreate(ClassId, sp[OSclass], matchedClasses);
 
       //Club is autocreated...
       pTeam team=event.addTeam(sp[OSclub] + L" " +  sp[OSdesc], ClubId,  ClassId);
@@ -215,10 +213,10 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
         r->setFinishTime( event.convertAbsoluteTime(sp[rindex+OSRfinish]) );
 
         if (sp[rindex+OSRstatus].length()>0)
-          r->setStatus( ConvertOEStatus( wtoi(sp[rindex+OSRstatus]) ), true, false);
+          r->setStatus( ConvertOEStatus( wtoi(sp[rindex+OSRstatus]) ), true, false, false);
 
         if (r->getStatus()==StatusOK && r->getRunningTime()==0)
-          r->setStatus(StatusUnknown, true, false);
+          r->setStatus(StatusUnknown, true, false, false);
 
         r->addClassDefaultFee(false);
 
@@ -340,24 +338,14 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       OErent=35, OEfee=36, OEpaid=37, OEcourseno=38, OEcourse=39,
       OElength=40};
 
-/*  fin.open(file);
-
-  if (!fin.good())
-    return false;
-
-  char bf[1024];
-  fin.getline(bf, 1024);
-  */
   list< vector<wstring> > allLines;
   parse(file, allLines);
   list< vector<wstring> >::iterator it = allLines.begin();
+
+  set<wstring> matchedClasses;
   // Skip first line
-
-
   nimport=0;
   while (++it != allLines.end()) {
-    //fin.getline(bf, 1024);
-    //split(bf, sp);
     const vector<wstring> &sp = *it;
     if (sp.size()>20) {
       nimport++;
@@ -444,7 +432,7 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       //Autocreate class if it does not exist...
       int classId=wtoi(sp[OEclassno]);
       if (classId>0 && !pr->hasFlag(oAbstractRunner::FlagUpdateClass)) {
-        pClass pc=event.getClassCreate(classId, sp[OEclass]);
+        pClass pc=event.getClassCreate(classId, sp[OEclass], matchedClasses);
 
         if (pc) {
           pc->synchronize();
@@ -750,7 +738,7 @@ bool csvparser::importOCAD_CSV(oEvent &event, const wstring &file, bool addClass
           }
           else {
             for (size_t i = 0; i<cls->getNumStages(); i++)
-              cls->addStageCourse(i, pc->getId());
+              cls->addStageCourse(i, pc->getId(), -1);
           }
 
           cls->synchronize();
@@ -771,6 +759,8 @@ bool csvparser::importRAID(oEvent &event, const wstring &file)
 
   list< vector<wstring> > allLines;
   parse(file, allLines);
+
+  set<wstring> matchedClasses;
   list< vector<wstring> >::iterator it = allLines.begin();
   nimport=0;
   while (++it != allLines.end()) {
@@ -782,7 +772,7 @@ bool csvparser::importRAID(oEvent &event, const wstring &file)
       int ClubId=0;
       //Create class with this class number...
       int ClassId=wtoi(sp[RAIDclassid]);
-      pClass pc = event.getClassCreate(ClassId, sp[RAIDclass]);
+      pClass pc = event.getClassCreate(ClassId, sp[RAIDclass], matchedClasses);
       ClassId = pc->getId();
 
       //Club is autocreated...
@@ -829,13 +819,13 @@ int csvparser::selectPunchIndex(const wstring &competitionDate, const vector<wst
   for (size_t k = 0; k < sp.size(); k++) {
     processGeneralTime(sp[k], pt, date);
     if (!pt.empty()) {
-      if (ti == -1) {
+      //if (ti == -1) {
         ti = k;
         pt.swap(processedTime);
-      }
-      else {
-        return -1; // Not a unique time
-      }
+     // }
+     // else {
+    //    return -1; // Not a unique time
+    //  }
       if (!date.empty()) {
         date.swap(processedDate);
         di = k;
@@ -984,7 +974,7 @@ void csvparser::checkSIConfigHeader(const vector<wstring> &sp) {
     else if (key == L"First name") {
       siconfigmap[sicFirstName] = k;
     }
-    else if (key == L"Last name") {
+    else if (key == L"Last name" || key == L"name") {
       siconfigmap[sicLastName] = k;
     }
     else if (key == L"No. of records" || key == L"No. of punches") {
@@ -1019,13 +1009,13 @@ const wchar_t *csvparser::getSIC(SIConfigFields sic, const vector<wstring> &sp) 
 bool csvparser::checkSIConfigLine(const oEvent &oe, const vector<wstring> &sp, SICard &card) {
   if (siconfigmap.empty())
     return false;
-  
+
   int startIx = siconfigmap[sicRecordStart];
   if (startIx == 0)
     return false;
 
   int cardNo = wtoi(getSIC(sicSIID, sp));
-  
+
   if (cardNo < 1000 || cardNo > 99999999)
     return false;
   bool is12Hour = false;
@@ -1040,14 +1030,14 @@ bool csvparser::checkSIConfigLine(const oEvent &oe, const vector<wstring> &sp, S
   
   vector< pair<int, int> > punches;
   int np = wtoi(getSIC(sicNumPunch, sp));
-  
 
-  for (int k=0; k < np; k++) {
-    size_t ix = startIx + k*3;
-    if (ix+2 >= sp.size())
+
+  for (int k = 0; k < np; k++) {
+    size_t ix = startIx + k * 3;
+    if (ix + 2 >= sp.size())
       return false;
     int code = wtoi(sp[ix]);
-    int time = analyseSITime(sp[ix+1].c_str(), sp[ix+2].c_str(), is12Hour);
+    int time = analyseSITime(sp[ix + 1].c_str(), sp[ix + 2].c_str(), is12Hour);
     if (code > 0) {
       punches.push_back(make_pair(code, time));
     }
@@ -1055,7 +1045,7 @@ bool csvparser::checkSIConfigLine(const oEvent &oe, const vector<wstring> &sp, S
       return false;
     }
   }
-
+ 
   if ( (finish > 0 && finish != NOTIME) || punches.size() > 2) {
     card.clear(0);
     card.CardNumber = cardNo;
@@ -1452,4 +1442,128 @@ void csvparser::importTeamLineup(const wstring &file,
     lineNo++;
     data.pop_front();
   }
+}
+
+int csvparser::importRanking(oEvent &oe, const wstring &file, vector<wstring> &problems) {
+  list< vector<wstring> > data;
+  parse(file, data);
+
+  size_t idIx = -1;
+  size_t nameIx = 1;
+  size_t lastNameIx = -1;
+  size_t rankIx = -1;
+  map<int64_t, pair<wstring, int> > id2Rank;
+  map<wstring, pair<int, bool> > name2RankDup;
+  bool first = true;
+  for (auto &rank : data) {
+    if (first) {
+      first = false;
+      bool any = false;
+
+      for (size_t i = 0; i < rank.size(); i++) {
+        wstring s = canonizeName(rank[i].c_str());
+        
+        if (s.find(L"name")  != wstring::npos && (s.find(L"last") != wstring::npos || s.find(L"family") != wstring::npos) && lastNameIx == -1) {
+          lastNameIx = i;
+          any = true;
+        }
+        else if (s.find(L"name") != wstring::npos && (s.find(L"first") != wstring::npos || s.find(L"given") != wstring::npos) && nameIx == -1) {
+          nameIx = i;
+          any = true;
+        }
+        else if (s.find(L" id") != wstring::npos && idIx == -1) {
+          idIx = i;
+          any = true;
+        }
+        else if (s.find(L"position") != wstring::npos && rankIx == -1) {
+          rankIx = i;
+          any = true;
+        }
+      }
+
+      if (idIx == -1)
+        idIx = 0;
+
+      if (nameIx == -1)
+        nameIx = 1;
+
+      if (lastNameIx == -1)
+        lastNameIx = 2;
+
+      if (rankIx == -1)
+        rankIx = 4;
+
+      if (any)
+        continue;
+    }
+    
+    if (rank.size() <= rankIx)
+      continue;
+
+    int rpos = _wtoi(rank[rankIx].c_str());
+    if (rpos <= 0)
+      continue;
+
+    wstring name;
+    if (nameIx < rank.size()) {
+      name = rank[nameIx];
+
+      if (lastNameIx < rank.size()) {
+        name += L" " + rank[lastNameIx];
+      }
+    }
+    if (name.empty())
+      continue;
+
+    auto res = name2RankDup.emplace(name, make_pair(rpos, false));
+
+    if (!res.second)
+      res.first->second.second = true; // Duplicate names
+
+    if (idIx < rank.size()) {
+      int64_t id = oBase::converExtIdentifierString(rank[idIx]);
+      if (id != 0)
+        id2Rank[id] = make_pair(name, rpos);
+    }
+  }
+
+  if ((name2RankDup.size() < data.size() / 2 || name2RankDup.empty()) &&
+    (id2Rank.size() < data.size() / 2 || id2Rank.empty())) {
+    throw meosException(L"Felaktigt rankingformat i X. Förväntat: Y#" + file + L"#ID; First name; Last name; Rank");
+  }
+
+  vector<pRunner> runners;
+  oe.getRunners(-1, -1, runners);
+  
+  int count = 0;
+  vector<pRunner> remRunners;
+  for (pRunner r : runners) {
+    int64_t id = r->getExtIdentifier();
+    auto res = id2Rank.find(id);
+    if (res != id2Rank.end() && r->matchName(res->second.first)) {
+      r->getDI().setInt("Rank", res->second.second);
+      r->synchronize(true);
+      count++;
+    }
+    else
+      remRunners.push_back(r);
+  }
+
+  for (pRunner r : remRunners) {
+    auto res = name2RankDup.find(r->getName());
+    if (r->getRaceNo() > 0)
+      continue;
+    if (res != name2RankDup.end()) {
+      if (res->second.second)
+        problems.push_back(r->getCompleteIdentification());
+      else {
+        res->second.second = true;
+        r->getDI().setInt("Rank", res->second.first);
+        r->synchronize(true);
+        count++;
+      }
+    }
+  }
+
+  return count;
 }

@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -474,7 +474,7 @@ int TabRunner::searchCB(gdioutput &gdi, int type, void *data) {
 }
 
 pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
-  oe->synchronizeList(oLCardId, true, true);
+  oe->synchronizeList(oListId::oLCardId);
   TabSI &tsi = dynamic_cast<TabSI &>(*gdi.getTabs().get(TSITab));
   tsi.storedInfo.clear();
 
@@ -546,11 +546,8 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     RunnerStatus originalStatus = r->getStatus();
     r->setName(name, true);
 
-    if (gdi.hasField("Bib")) {
-      const wstring &bib = gdi.getText("Bib");
-      wchar_t pat[32];
-      int num = oClass::extractBibPattern(bib, pat);
-      r->setBib(bib, num, num>0, false);
+    if (dynamic_cast<InputInfo &>(gdi.getBaseInfo("PTime")).changed()) {
+      savePunchTime(r, gdi);
     }
 
     bool noSetStatus = false;
@@ -579,7 +576,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     const bool hireChecked = gdi.isChecked("RentCard");
     const bool hireState = r->isHiredCard();
     if (hireChecked && !hireState) {
-      r->getDI().setInt("CardFee", oe->getDI().getInt("CardFee"));
+      r->getDI().setInt("CardFee", oe->getBaseCardFee());
     }
     else if (!hireChecked && hireState) {
       r->getDI().setInt("CardFee", 0);
@@ -639,6 +636,15 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
 
     r->setClassId(classId, true);
 
+    if (gdi.hasField("Bib")) {
+      const wstring &bib = gdi.getText("Bib");
+      wchar_t pat[32];
+      int num = oClass::extractBibPattern(bib, pat);
+      bool lockedForking = r->getClassRef(true) && r->getClassRef(true)->lockedForking();
+
+      r->setBib(bib, num, num>0 && !lockedForking, false);
+    }
+
     r->setCourseId(gdi.getSelectedItem("RCourse").first);
 
     RunnerStatus sIn = (RunnerStatus)gdi.getSelectedItem("Status").first;
@@ -650,7 +656,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     vector<int> mp;
     r->evaluateCard(true, mp, 0, true);
 
-    if (r->getClassId(true) != classId) {
+    if (r->getClassId(true) != classId && r->getClassId(false) != classId) {
       gdi.alert("Deltagarens klass styrs av laget.");
     }
 
@@ -890,10 +896,10 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
       TabList::splitPrintSettings(*oe, gdi, false, TRunnerTab, (TabList::PrintSettingsSelection)bi.getExtraInt());
     }
     else if (bi.id=="LabelPrint") {
-			if(!runnerId)
-				return 0;
-			pRunner r=oe->getRunner(runnerId, 0);
-			if(!r) return 0;
+      if(!runnerId)
+        return 0;
+      pRunner r=oe->getRunner(runnerId, 0);pRunner r=oe->getRunner(runnerId, 0);
+      if(!r) return 0;
 
       gdioutput gdiprint(2.0,  gdi.getHWNDTarget(), labelPrinter);
       r->printLabel(gdiprint);
@@ -975,7 +981,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
         return 0;
       pRunner r = oe->getRunner(runnerId, 0);
       if (getExtraWindow("ecosettings", true) == 0) {
-        gdioutput *settings = createExtraWindow("ecosettings", L"Economy", 550, 350);
+        gdioutput *settings = createExtraWindow("ecosettings", L"Economy", gdi.scaleLength(550), gdi.scaleLength(350), true);
         TabRunner &dst = dynamic_cast<TabRunner&>(*settings->getTabs().get(TabType::TRunnerTab));
         dst.loadEconomy(*settings, *r);
       }
@@ -1095,6 +1101,10 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
         pRunner r = oe->getRunner(runnerId, 0);
         if (r) {
           warnDuplicateCard(gdi, cardNo, r);
+
+          if (ii.changedInput() && oe->hasHiredCardData()) {
+            gdi.check("RentCard", oe->isHiredCard(cardNo));
+          }
         }
       }
     }
@@ -1248,7 +1258,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
             (listenToPunches || oe->isReadOnly()) && currentMode == 5) {
       if (ei.getData() > 0) {
         vector<pRunner> rs;
-        oe->getRunnersByCard(ei.getData(), rs);
+        oe->getRunnersByCardNo(ei.getData(), true, oEvent::CardLookupProperty::Any, rs);
         if (!rs.empty()) {
           runnersToReport.resize(rs.size());
           for (size_t k = 0; k<rs.size(); k++)
@@ -1374,7 +1384,6 @@ int TabRunner::vacancyCB(gdioutput &gdi, int type, void *data)
   if (type == GUI_BUTTON) {
     ButtonInfo bi=*(ButtonInfo *)data;
     TabSI &tsi = dynamic_cast<TabSI &>(*gdi.getTabs().get(TSITab));
-      
 
     if (bi.id == "VacancyAdd") {
       showVacancyList(gdi, "add");
@@ -1445,7 +1454,7 @@ int TabRunner::vacancyCB(gdioutput &gdi, int type, void *data)
     int cardFee = 0;
 
     if (gdi.isChecked("RentCard")) {
-      cardFee = oe->getDI().getInt("CardFee");
+      cardFee = oe->getBaseCardFee();
       r->getDI().setInt("CardFee", cardFee);
     }
     else
@@ -1515,9 +1524,12 @@ int TabRunner::vacancyCB(gdioutput &gdi, int type, void *data)
   return 0;
 }
 
-void TabRunner::setCardNo(gdioutput &gdi, int cardNo)
-{
-    pRunner db_r=oe->dbLookUpByCard(cardNo);
+void TabRunner::setCardNo(gdioutput &gdi, int cardNo) {
+  pRunner db_r=oe->dbLookUpByCard(cardNo);
+
+  if (cardNo > 0 && oe->hasHiredCardData()) {
+    gdi.check("RentCard", oe->isHiredCard(cardNo));
+  }
 
   if (db_r) {
     gdi.setText("Name", db_r->getName());
@@ -1525,8 +1537,7 @@ void TabRunner::setCardNo(gdioutput &gdi, int cardNo)
   }
 }
 
-void TabRunner::showRunnerReport(gdioutput &gdi)
-{
+void TabRunner::showRunnerReport(gdioutput &gdi) {
   gdi.clearPage(true);
   currentMode = 5;
 
@@ -1535,13 +1546,13 @@ void TabRunner::showRunnerReport(gdioutput &gdi)
   else if (oe->isReadOnly())
     gdi.addString("", fontLarge, makeDash(L"MeOS - Resultatkiosk")).setColor(colorDarkBlue);
 
-   gdi.dropLine();
+  gdi.dropLine();
 
   gdi.pushX();
   gdi.fillRight();
 
   gdi.addSelection("ReportRunner", 300, 300, RunnerCB);
-  oe->fillRunners(gdi, "ReportRunner", true, oEvent::RunnerFilterShowAll|oEvent::RunnerCompactMode);
+  oe->fillRunners(gdi, "ReportRunner", true, oEvent::RunnerFilterShowAll | oEvent::RunnerCompactMode);
   gdi.selectItemByData("ReportRunner", runnerId);
 
   if (!oe->isReadOnly()) {
@@ -1557,44 +1568,53 @@ void TabRunner::showRunnerReport(gdioutput &gdi)
   gdi.popX();
   gdi.registerEvent("DataUpdate", RunnerCB);
   gdi.registerEvent("ReadCard", RunnerCB);
-
-  gdi.fillDown();
-  oe->calculateResults(oEvent::RTClassResult);
-
+  
   if (runnerId > 0) {
     runnersToReport.resize(1);
     runnersToReport[0] = make_pair(runnerId, false);
   }
+  generateRunnerReport(*oe, gdi, runnersToReport);
+
+  if (runnersToReport.size() == 1)
+    runnerId = runnersToReport[0].first;
+}
+
+ void TabRunner::generateRunnerReport(oEvent &oe, gdioutput &gdi, vector<pair<int, bool>> &runnersToReport) {
+   oe.synchronizeList({ oListId::oLRunnerId, oListId::oLTeamId, oListId::oLPunchId });
+  gdi.fillDown();
 
   cTeam t = 0;
+  set<int> clsSet;
   for (size_t k = 0; k < runnersToReport.size(); k++) {
-    pRunner r = oe->getRunner(runnersToReport[k].first, 0);
+    pRunner r = oe.getRunner(runnersToReport[k].first, 0);
+    if (!r)
+      continue;
+    clsSet.insert(r->getClassId(true));
     if (r && r->getTeam()) {
       pClass cls = r->getClassRef(true);
-      if (cls && cls->getClassType() == oClassPatrol)
+      if (cls && cls->getClassType() != oClassRelay)
         continue;
 
       if (t == 0)
         t = r->getTeam();
     }
   }
-
-  if (runnersToReport.size() == 1)
-    runnerId = runnersToReport[0].first;
+  oe.calculateResults(clsSet, oEvent::ResultType::PreliminarySplitResults, true);
+  oe.calculateResults(clsSet, oEvent::ResultType::ClassResult);
 
   if (t == 0) {
     for (size_t k = 0; k < runnersToReport.size(); k++)
-      runnerReport(gdi, runnersToReport[k].first, runnersToReport[k].second);
+      runnerReport(oe, gdi, runnersToReport[k].first, runnersToReport[k].second);
   }
   else {
-    oe->calculateTeamResults(false);
+    oe.calculateTeamResults(false);
 
     set<int> selectedRunners;
     bool selHasRes = false;
     for (size_t k = 0; k < runnersToReport.size(); k++) {
       selectedRunners.insert(runnersToReport[k].first);
-      pRunner r = oe->getRunner(runnersToReport[k].first, 0);
-      if (r->getStatus() != StatusUnknown)
+      pRunner r = oe.getRunner(runnersToReport[k].first, 0);
+      if (r && r->hasOnCourseResult())
         selHasRes = true;
     }
 
@@ -1605,7 +1625,7 @@ void TabRunner::showRunnerReport(gdioutput &gdi)
         tInfo += L", +" + formatTime(t->getTimeAfter(-1));
     }
     else if (t->getStatus() != StatusUnknown) {
-      tInfo += L" " + t->getStatusS();
+      tInfo += L" " + t->getStatusS(true);
     }
 
     gdi.addStringUT(fontMediumPlus, t->getClass(true));
@@ -1625,10 +1645,10 @@ void TabRunner::showRunnerReport(gdioutput &gdi)
         bool selected = selectedRunners.count(r->getId()) > 0;
       
         if (selHasRes) {
-          runnerReport(gdi, r->getId(), !selected);
+          runnerReport(oe, gdi, r->getId(), !selected);
         }
         else {
-          runnerReport(gdi, r->getId(), !nextSelected);
+          runnerReport(oe, gdi, r->getId(), !nextSelected);
         }
 
         visitedSelected |= selected;
@@ -1637,11 +1657,11 @@ void TabRunner::showRunnerReport(gdioutput &gdi)
   }
 }
 
-void TabRunner::runnerReport(gdioutput &gdi, int id, bool compact) {
-  pRunner r = oe->getRunner(id, 0);
+void TabRunner::runnerReport(oEvent &oe, gdioutput &gdi, int id, bool compact) {
+  pRunner r = oe.getRunner(id, 0);
   if (!r || ! r->getClassRef(false))
     return;
-
+  
   gdi.pushX();
   gdi.fillDown();
   if (r->getTeam() == 0) {
@@ -1659,18 +1679,18 @@ void TabRunner::runnerReport(gdioutput &gdi, int id, bool compact) {
 
   wstring str;
   if (r->getTeam() == 0) {
-    str = oe->formatListString(lRunnerTimeStatus,  r);
+    str = oe.formatListString(lRunnerTimeStatus,  r);
   }
   else {
-    str = oe->formatListString(lTeamLegTimeStatus,  r);
-    str += L" (" + oe->formatListString(lRunnerTimeStatus,  r) + L")";
+    str = oe.formatListString(lTeamLegTimeStatus,  r);
+    str += L" (" + oe.formatListString(lRunnerTimeStatus,  r) + L")";
   }
   
   gdi.dropLine(0.3);
 
   if (r->statusOK()) {
     int total, finished,  dns;
-    oe->getNumClassRunners(r->getClassId(true), r->getLegNumber(), total, finished, dns);
+    r->getClassRef(true)->getNumResults(r->getLegNumber(), total, finished, dns);
 
     if (r->getTeam() == 0) {
       gdi.addString("", fontMediumPlus, L"Tid: X, nuvarande placering Y/Z.#" + str + L"#" + r->getPlaceS() + L"#" + itow(finished));
@@ -1698,12 +1718,12 @@ void TabRunner::runnerReport(gdioutput &gdi, int id, bool compact) {
   if (r->getFinishTime() > 0)
     gdi.addString("", fontMedium, L"Måltid: X  #" + r->getFinishTimeS());
 
-  const wstring &after = oe->formatListString(lRunnerTimeAfter, r);
+  const wstring &after = oe.formatListString(lRunnerTimeAfter, r);
   if (!after.empty()) {
     gdi.addString("", fontMedium, L"Tid efter: X  #" + after);
   }
 
-  const wstring &lost = oe->formatListString(lRunnerMissedTime,  r);
+  const wstring &lost = oe.formatListString(lRunnerLostTime, r);
   if (!lost.empty()) {
     gdi.addString("", fontMedium, L"Bomtid: X  #" + lost).setColor(colorDarkRed);
   }
@@ -1810,7 +1830,7 @@ void TabRunner::runnerReport(gdioutput &gdi, int id, bool compact) {
   }
   else {
     vector<pFreePunch> punches;
-    oe->getPunchesForRunner(r->getId(), punches);
+    oe.getPunchesForRunner(r->getId(), true, punches);
 
     int lastT = r->getStartTime();
     for (size_t k = 0; k < punches.size(); k++) {
@@ -1842,7 +1862,7 @@ void TabRunner::runnerReport(gdioutput &gdi, int id, bool compact) {
       int t = punches[k]->getAdjustedTime();
       if (t>0) {
         int st = r->getStartTime();
-        gdi.addString("", yp + lh, cx, normalText, L"Klocktid: X#" + oe->getAbsTime(t), limit);
+        gdi.addString("", yp + lh, cx, normalText, L"Klocktid: X#" + oe.getAbsTime(t), limit);
         if (st > 0 && t > st) {
           wstring split = formatTimeHMS(t-st);
           if (lastT>0 && st != lastT && lastT < t)
@@ -1953,7 +1973,7 @@ void TabRunner::showVacancyList(gdioutput &gdi, const string &method, int classI
         lastFee = tsi.storedInfo.storedFee;
 
       gdi.addCombo("Fee", 60, 150, 0, L"Avgift:");
-      oe->fillFees(gdi, "Fee", true);
+      oe->fillFees(gdi, "Fee", false, true);
       gdi.autoGrow("Fee");
 
       if (!lastFee.empty() && lastFee != L"@") {
@@ -2048,7 +2068,6 @@ void TabRunner::showInForestList(gdioutput &gdi)
   clearInForestData();
   bool hasDNS;
   oe->analyseDNS(unknown_dns, known_dns, known, unknown, hasDNS);
-  oe->setupCardHash(false);
   if (!unknown.empty()) {
     gdi.dropLine();
     gdi.dropLine(0.5);
@@ -2082,8 +2101,6 @@ void TabRunner::showInForestList(gdioutput &gdi)
   else
     gdi.disableInput("SetUnknown");
 
-  oe->setupCardHash(true);
-
   if (known.empty() && unknown.empty() && known_dns.empty()) {
     gdi.addString("", 10, "inforestwarning");
   }
@@ -2100,19 +2117,27 @@ void TabRunner::listRunners(gdioutput &gdi, const vector<pRunner> &r, bool filte
   for (size_t k=0; k<r.size(); k++) {
     if (filterVacant && r[k]->isVacant())
       continue;
+    out.clear();
     sprintf_s(bf, "%d.", k+1);
     gdi.addStringUT(yp, xp, 0, bf);
-    gdi.addStringUT(yp, xp+40, 0, r[k]->getNameAndRace(true), 190);
-    gdi.addStringUT(yp, xp+200, 0, r[k]->getClass(true), 140);
-    gdi.addStringUT(yp, xp+350, 0, r[k]->getClub(), 190);
+    gdi.addStringUT(yp, xp+gdi.scaleLength(40), 0, r[k]->getNameAndRace(true), gdi.scaleLength(190));
+    gdi.addStringUT(yp, xp+gdi.scaleLength(200), 0, r[k]->getClass(true), gdi.scaleLength(140));
+    gdi.addStringUT(yp, xp + gdi.scaleLength(350), 0, r[k]->getClub(), +gdi.scaleLength(190));
     int c = r[k]->getCardNo();
     if (c>0) {
-      oe->getRunnersByCardNo(c, true, true, out);
+      {
+        vector<pRunner> o2;
+        oe->getRunnersByCardNo(c, false, oEvent::CardLookupProperty::SkipNoStart, o2);
+        for (pRunner r : o2) {
+          if (!r->skip())
+            out.push_back(r);
+        }
+      }
       if (out.size() <= 1) {
-        gdi.addStringUT(yp, xp+550, 0, "(" + itos(c) + ")", 190);
+        gdi.addStringUT(yp, xp+gdi.scaleLength(550), 0, "(" + itos(c) + ")", 190);
       }
       else {
-        TextInfo &ti = gdi.addStringUT(yp, xp+550, 0, L"(" + itow(c) + lang.tl(", reused card") + L")", 100);
+        TextInfo &ti = gdi.addStringUT(yp, xp+gdi.scaleLength(550), 0, L"(" + itow(c) + lang.tl(", reused card") + L")", gdi.scaleLength(100));
         wstring tt;
         for (size_t j = 0; j < out.size(); j++) {
           if (out[j] == r[k]->getMultiRunner(0))
@@ -2198,7 +2223,6 @@ void disablePunchCourseChange(gdioutput &gdi)
   gdi.disableInput("PTime");
   gdi.setText("PTime", L"");
   gdi.selectItemByData("Punches", -1);
-
 }
 
 void disablePunchCourse(gdioutput &gdi)
@@ -2218,37 +2242,47 @@ void UpdateStatus(gdioutput &gdi, pRunner r)
   gdi.setText("RunnerInfo", lang.tl(r->getProblemDescription()), true);
 }
 
-int TabRunner::punchesCB(gdioutput &gdi, int type, void *data)
-{
-  DWORD rid=runnerId;
+int TabRunner::punchesCB(gdioutput &gdi, int type, void *data) {
+  DWORD rid = runnerId;
   if (!rid)
     return 0;
 
-  pRunner r=oe->getRunner(rid, 0);
+  pRunner r = oe->getRunner(rid, 0);
 
-  if (!r){
+  if (!r) {
     gdi.alert("Deltagaren måste sparas innan stämplingar kan hanteras.");
     return 0;
   }
+  if (type == GUI_LISTBOXSELECT) {
+    ListBoxInfo bi = *(ListBoxInfo *)data;
+    if (bi.id == "Course") {
+      if (signed(bi.data) >= 0) {
+        pCourse pc = r->getCourse(true);
+        if (!pc) return 0;
 
+        return gdi.sendCtrlMessage("AddC");
+      }
+    }
+  }
+  else if (type == GUI_LISTBOX) {
+    ListBoxInfo bi = *(ListBoxInfo *)data;
 
-  if (type==GUI_LISTBOX){
-    ListBoxInfo bi=*(ListBoxInfo *)data;
-
-    if (bi.id=="Punches") {
+    if (bi.id == "Punches") {
       if (bi.data != -1) {
-        pCard card=r->getCard();
+        pCard card = r->getCard();
         if (!card) return 0;
         pPunch punch = card->getPunchByIndex(bi.data);
-        if (!punch) 
+        if (!punch)
           throw meosException("Punch not found.");
 
-        wstring ptime=punch->getTime();
+        wstring ptime;
+        if (punch->getTimeInt() > 0)
+         ptime = punch->getTime();
 
-        if (!ptime.empty()) {
-          gdi.enableInput("SaveC");
-          gdi.setText("PTime", ptime);
-        }
+        gdi.setText("PTime", ptime);
+        
+        gdi.enableInput("SaveC");
+        
         gdi.enableInput("RemoveC");
         gdi.enableInput("PTime");
       }
@@ -2256,46 +2290,44 @@ int TabRunner::punchesCB(gdioutput &gdi, int type, void *data)
         gdi.disableInput("SaveC");
         gdi.disableInput("RemoveC");
         gdi.setText("PTime", L"");
+        gdi.disableInput("PTime");
       }
       disablePunchCourseAdd(gdi);
     }
-    else if (bi.id=="Course") {
-      if (signed(bi.data)>=0) {
-        pCourse pc=r->getCourse(true);
-
+    else if (bi.id == "Course") {
+      if (signed(bi.data) >= 0) {
+        pCourse pc = r->getCourse(true);
         if (!pc) return 0;
-
         gdi.enableInput("AddC");
         gdi.enableInput("AddAllC");
       }
-      else{
+      else {
         gdi.disableInput("AddC");
         gdi.disableInput("AddAllC");
       }
       disablePunchCourseChange(gdi);
     }
   }
-  else if (type==GUI_BUTTON){
-    ButtonInfo bi=*(ButtonInfo *)data;
-    pCard card=r->getCard();
+  else if (type == GUI_BUTTON) {
+    ButtonInfo bi = *(ButtonInfo *)data;
+    pCard card = r->getCard();
 
-    if (!card){
+    if (!card) {
       if (!gdi.ask(L"ask:addpunches"))
         return 0;
 
-      card=oe->allocateCard(r);
+      card = oe->allocateCard(r);
 
       card->setCardNo(r->getCardNo());
       vector<int> mp;
       r->addPunches(card, mp);
-
     }
 
-    if (bi.id=="AddC"){
+    if (bi.id == "AddC") {
       vector<int> mp;
       r->evaluateCard(true, mp);
 
-      pCourse pc=r->getCourse(true);
+      pCourse pc = r->getCourse(true);
 
       if (!pc) return 0;
 
@@ -2304,7 +2336,7 @@ int TabRunner::punchesCB(gdioutput &gdi, int type, void *data)
       if (!gdi.getSelectedItem("Course", lbi))
         return 0;
 
-      oControl *oc=pc->getControl(lbi.data);
+      oControl *oc = pc->getControl(lbi.data);
 
       if (!oc) return 0;
       vector<int> nmp;
@@ -2313,7 +2345,7 @@ int TabRunner::punchesCB(gdioutput &gdi, int type, void *data)
         r->evaluateCard(true, nmp, oc->getFirstNumber()); //Add this punch
       }
       else {
-        for (size_t k = 0; k<mp.size(); k++) {
+        for (size_t k = 0; k < mp.size(); k++) {
           if (oc->hasNumber(mp[k]))
             r->evaluateCard(true, nmp, mp[k]); //Add this punch
         }
@@ -2326,13 +2358,12 @@ int TabRunner::punchesCB(gdioutput &gdi, int type, void *data)
       card->fillPunches(gdi, "Punches", pc);
       UpdateStatus(gdi, r);
     }
-    else if (bi.id=="AddAllC"){
+    else if (bi.id == "AddAllC") {
       vector<int> mp;
       r->evaluateCard(true, mp);
-      vector<int>::iterator it=mp.begin();
+      vector<int>::iterator it = mp.begin();
 
-
-      while(it!=mp.end()){
+      while (it != mp.end()) {
         vector<int> nmp;
         r->evaluateCard(true, nmp, *it); //Add this punch
         ++it;
@@ -2348,30 +2379,30 @@ int TabRunner::punchesCB(gdioutput &gdi, int type, void *data)
       r->hasManuallyUpdatedTimeStatus();
       UpdateStatus(gdi, r);
     }
-    else if (bi.id=="SaveC"){
-      //int time=oe->GetRelTime();
-
+    else if (bi.id == "SaveC") {
+      if (!savePunchTime(r, gdi))
+        return false;
       ListBoxInfo lbi;
 
       if (!gdi.getSelectedItem("Punches", lbi))
         return 0;
+      /*
+            pCard pc=r->getCard();
 
-      pCard pc=r->getCard();
+            if (!pc) return 0;
 
-      if (!pc) return 0;
+            pPunch pp = pc->getPunchByIndex(lbi.data);
 
-      pPunch pp = pc->getPunchByIndex(lbi.data);
-      
-      if (!pp)
-        throw meosException("Punch not found.");
+            if (!pp)
+              throw meosException("Punch not found.");
 
-      pc->setPunchTime(pp, gdi.getText("PTime"));
+            pc->setPunchTime(pp, gdi.getText("PTime"));
 
+            r->evaluateCard(true, mp);
+
+            //synchronize SQL
+            card->synchronize();*/
       vector<int> mp;
-      r->evaluateCard(true, mp);
-
-      //synchronize SQL
-      card->synchronize();
       r->synchronize();
       r->evaluateCard(true, mp);
       r->hasManuallyUpdatedTimeStatus();
@@ -2381,6 +2412,30 @@ int TabRunner::punchesCB(gdioutput &gdi, int type, void *data)
     }
   }
   return 0;
+}
+
+bool TabRunner::savePunchTime(pRunner r, gdioutput &gdi) {
+  ListBoxInfo lbi;
+  pCard card = r->getCard();
+  if (!card)
+    return false;
+
+  if (!gdi.getSelectedItem("Punches", lbi))
+    return 0;
+
+  pPunch pp = card->getPunchByIndex(lbi.data);
+
+  if (!pp)
+    return false;
+    
+  card->setPunchTime(pp, gdi.getText("PTime"));
+
+  vector<int> mp;
+  r->evaluateCard(true, mp);
+
+  //synchronize SQL
+  card->synchronize();
+  return true;
 }
 
 bool TabRunner::loadPage(gdioutput &gdi)
@@ -2515,26 +2570,28 @@ bool TabRunner::loadPage(gdioutput &gdi)
   if (numSL > 0)
     gdi.fillRight();
 
-  gdi.addSelection("RCourse", numSL == 0 ? 220 : 180, 300, RunnerCB, L"Bana:");
-  oe->fillCourses(gdi, "RCourse", true);
-  gdi.addItem("RCourse", lang.tl("[Klassens bana]"), 0);
+  if (!oe->getMeOSFeatures().withoutCourses(*oe)) {
+    gdi.addSelection("RCourse", numSL == 0 ? 220 : 180, 300, RunnerCB, L"Bana:");
+    oe->fillCourses(gdi, "RCourse", true);
+    gdi.addItem("RCourse", lang.tl("[Klassens bana]"), 0);
 
-  if (numSL > 0) {
-    gdi.fillDown();
-    gdi.addSelection("NumShort", 60, 300, RunnerCB, L"Avkortning:");
-    vector< pair<wstring, size_t> > data;
-    if (numSL == 1) {
-      data.push_back(make_pair(lang.tl("Nej"), 0));
-      data.push_back(make_pair(lang.tl("Ja"), 1));
-    }
-    else {
-      data.push_back(make_pair(lang.tl("Nej"), 0));
-      for (int i = 1; i <= numSL; i++) {
-        data.push_back(make_pair(itow(i), i));
+    if (numSL > 0) {
+      gdi.fillDown();
+      gdi.addSelection("NumShort", 60, 300, RunnerCB, L"Avkortning:");
+      vector< pair<wstring, size_t> > data;
+      if (numSL == 1) {
+        data.push_back(make_pair(lang.tl("Nej"), 0));
+        data.push_back(make_pair(lang.tl("Ja"), 1));
       }
+      else {
+        data.push_back(make_pair(lang.tl("Nej"), 0));
+        for (int i = 1; i <= numSL; i++) {
+          data.push_back(make_pair(itow(i), i));
+        }
+      }
+      gdi.addItem("NumShort", data);
+      gdi.popX();
     }
-    gdi.addItem("NumShort", data);
-    gdi.popX();
   }
 
   gdi.pushX();
@@ -2759,6 +2816,8 @@ void TabRunner::fillRunnerList(gdioutput &gdi) {
 
 bool TabRunner::canSetStart(pRunner r) const {
   pClass pc = r->getTeam() ? r->getTeam()->getClassRef(false) : r->getClassRef(true);
+  if (r->getTeam() && pc->isQualificationFinalBaseClass())
+    pc = r->getClassRef(true);
 
   if (pc && pc->getNumStages() > 0) {
     StartTypes st = pc->getStartType(r->getLegNumber());
@@ -2791,9 +2850,9 @@ bool TabRunner::canSetFinish(pRunner r) const {
 pRunner TabRunner::warnDuplicateCard(int cno, pRunner r)  {
   pRunner warnCardDupl = 0;
 
-  if (!r->getCard()) {
+  if (!r->getCard() && cno != 0) {
     vector<pRunner> allR;
-    oe->getRunners(0, 0, allR, false);
+    oe->getRunnersByCardNo(cno, false, oEvent::CardLookupProperty::Any, allR);
     for (size_t k = 0; k < allR.size(); k++) {
       if (!r->canShareCard(allR[k], cno)) {
         warnCardDupl = allR[k];
@@ -2829,19 +2888,33 @@ int TabRunner::numShorteningLevels() const {
   map<int, int> known;
   int res = 0;
   for (size_t k = 0; k < allCrs.size(); k++) {
-    pCourse sh = allCrs[k]->getShorterVersion();
-    touch.clear();
+    auto shInfo = allCrs[k]->getShorterVersion();
+    pCourse cCourse = allCrs[k];
     int count = 0;
-    while (sh && !touch.count(sh->getId())) {
-      count++;
-      map<int, int>::iterator r = known.find(sh->getId());
-      if (r != known.end()) {
-        count += r->second;
-        break;
+    if (shInfo.second) {
+      pCourse sh = shInfo.second;
+      touch.clear();
+      while (sh && !touch.count(sh->getId())) {
+        cCourse = sh;
+        count++;
+        map<int, int>::iterator r = known.find(sh->getId());
+        if (r != known.end()) {
+          count += r->second;
+          break;
+        }
+        touch.insert(sh->getId());
+        shInfo = sh->getShorterVersion();
+        sh = shInfo.second;
       }
-      touch.insert(sh->getId());
-      sh = sh->getShorterVersion();
     }
+
+    if (shInfo.first && !shInfo.second) {
+      // Course with loops
+      int nl = cCourse->getNumLoops();
+      if (nl > 0)
+      count += nl - 1;
+    }
+
     known[allCrs[k]->getId()] = count;
     res = max(res, count);
   }
@@ -2850,7 +2923,7 @@ int TabRunner::numShorteningLevels() const {
 
 void TabRunner::updateNumShort(gdioutput &gdi, pCourse crs, pRunner r) {
   if (gdi.hasField("NumShort")) {
-    if (crs && crs->getShorterVersion()) {
+    if (crs && crs->getShorterVersion().first) {
       gdi.enableInput("NumShort");
       if (r)
         gdi.selectItemByData("NumShort", r->getNumShortening());
@@ -2884,7 +2957,6 @@ void TabRunner::autoGrowCourse(gdioutput &gdi) {
     gdi.refresh();
   }
 }
-
 
 void TabRunner::EconomyHandler::init(oRunner &r) {
   oe = r.getEvent();
@@ -2951,7 +3023,6 @@ void TabRunner::EconomyHandler::save(gdioutput &gdi) {
     r.getDI().setInt("CardFee", cf);
   int paid = oe->interpretCurrency(gdi.getText("PaidAmount"));
   r.getDI().setInt("Paid", paid);
-
 
   if (paid != 0) {
     int m = gdi.getSelectedItem("").first;

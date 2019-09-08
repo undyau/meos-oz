@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@
 #include "TimeStamp.h"
 #include "stdafx.h"
 #include <vector>
+#include <memory>
 
 class oEvent;
 class gdioutput;
@@ -58,11 +59,14 @@ enum SortOrder {ClassStartTime,
                 ClassFinishTime,
                 ClassStartTimeClub,
                 ClassPoints,
+                ClassLiveResult,
+	              ClassKnockoutTotalResult,
                 SortByName,
                 SortByLastName,
                 SortByFinishTime,
                 SortByFinishTimeReverse,
                 SortByStartTime,
+                SortByStartTimeClass,
                 CourseResult,
                 CourseStartTime,
                 SortByEntryTime,
@@ -70,8 +74,18 @@ enum SortOrder {ClassStartTime,
                 CoursePoints,
                 SortEnumLastItem};
 
-class oBase
-{
+class oBase {
+public:
+  class oBaseReference {
+  private:
+    oBase * ref = nullptr;
+  public:
+    oBase * get() {
+      return ref;
+    }
+
+    friend class oBase;
+  };
 private:
   void storeChangeStatus() {reChanged = changed;}
   void resetChangeStatus() {changed &= reChanged;}
@@ -81,23 +95,27 @@ private:
   const static unsigned long long BaseGenStringFlag = 1ull << 63;
   const static unsigned long long Base36StringFlag = 1ull << 62;
   const static unsigned long long ExtStringMask = ~(BaseGenStringFlag|Base36StringFlag);
+  shared_ptr<oBaseReference> myReference;
 
 protected:
   int Id;
   TimeStamp Modified;
   string sqlUpdated; //SQL TIMESTAMP
   int counter;
+  oEvent *oe;
+  bool Removed;
 
   // True if the object is incorrect and needs correction
   // An example is if id changed as we wrote. Then owner
   // needs to be updated.
-  bool correctionNeeded;
+  bool correctionNeeded = false;
 
-  oEvent *oe;
-  bool Removed;
+private:
+  
+  bool implicitlyAdded = false;
+  bool addedToEvent = false;
 
-  //Used for selections, etc.
-  int _objectmarker;
+protected:
 
   /// Mark the object as changed (on client) and that it needs synchronize to server
   virtual void updateChanged();
@@ -115,6 +133,15 @@ protected:
   void setLocalObject() { localObject = true; }
 
 public:
+
+  // Get a safe reference to this object
+  const shared_ptr<oBaseReference> &getReference() {
+    if (!myReference) {
+      myReference = make_shared<oBaseReference>();
+      myReference->ref = this;
+    }
+    return myReference;
+  }
 
   // Returns true if the object is local, not stored in DB/On disc
   bool isLocalObject() { return localObject; }
@@ -141,6 +168,11 @@ public:
   wstring getTimeStamp() const;
 
   bool existInDB() const { return !sqlUpdated.empty(); }
+
+  void setImplicitlyCreated() { implicitlyAdded = true; }
+  bool isImplicitlyCreated() const { return implicitlyAdded; }
+  bool isAddedToEvent() const { return addedToEvent; }
+  void addToEvent() { addedToEvent = true; }
 
   oDataInterface getDI();
 

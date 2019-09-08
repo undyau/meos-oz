@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -71,12 +71,13 @@ private:
   vector<pRunner> known;
   vector<pRunner> unknown;
   void clearInForestData();
+  bool savePunchTime(pRunner r, gdioutput &gdi);
 
   PrinterObject splitPrinter;
-	PrinterObject labelPrinter;
+  PrinterObject labelPrinter;
 
   void showRunnerReport(gdioutput &gdi);
-  void runnerReport(gdioutput &gdi, int id, bool compactReport);
+  static void runnerReport(oEvent &oe, gdioutput &gdi, int id, bool compactReport);
 
   void showVacancyList(gdioutput &gdi, const string &method="", int classId=0);
   void showCardsList(gdioutput &gdi);
@@ -123,7 +124,7 @@ public:
   bool loadPage(gdioutput &gdi);
   bool loadPage(gdioutput &gdi, int runnerId);
 
-
+  static void generateRunnerReport(oEvent &oe, gdioutput &gdi,  vector<pair<int, bool>> &runnersToReport);
 
   TabRunner(oEvent *oe);
   ~TabRunner(void);

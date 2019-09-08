@@ -9,9 +9,11 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
+#include <set>
+
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -176,7 +178,7 @@ protected:
   SI_StationInfo *Current_SI_Info; //Current SI_Info in use (for thread startup);
 
   WORD calcCRC(BYTE *data, DWORD length);
-  bool checkCRC(BYTE *bf);
+  bool checkCRC(BYTE *bf, DWORD maxLen);
   void setCRC(BYTE *bf);
 
   bool getCard5Data(BYTE *data, SICard &card);
@@ -204,11 +206,30 @@ protected:
   volatile int tcpPortOpen;
   volatile unsigned int serverSocket;
 
+  bool MonitorTEST(SI_StationInfo &si);
   bool MonitorSI(SI_StationInfo &si);
   int MonitorTCPSI(WORD port, int localZeroTime);
 
+  struct TestCard {
+    int cardNo;
+    vector<int> punches;
+
+    bool operator<(const TestCard &c) const {
+      return cardNo < c.cardNo;
+    }
+
+    TestCard(int cardNo, const vector<int> &punches) : cardNo(cardNo), 
+                                                 punches(punches) {
+    }
+  };
+
+  set<TestCard> testCards;
+
 public:
   SI_StationInfo *findStation(const wstring &com);
+
+  /** Log debug data. */
+  void debugLog(const wchar_t *ptr);
 
   void getInfoString(const wstring &com, vector<wstring> &info);
   bool isPortOpen(const wstring &com);
@@ -220,6 +241,7 @@ public:
   void addCard(const SICard &sic);
   void addPunch(DWORD Time, int Station, int Card, int Mode=0);
 
+  void addTestCard(int cardNo, const vector<int> &punches);
 
   void EnumrateSerialPorts(list<int> &ports);
 

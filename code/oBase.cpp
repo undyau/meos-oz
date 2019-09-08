@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -44,8 +44,7 @@ static char THIS_FILE[]=__FILE__;
 
 char RunnerStatusOrderMap[100];
 
-oBase::oBase(oEvent *poe)
-{
+oBase::oBase(oEvent *poe) {
   Removed = false;
   oe = poe;
   Id = 0;
@@ -57,8 +56,14 @@ oBase::oBase(oEvent *poe)
   localObject = false;
 }
 
-oBase::~oBase()
-{
+oBase::~oBase(){
+  if (myReference)
+    myReference->ref = nullptr;
+}
+
+void oBase::remove() {
+  if (myReference)
+    myReference->ref = nullptr;
 }
 
 bool oBase::synchronize(bool writeOnly)

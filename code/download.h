@@ -7,7 +7,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@ private:
   bool success;
   void initThread();
 
-  bool httpSendReqEx(HINTERNET hConnect, const wstring &dest, const vector< pair<wstring, wstring> > &headers,
+  bool httpSendReqEx(HINTERNET hConnect, bool https, const wstring &dest, const vector< pair<wstring, wstring> > &headers,
                      const wstring &upFile, const wstring &outFile, ProgressWindow &pw, int &errroCode) const;
 
 public:
@@ -87,7 +87,7 @@ protected:
 
   friend void SUThread(void *ptr);
 
-	std::vector<string*> usedBuffers;
+  std::vector<string*> usedBuffers;
 
 };
 

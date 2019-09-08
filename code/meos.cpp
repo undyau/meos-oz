@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -67,6 +67,7 @@
 #include "restserver.h"
 #include "autocomplete.h"
 #include "image.h"
+#include "csvparser.h"
 
 int defaultCodePage = 1252;
 
@@ -154,9 +155,9 @@ void LoadPage(gdioutput &gdi, TabType type) {
 // Path to settings file
 static wchar_t settings[260];
 // Startup path
-static wchar_t programPath[MAX_PATH];
+wchar_t programPath[MAX_PATH];
 // Exe path
-static wchar_t exePath[MAX_PATH];
+wchar_t exePath[MAX_PATH];
 
 
 void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
@@ -197,7 +198,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   int       nCmdShow)
 {
   hInst = hInstance; // Store instance handle in our global variable
-
+  
   atexit(dumpLeaks);	//
   _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -215,7 +216,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     ShowWindow(hSplash, SW_SHOW);
     UpdateWindow(hSplash);
   }
-
   DWORD splashStart = GetTickCount();
 
   for (int k = 0; k < 100; k++) {
@@ -235,6 +235,17 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   StringCache::getInstance().init();
 
   GetCurrentDirectory(MAX_PATH, programPath);
+  bool utfRecode = false;
+  if (utfRecode) {
+    vector<wstring> dyn;
+
+    expandDirectory(L".", L"*.cpp", dyn);
+    expandDirectory(L".", L"*.h", dyn);
+    expandDirectory(L"./meosdb", L"*.cpp", dyn);
+    expandDirectory(L"./meosdb", L"*.h", dyn);
+    for (auto &f : dyn)
+      csvparser::convertUTF(f);
+  }
   
   GetModuleFileName(NULL, exePath, MAX_PATH);
   int lastDiv = -1;
@@ -263,7 +274,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   gdi_extra.push_back(gdi_main);
 
   try {
-	  gEvent = new oExtendedEvent(*gdi_main);
+    gEvent = new oExtendedEvent(*gdi_main);
   }
   catch (meosException &ex) {
     gdi_main->alert(wstring(L"Failed to create base event: ") + ex.wwhat());
@@ -288,6 +299,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   lang.get().addLangResource(L"Svenska", L"103");
   lang.get().addLangResource(L"Deutsch", L"105");
   lang.get().addLangResource(L"Dansk", L"106");
+  lang.get().addLangResource(L"Ceský", L"108");
   lang.get().addLangResource(L"Français", L"110");
   lang.get().addLangResource(L"Russian", L"107");
 
@@ -819,7 +831,7 @@ gdioutput *getExtraWindow(const string &tag, bool toForeGround) {
   return 0;
 }
 
-gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x, int max_y) {
+gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x, int max_y, bool fixedSize) {
   if (getExtraWindow(tag, false) != 0)
     throw meosException("Window already exists");
 
@@ -836,22 +848,31 @@ gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x,
   for (size_t k = 0; k<gdi_extra.size(); k++) {
     if (gdi_extra[k]) {
       HWND hWnd = gdi_extra[k]->getHWNDTarget();
-      RECT rc;
-      if (GetWindowRect(hWnd, &rc)) {
-        xp = max<int>(rc.left + 16, xp);
-        yp = max<int>(rc.top + 32, yp);
+      RECT rcc;
+      if (GetWindowRect(hWnd, &rcc)) {
+        xp = max<int>(rcc.left + 16, xp);
+        yp = max<int>(rcc.top + 32, yp);
       }
     }
   }
 
-  int xs = gEvent->getPropertyInt("xsize", max(850, min(int(rc.right)-yp, 1124)));
-  int ys = gEvent->getPropertyInt("ysize", max(650, min(int(rc.bottom)-yp-40, 800)));
+  if (xp > rc.right - 100)
+    xp = rc.right - 100;
 
-  if (max_x>0)
-    xs = min(max_x, xs);
-  if (max_y>0)
-    ys = min(max_y, ys);
+  if (yp > rc.bottom - 100)
+    yp = rc.bottom - 100;
 
+  int xs = max_x, ys = max_y;
+  if (!fixedSize) {
+    xs = gEvent->getPropertyInt("xsize", max(850, min(int(rc.right) - yp, 1124)));
+    ys = gEvent->getPropertyInt("ysize", max(650, min(int(rc.bottom) - yp - 40, 800)));
+
+    if (max_x > 0)
+      xs = min(max_x, xs);
+    if (max_y > 0)
+      ys = min(max_y, ys);
+  }
+  
   hWnd = CreateWindowEx(0, szWorkSpaceClass, title.c_str(),
     WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,
     xp, yp, max(xs, 200), max(ys, 100), 0, NULL, hInst, NULL);
@@ -933,7 +954,8 @@ void InsertSICard(gdioutput &gdi, SICard &sic);
 
 //static int xPos=0, yPos=0;
 void createTabs(bool force, bool onlyMain, bool skipTeam, bool skipSpeaker,
-                bool skipEconomy, bool skipLists, bool skipRunners, bool skipControls)
+                bool skipEconomy, bool skipLists,
+                bool skipRunners, bool skipCourses, bool skipControls)
 {
   static bool onlyMainP = false;
   static bool skipTeamP = false;
@@ -941,11 +963,12 @@ void createTabs(bool force, bool onlyMain, bool skipTeam, bool skipSpeaker,
   static bool skipEconomyP = false;
   static bool skipListsP = false;
   static bool skipRunnersP = false;
+  static bool skipCoursesP = false;
   static bool skipControlsP = false;
 
   if (!force && onlyMain==onlyMainP && skipTeam==skipTeamP && skipSpeaker==skipSpeakerP &&
       skipEconomy==skipEconomyP && skipLists==skipListsP &&
-      skipRunners==skipRunnersP && skipControls==skipControlsP)
+      skipRunners==skipRunnersP && skipControls==skipControlsP && skipCourses == skipCoursesP)
     return;
 
   onlyMainP = onlyMain;
@@ -954,6 +977,7 @@ void createTabs(bool force, bool onlyMain, bool skipTeam, bool skipSpeaker,
   skipEconomyP = skipEconomy;
   skipListsP = skipLists;
   skipRunnersP = skipRunners;
+  skipCoursesP = skipCourses;
   skipControlsP = skipControls;
 
   int oldid=TabCtrl_GetCurSel(hMainTab);
@@ -983,6 +1007,9 @@ void createTabs(bool force, bool onlyMain, bool skipTeam, bool skipSpeaker,
       continue;
 
     if (skipRunners && it->getType() == typeid(TabRunner))
+      continue;
+
+    if (skipCourses && it->getType() == typeid(TabCourse))
       continue;
 
     if (skipControls && it->getType() == typeid(TabControl))
@@ -1044,7 +1071,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       ic.dwICC=ICC_TAB_CLASSES ;
       InitCommonControlsEx(&ic);
       hMainTab=CreateWindowEx(0, WC_TABCONTROL, L"tabs", WS_CHILD|WS_VISIBLE|WS_CLIPSIBLINGS, 0, 0, 300, 20, hWnd, 0, hInst, 0);
-      createTabs(true, true, false, false, false, false, false, false);
+      createTabs(true, true, false, false, false, false, false, false, false);
 
       SetTimer(hWnd, 4, 10000, 0); //Connection check
       break;
@@ -1188,6 +1215,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       if (autoTask)
         autoTask->synchronize(gdi_extra);
       break;
+    
+    case WM_USER + 5:
+      if (gdi_main)
+        gdi_main->addInfoBox("ainfo", L"info:advanceinfo", 10000);
+
+      break;
+    
     case WM_COMMAND:
       wmId    = LOWORD(wParam);
       wmEvent = HIWORD(wParam);
@@ -1267,7 +1301,7 @@ void scrollVertical(gdioutput *gdi, int yInc, HWND hWnd) {
   if (si.nPage==0)
     yInc = 0;
 
-  int yPos=gdi->GetOffsetY();
+  int yPos=gdi->getOffsetY();
   int a=si.nMax-signed(si.nPage-1) - yPos;
 
   if ( (yInc = max( -yPos, min(yInc, a)))!=0 ) {
@@ -1278,9 +1312,9 @@ void scrollVertical(gdioutput *gdi, int yInc, HWND hWnd) {
 
     ScrollArea.top=-gdi->getHeight()-100;
     ScrollArea.bottom+=gdi->getHeight();
-    ScrollArea.right=gdi->getWidth()-gdi->GetOffsetX()+15;
+    ScrollArea.right=gdi->getWidth()-gdi->getOffsetX()+15;
     ScrollArea.left = -2000;
-    gdi->SetOffsetY(yPos);
+    gdi->setOffsetY(yPos);
 
     bool inv = true; //Inv = false works only for lists etc. where there are not controls in the scroll area.
 
@@ -1320,7 +1354,7 @@ void updateScrollInfo(HWND hWnd, gdioutput &gdi, int nHeight, int nWidth) {
 
   if (maxy>0) {
     si.nMax=maxy+nHeight;
-    si.nPos=gdi.GetOffsetY();
+    si.nPos=gdi.getOffsetY();
     si.nPage=nHeight;
   }
   else {
@@ -1333,7 +1367,7 @@ void updateScrollInfo(HWND hWnd, gdioutput &gdi, int nHeight, int nWidth) {
   si.nMin=0;
   if (maxx>0) {
     si.nMax=maxx+nWidth;
-    si.nPos=gdi.GetOffsetX();
+    si.nPos=gdi.getOffsetX();
     si.nPage=nWidth;
   }
   else {
@@ -1420,7 +1454,7 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
       //int hwndScrollBar = (HWND) lParam;      // handle to scroll bar
 
       int yInc;
-      int yPos=gdi->GetOffsetY();
+      int yPos=gdi->getOffsetY();
       RECT rc;
       GetClientRect(hWnd, &rc);
       int pagestep = max(50, int(0.9*rc.bottom));
@@ -1467,7 +1501,7 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
       }
 
       scrollVertical(gdi, yInc, hWnd);
-      gdi->storeAutoPos(gdi->GetOffsetY());
+      gdi->storeAutoPos(gdi->getOffsetY());
       break;
     }
 
@@ -1477,7 +1511,7 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
       //int hwndScrollBar = (HWND) lParam;      // handle to scroll bar
 
       int xInc;
-      int xPos=gdi->GetOffsetX();
+      int xPos=gdi->getOffsetX();
 
       switch(nScrollCode)
       {
@@ -1541,7 +1575,7 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         GetClientRect(hWnd, &ScrollArea);
         ClipArea=ScrollArea;
 
-        gdi->SetOffsetX(xPos);
+        gdi->setOffsetX(xPos);
 
         ScrollWindowEx (hWnd, -xInc,  0,
           0, &ClipArea,
@@ -1560,7 +1594,7 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
     case WM_MOUSEWHEEL: {
       int dz = GET_WHEEL_DELTA_WPARAM(wParam);
       scrollVertical(gdi, -dz, hWnd);
-      gdi->storeAutoPos(gdi->GetOffsetY());
+      gdi->storeAutoPos(gdi->getOffsetY());
       }
       break;
 
@@ -1748,7 +1782,6 @@ bool getMeOSFile(wchar_t *FileNamePath, const wchar_t *FileName) {
   wcscpy_s(FileNamePath, MAX_PATH, Path);
   return true;
 }
-
 
 bool getUserFile(wchar_t *FileNamePath, const wchar_t *FileName)
 {

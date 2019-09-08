@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -65,7 +65,6 @@ oCard::~oCard()
 bool oCard::Write(xmlparser &xml)
 {
   if (Removed) return true;
-
   xml.startTag("Card");
   xml.write("CardNo", cardNo);
   xml.write("Punches", getPunchString());
@@ -137,17 +136,13 @@ void oCard::addPunch(int type, int time, int matchControlId)
   updateChanged();
 }
 
-string oCard::getPunchString()
-{
-  oPunchList::iterator it;
-
-  string pstring;
-
-  for(it=punches.begin(); it != punches.end(); ++it){
-    pstring += it->codeString();
+const string &oCard::getPunchString() const {
+  punchString.clear();
+  punchString.reserve(punches.size() * 16);
+  for(auto &p : punches) {
+    p.appendCodeString(punchString);
   }
-
-  return pstring;
+  return punchString;
 }
 
 void oCard::importPunches(const string &s) {
@@ -167,7 +162,7 @@ void oCard::importPunches(const string &s) {
   return;
 }
 
-bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
+bool oCard::fillPunches(gdioutput &gdi, const string &name, oCourse *crs) {
   oPunchList::iterator it;
   synchronize(true);
   int ix = 0;
@@ -212,7 +207,7 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
     if (!hasStart && !it->isStart()){
       if (it->isUsed){
         if (showStart)
-          gdi.addItem(name, lang.tl("Start")+L"\t-", -1);
+          gdi.addItem(name, lang.tl("Start")+L"\t\u2013", -1);
         hasStart=true;
       }
     }
@@ -230,11 +225,11 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
               gdi.addItem(name, rogainingIndex[matchPunch].second->getString(),
                                 rogainingIndex[matchPunch].first);
             else
-              gdi.addItem(name, L"-\t-", -1);
+              gdi.addItem(name, L"\u2013\t\u2013", -1);
           }
           else {
             while(0<punchRemain--) {
-              gdi.addItem(name, L"-\t-", -1);
+              gdi.addItem(name, L"\u2013\t\u2013", -1);
             }
           }
           // Next control
@@ -254,13 +249,13 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
                   gdi.addItem(name, rogainingIndex[matchPunch].second->getString(),
                                     rogainingIndex[matchPunch].first);
                 else
-                  gdi.addItem(name, L"-\t-", -1);
+                  gdi.addItem(name, L"\u2013\t\u2013", -1);
                 ctrl = crs->getControl(++matchPunch);
               }
               punchRemain = ctrl ? ctrl->getNumMulti() : 1;
             }
             else {
-              gdi.addItem(name, L"-\t-", -1);
+              gdi.addItem(name, L"\u2013\t\u2013", -1);
               ctrl = crs->getControl(++matchPunch);
             }
           }
@@ -268,7 +263,7 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
 
         if (it->isFinish() && crs) { //Add missing punches before the finish
           while(ctrl) {
-            gdi.addItem(name, L"-\t-", -1);
+            gdi.addItem(name, L"\u2013\t\u2013", -1);
             ctrl = crs->getControl(++matchPunch);
           }
         }
@@ -287,7 +282,7 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
                 gdi.addItem(name, rogainingIndex[matchPunch].second->getString(),
                                   rogainingIndex[matchPunch].first);
               else
-                gdi.addItem(name, L"-\t-", -1);
+                gdi.addItem(name, L"\u2013\t\u2013", -1);
               ctrl = crs->getControl(++matchPunch);
             }
             punchRemain = ctrl ? ctrl->getNumMulti() : 1;
@@ -305,7 +300,7 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
   }
 
   if (!hasStart && showStart)
-    gdi.addItem(name, lang.tl("Start")+L"\t-", -1);
+    gdi.addItem(name, lang.tl("Start")+L"\t\u2013", -1);
 
   if (!hasFinish && showFinish) {
 
@@ -317,7 +312,7 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
             gdi.addItem(name, rogainingIndex[matchPunch].second->getString(),
                               rogainingIndex[matchPunch].first);
           else
-            gdi.addItem(name, L"-\t-", -1);
+            gdi.addItem(name, L"\u2013\t\u2013", -1);
           ctrl = crs->getControl(++matchPunch);
         }
         punchRemain = ctrl ? ctrl->getNumMulti() : 1;
@@ -328,7 +323,7 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, pCourse crs) {
       }
     }
 
-    gdi.addItem(name, lang.tl("Mål")+L"\t-", -1);
+    gdi.addItem(name, lang.tl("Mål")+L"\t\u2013", -1);
   }
 
   if (extra) {
@@ -492,7 +487,7 @@ bool oCard::setPunchTime(const pPunch punch, const wstring &time)
 
 
 pCard oEvent::getCard(int Id) const
-{
+{  // Do allow removed cards
   if (Id < int(Cards.size() / 2)) {
     for (oCardList::const_iterator it = Cards.begin(); it != Cards.end(); ++it){
       if (it->Id==Id)
@@ -509,7 +504,7 @@ pCard oEvent::getCard(int Id) const
 }
 
 void oEvent::getCards(vector<pCard> &c) {
-  synchronizeList(oLCardId);
+  synchronizeList(oListId::oLCardId);
   c.clear();
   c.reserve(Cards.size());
 
@@ -519,17 +514,16 @@ void oEvent::getCards(vector<pCard> &c) {
   }
 }
 
-
 pCard oEvent::addCard(const oCard &oc)
 {
   if (oc.Id<=0)
     return 0;
 
   Cards.push_back(oc);
+  Cards.back().addToEvent();
 
   return &Cards.back();
 }
-
 
 pCard oEvent::getCardByNumber(int cno) const
 {
@@ -592,8 +586,7 @@ void oEvent::generateCardTableData(Table &table, oCard *addCard)
   }
 
   oCardList::iterator it;
-  synchronizeList(oLCardId, true, false);
-  synchronizeList(oLRunnerId, false, true);
+  synchronizeList({ oListId::oLCardId, oListId::oLRunnerId });
 
   for (it=Cards.begin(); it!=Cards.end(); ++it) {
     if (!it->isRemoved()) {
@@ -707,16 +700,10 @@ void oCard::getPunches(vector<pPunch> &punchesOut) const {
   }
 }
 
-bool oCard::comparePunchTime(oPunch *p1, oPunch *p2) {
-  return p1->Time < p2->Time;
-}
-
 void oCard::setupFromRadioPunches(oRunner &r) {
-  oe->synchronizeList(oLPunchId, true, true);
+  oe->synchronizeList(oListId::oLPunchId);
   vector<pFreePunch> p;
-  oe->getPunchesForRunner(r.getId(), p);
-
-  sort(p.begin(), p.end(), comparePunchTime);
+  oe->getPunchesForRunner(r.getId(), true, p);
 
   for (size_t k = 0; k < p.size(); k++)
     addPunch(p[k]->Type, p[k]->Time, 0);

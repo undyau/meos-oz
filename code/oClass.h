@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -136,8 +136,13 @@ struct ClassResultInfo {
 
 class QualificationFinal;
 
-enum ClassType {oClassIndividual=1, oClassPatrol=2,
-                oClassRelay=3, oClassIndividRelay=4};
+enum ClassType {
+  oClassIndividual = 1, 
+  oClassPatrol = 2,
+  oClassRelay = 3, 
+  oClassIndividRelay = 4, 
+  oClassKnockout = 5
+};
 
 enum ClassMetaType {ctElite, ctNormal, ctYouth, ctTraining,
                     ctExercise, ctOpen, ctUnknown};
@@ -195,8 +200,10 @@ protected:
   mutable int tIgnoreStartPunch;
 
   // Sort classes for this index
-  int tSortIndex;
-  int tMaxTime;
+  mutable int tSortIndex;
+  mutable int tMaxTime;
+
+  mutable bool isInitialized = false;
 
   // True when courses was changed on this client. Used to update course pool  bindings
   bool tCoursesChanged;
@@ -239,7 +246,7 @@ protected:
   void exportIOFStart(xmlparser &xml);
 
   /** Setup transient data */
-  void reinitialize();
+  void reinitialize(bool force) const;
 
   /** Recalculate derived data */
   void apply();
@@ -247,12 +254,19 @@ protected:
   void calculateSplits();
   void clearSplitAnalysis();
 
+  /** Map to correct leg number for diff class/runner class (for example qual/final)*/
+  int mapLeg(int inputLeg) const {
+    if (inputLeg > 0 && legInfo.size() == 1)
+      return 0; // The case with different class for team/runner. Leg is an index in another class.
+    return inputLeg;
+  }
+
   /** Info about the result in the class for each leg.
       Use oEvent::analyseClassResultStatus to setup */
   mutable vector<ClassResultInfo> tResultInfo;
 
   /** Get/calculate sort index from candidate */
-  int getSortIndex(int candidate);
+  int getSortIndex(int candidate) const;
 
   /** Get internal data buffers for DI */
   oDataContainer &getDataBuffers(pvoid &data, pvoid &olddata, pvectorstr &strData) const;
@@ -264,7 +278,24 @@ protected:
   mutable vector<pClass> virtualClasses;
   pClass parentClass;
 
-  shared_ptr<QualificationFinal> qualificatonFinal;
+  mutable shared_ptr<QualificationFinal> qualificatonFinal;
+
+  int tMapsRemaining;
+  mutable int tMapsUsed;
+  mutable int tMapsUsedNoVacant;
+
+  // First is data revision, second is key
+  mutable pair<int, map<string, int>> tTypeKeyToRunnerCount;
+
+  enum CountKeyType {
+    All,
+    Finished,
+    ExpectedStarting,
+    DNS,
+    IncludeNotCompeting
+  };
+
+  static string getCountTypeKey(int leg, CountKeyType type, bool countVacant);
 
   void configureInstance(int instance, bool allowCreation) const;
 public:
@@ -272,7 +303,25 @@ public:
   /** The master class in a qualification/final scheme. */
   const pClass getParentClass() const { return parentClass; }
 
-  const QualificationFinal *getQualificationFinal() const { return qualificatonFinal.get(); }
+  const QualificationFinal *getQualificationFinal() const {
+    reinitialize(false);
+    return qualificatonFinal.get();
+  }
+
+  void clearQualificationFinal() const;
+
+  bool isQualificationFinalClass() const {
+    return parentClass && parentClass->isQualificationFinalBaseClass();
+  }
+
+  bool isQualificationFinalBaseClass() const {
+    return qualificatonFinal != nullptr;
+  }
+
+  bool isTeamClass() const {
+    int ns = getNumStages();
+    return ns > 0 && getNumDistinctRunners() == 1;
+  }
 
   /** Returns the number of possible final classes.*/
   int getNumQualificationFinalClasses() const;
@@ -345,7 +394,7 @@ public:
       return false;
   }
 
-  oClass *getVirtualClass(int instance, bool allowCreation);
+  pClass getVirtualClass(int instance, bool allowCreation);
   const pClass getVirtualClass(int instance) const;
 
   ClassStatus getClassStatus() const;
@@ -507,9 +556,13 @@ public:
   // Get total number of runners running this class.
   // Use checkFirstLeg to only check the number of runners running leg 1.
   int getNumRunners(bool checkFirstLeg, bool noCountVacant, bool noCountNotCompeting) const;
+  void getNumResults(int leg, int &total, int &finished, int &dns) const;
 
   //Get remaining maps for class (or int::minvalue)
-  int getNumRemainingMaps(bool recalculate) const;
+  int getNumRemainingMaps(bool forceRecalculate) const;
+
+  void setNumberMaps(int nm);
+  int getNumberMaps(bool rawAttribute = false) const;
 
   const wstring &getName() const {return Name;}
   void setName(const wstring &name);
@@ -531,9 +584,10 @@ public:
   int getCourseId() const {if (Course) return Course->getId(); else return 0;}
   void setCourse(pCourse c);
 
-  bool addStageCourse(int stage, int courseId);
-  bool addStageCourse(int stage, pCourse pc);
+  bool addStageCourse(int stage, int courseId, int index);
+  bool addStageCourse(int stage, pCourse pc,  int index);
   void clearStageCourses(int stage);
+  bool moveStageCourse(int stage, int index, int offset);
 
   bool removeStageCourse(int stage, int courseId, int position);
 

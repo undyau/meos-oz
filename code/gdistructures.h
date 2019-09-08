@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -154,7 +154,7 @@ public:
 
   TextInfo &changeFont(const wstring &fnt) {font = fnt; return *this;} //Note: size not updated
 
-  bool isFormatInfo() const { return format == pageNewPage || format == pagePageInfo; }
+  bool isFormatInfo() const { return format == pageNewPage || format == pagePageInfo || format == pageNewChapter; }
 
   int getHeight() {return int(textRect.bottom-textRect.top);}
   gdiFonts getGdiFont() const {return gdiFonts(format & 0xFF);}
@@ -251,7 +251,9 @@ public:
   InputInfo &setFont(gdioutput &gdi, gdiFonts font);
   GDICOLOR getBgColor() const {return bgColor;}
   GDICOLOR getFgColor() const {return fgColor;}
-
+  /** Return the previously stored text */
+  const wstring &getPreviousText() const { return focusText; }
+  bool changedInput() const { return text != focusText; }
   InputInfo &setPassword(bool pwd);
   
   HWND getControlWindow() const {return hWnd;}
@@ -276,7 +278,7 @@ private:
   bool isEditControl;
   bool writeLock;
   wstring original;
-  wstring focusText; // Test when got focus
+  wstring focusText; // Text when got focus
   bool ignoreCheck; // True if changed-state should be ignored
   friend class gdioutput;
 };

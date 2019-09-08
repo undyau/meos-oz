@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -105,6 +105,13 @@ void IOF30Interface::readCourseData(gdioutput &gdi, const xmlobject &xo, bool up
       failed++;
   }
 
+  vector<pCourse> allC;
+  oe.getCourses(allC);
+  for (pCourse pc : allC) {
+    if (!courses.count(pc->getName()))
+      courses[pc->getName()] = pc;
+  }
+
   if (!updateClass)
     return;
 
@@ -155,7 +162,7 @@ void IOF30Interface::classCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
       wstring cname;
       xClsAssignment.getObjectString("ClassName", cname);
       if (cname.length() > 0) {
-        pClass pc = oe.getClassCreate(0, cname);
+        pClass pc = oe.getClassCreate(0, cname, matchedClasses);
         if (pc)
           cls2Stages.insert(make_pair(pc->getId(), vector<int>()) );
       }
@@ -268,7 +275,7 @@ void IOF30Interface::classCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
       if (pc->hasMultiCourse()) {
         for (size_t k = 0; k < pc->getNumStages(); k++) {
           for (size_t j = 0; j < pCrs.size(); j++)
-            pc->addStageCourse(k, pCrs[j]);
+            pc->addStageCourse(k, pCrs[j], -1);
         }
       }
       else
@@ -276,7 +283,7 @@ void IOF30Interface::classCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
     }
     else if (leg == 0 && pCrs.size() == 1) {
       if (pc->hasMultiCourse())
-        pc->addStageCourse(0, pCrs[0]);
+        pc->addStageCourse(0, pCrs[0], -1);
       else
         pc->setCourse(pCrs[0]);
     }
@@ -285,7 +292,7 @@ void IOF30Interface::classCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
         pc->setNumStages(leg+1);
 
       for (size_t j = 0; j < pCrs.size(); j++)
-        pc->addStageCourse(leg, pCrs[j]);
+        pc->addStageCourse(leg, pCrs[j], -1);
     }
   }
 }
@@ -398,6 +405,13 @@ void IOF30Interface::teamCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
     if (!bib.empty()) {
       teamText = bib;
       t = bib2Team[bib];
+      if (t == nullptr) {
+        int ibib = _wtoi(bib.c_str()); 
+        if (ibib > 0) {
+          wstring bib2 = itow(ibib);
+          t = bib2Team[bib2];
+        }
+      }
     }
 
     if (t == 0) {
@@ -509,7 +523,7 @@ void IOF30Interface::classAssignmentObsolete(gdioutput &gdi, xmlList &xAssignmen
         wstring cName;
         xCls[j].getObjectString("Name", cName);
         int id = xCls[j].getObjectInt("Id");
-        pClass cls = oe.getClassCreate(id, cName);
+        pClass cls = oe.getClassCreate(id, cName, matchedClasses);
         if (cls) {
           class2Courses[cls->getId()].push_back(pc);
 
@@ -619,7 +633,7 @@ void IOF30Interface::classAssignmentObsolete(gdioutput &gdi, xmlList &xAssignmen
               c[k]->setNumStages(1);
               c[k]->clearStageCourses(0);
               for (size_t j = 0; j < crsFam.size(); j++)
-                c[k]->addStageCourse(0, crsFam[j]->getId());
+                c[k]->addStageCourse(0, crsFam[j]->getId(), -1);
             }
           }
           else {
@@ -627,7 +641,7 @@ void IOF30Interface::classAssignmentObsolete(gdioutput &gdi, xmlList &xAssignmen
             for (int i = 0; i < nl; i++) {
               c[k]->clearStageCourses(i);
               for (int j = 0; j < nFam; j++)
-                c[k]->addStageCourse(i, crsFam[(j + i)%nFam]->getId());
+                c[k]->addStageCourse(i, crsFam[(j + i)%nFam]->getId(), -1);
             }
           }
           assigned = true;
@@ -647,7 +661,7 @@ void IOF30Interface::classAssignmentObsolete(gdioutput &gdi, xmlList &xAssignmen
             const vector<pCourse> &crsFam = coursesFamilies.find(*fit)->second;
             int nFam = crsFam.size();
             for (int j = 0; j < nFam; j++)
-              c[k]->addStageCourse(i, crsFam[j]->getId());
+              c[k]->addStageCourse(i, crsFam[j]->getId(), -1);
           }
 
           assigned = true;
@@ -666,7 +680,7 @@ void IOF30Interface::classAssignmentObsolete(gdioutput &gdi, xmlList &xAssignmen
           for (int i = 0; i < nl; i++) {
             c[k]->clearStageCourses(i);
             for (int j = 0; j < nCrs; j++)
-              c[k]->addStageCourse(i, crs[(j + i)%nCrs]->getId());
+              c[k]->addStageCourse(i, crs[(j + i)%nCrs]->getId(), -1);
           }
         }
       }
@@ -738,6 +752,8 @@ void IOF30Interface::readEntryList(gdioutput &gdi, xmlobject &xo, bool removeNon
                                    int &entRead, int &entFail, int &entRemoved) {
   string ver;
   entRemoved = 0;
+  bool wasEmpty = oe.getNumRunners() == 0;
+
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
     gdi.addString("", 0, "Varning, okänd XML-version X#" + ver);
@@ -961,8 +977,95 @@ void IOF30Interface::readEntryList(gdioutput &gdi, xmlobject &xo, bool removeNon
     if (!rids.empty())
       oe.removeRunner(rids);
   }
+
+  if (wasEmpty) {
+    vector<pClass> allCls;
+    oe.getClasses(allCls, false);
+    set<int> fees;
+    set<int> redFees;
+    set<double> factor;    
+    for (pClass cls : allCls) {      
+      int cf = cls->getDCI().getInt("ClassFee");
+      int cfRed = cls->getDCI().getInt("ClassFeeRed");
+      if (cf > 0)
+        fees.insert(cf);
+
+      if (cfRed != 0 && cfRed != cf)
+        redFees.insert(cfRed);
+
+      int cfLate = cls->getDCI().getInt("HighClassFee");
+
+      if (cfLate > cf && cf > 0) {
+        factor.insert(double(cfLate) / double(cf));
+      }
+    }
+
+    int youthFee = numeric_limits<int>::max();
+    if (!fees.empty())
+      youthFee = min(youthFee, *fees.begin());
+    if (!redFees.empty())
+      youthFee = min(youthFee, *redFees.begin());
+
+    int eliteFee = numeric_limits<int>::max();
+    if (!fees.empty())
+      eliteFee = *fees.rbegin();
+
+    int normalFee = eliteFee;
+    for (int f : fees) {
+      if (f != youthFee && f != eliteFee) {
+        normalFee = f;
+      }
+    }
+   
+    if (youthFee != numeric_limits<int>::max()) {
+      oe.getDI().setInt("YouthFee", youthFee);
+    }
+
+    if (eliteFee != numeric_limits<int>::max()) {
+      oe.getDI().setInt("EliteFee", eliteFee);
+    }
+
+    if (normalFee != numeric_limits<int>::max()) {
+      oe.getDI().setInt("EntryFee", normalFee);
+    }
+
+    if (factor.size() > 0) {
+      double f = *factor.rbegin();
+      wstring fs = std::to_wstring(int((f - 1.0) * 100.0)) + L" %";
+      oe.getDI().setString("LateEntryFactor", fs);
+    }
+  }
 }
 
+void IOF30Interface::readServiceRequestList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail) {
+  string ver;
+  xo.getObjectString("iofVersion", ver);
+  if (!ver.empty() && ver > "3.0")
+    gdi.addString("", 0, "Varning, okänd XML-version X#" + ver);
+
+  xmlList req;
+  xo.getObjects("PersonServiceRequest", req);
+  entrySourceId = 0;
+
+  for (auto &rx : req) {
+    xmlobject xPers = rx.getObject("Person");
+    pRunner r = 0;
+    if (xPers)
+      r = readPerson(gdi, xPers);
+
+    if (r) {
+      auto xreq = rx.getObject("ServiceRequest");
+      if (xreq) {
+        auto xServ = xreq.getObject("Service");
+        string type;
+        if (xServ && xServ.getObjectString("type", type)=="StartGroup") {
+          int id = xServ.getObjectInt("Id");
+          r->getDI().setInt("Heat", id);
+        }
+      }
+    }
+  }
+}
 
 void IOF30Interface::readStartList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail) {
   string ver;
@@ -1148,26 +1251,13 @@ void IOF30Interface::readEvent(gdioutput &gdi, const xmlobject &xo,
   if (date) {
     wstring dateStr;
     date.getObjectString("Date", dateStr);
-    oe.setDate(dateStr);
     wstring timeStr;
     date.getObjectString("Time", timeStr);
     if (!timeStr.empty()) {
-      if (timeStr[timeStr.size()-1] == 'Z') { //Uh-oh - got UTC time        
-        SYSTEMTIME utc, local;
-        convertDateYMS(dateStr, utc, false);
-        if (timeStr.size() > 7 && timeStr[2] == ':' && timeStr[5] == ':') { // being lazy
-          utc.wHour = _wtoi(timeStr.c_str());
-          utc.wMinute = _wtoi(timeStr.substr(3).c_str());
-          utc.wSecond = _wtoi(timeStr.substr(6).c_str());
-          SystemTimeToTzSpecificLocalTime(0, &utc, &local);
-          wchar_t buf[25];
-          swprintf_s(buf, 25, L"%d-%02d-%02d", local.wYear, local.wMonth, local.wDay);
-          dateStr = wstring(buf);
-          oe.setDate(dateStr);
-          swprintf_s(buf, 25, L"%02d:%02d:%02d", local.wHour, local.wMinute, local.wSecond);
-          timeStr = wstring(buf);
-        }       
-      }
+      wstring tDate, tTime;
+      getLocalDateTime(dateStr, timeStr, tDate, tTime);
+      dateStr.swap(tDate);
+      timeStr.swap(tTime);
       int t = convertAbsoluteTimeISO(timeStr);
       if (t >= 0 && oe.getNumRunners() == 0) {
         int zt = t - 3600;
@@ -1176,6 +1266,9 @@ void IOF30Interface::readEvent(gdioutput &gdi, const xmlobject &xo,
         oe.setZeroTime(formatTimeHMS(zt));
       }
     }
+
+    oe.setDate(dateStr);
+
     //oe.setZeroTime(...);
   }
 
@@ -1361,12 +1454,12 @@ pTeam IOF30Interface::readTeamEntry(gdioutput &gdi, xmlobject &xTeam,
   if (newTeam) {
     wstring entryTime;
     xTeam.getObjectString("EntryTime", entryTime);
-    di.setDate("EntryDate", entryTime);
 
-    size_t tpos = entryTime.find_first_of(L"T");
-    if (tpos != -1) {
-      wstring timeString = entryTime.substr(tpos+1);
-      int t = convertAbsoluteTimeISO(timeString);
+    wstring date, time;
+    getLocalDateTime(entryTime, date, time);
+    di.setDate("EntryDate", date);
+    if (time.length() > 0) {
+      int t = convertAbsoluteTimeISO(time);
       if (t >= 0)
         di.setInt("EntryTime", t);
     }
@@ -1465,7 +1558,8 @@ pTeam IOF30Interface::getCreateTeam(gdioutput &gdi, const xmlobject &xTeam, bool
   if (!t)
     return 0;
 
-  t->setEntrySource(entrySourceId);
+  if (entrySourceId > 0)
+    t->setEntrySource(entrySourceId);
   t->flagEntryTouched(true);  
   if (t->getName().empty() || !t->hasFlag(oAbstractRunner::FlagUpdateName))
     t->setName(name, false);
@@ -1623,16 +1717,16 @@ pRunner IOF30Interface::readPersonEntry(gdioutput &gdi, xmlobject &xo, pTeam tea
 
   wstring entryTime;
   xo.getObjectString("EntryTime", entryTime);
-  di.setDate("EntryDate", entryTime);
-  size_t tpos = entryTime.find_first_of(L"T");
-  if (tpos != -1) {
-    wstring timeString = entryTime.substr(tpos+1);
-    int t = convertAbsoluteTimeISO(timeString);
+  
+  wstring date, time;
+  getLocalDateTime(entryTime, date, time);
+  di.setDate("EntryDate", date);
+  if (time.length() > 0) {
+    int t = convertAbsoluteTimeISO(time);
     if (t >= 0)
       di.setInt("EntryTime", t);
   }
-
-
+ 
   double fee = 0, paid = 0, taxable = 0, percentage = 0;
   wstring currency;
   xmlList xAssigned;
@@ -1652,7 +1746,7 @@ pRunner IOF30Interface::readPersonEntry(gdioutput &gdi, xmlobject &xo, pTeam tea
   if (sar) {
     string type;
     sar.getObjectString("type", type);
-    if (type == "groupedWithRef") {
+    if (type == "groupedWithRef" || type == "GroupedWith") {
       xmlobject pRef = sar.getObject("Person");
       if (pRef) {
         wstring sid;
@@ -1824,16 +1918,16 @@ pRunner IOF30Interface::readPerson(gdioutput &gdi, const xmlobject &person) {
     }
   }
   else
-	{
-		// Runner may already exist, but without a number ?
-		if (pname)
-		{
-			wstring given, family;
-			r = oe.getRunnerByName(getFirst(pname.getObjectString("Given", given), 2)+L" "+pname.getObjectString("Family", family));
-		}
-	}
-	
-	if (pid || r){
+  {
+    // Runner may already exist, but without a number ?
+    if (pname)
+    {
+      wstring given, family;
+      r = oe.getRunnerByName(getFirst(pname.getObjectString("Given", given), 2)+L" "+pname.getObjectString("Family", family));
+    }
+  }
+
+  if (pid || r){
     if (r) {
       // Check that a with this id runner does not happen to exist with a different source
       if (entrySourceId>0 && r->getEntrySource() != entrySourceId) {
@@ -1862,7 +1956,8 @@ pRunner IOF30Interface::readPerson(gdioutput &gdi, const xmlobject &person) {
     }
   }
 
-  r->setEntrySource(entrySourceId);
+  if (entrySourceId > 0)
+    r->setEntrySource(entrySourceId);
   r->flagEntryTouched(true);
  
   if (!r->hasFlag(oAbstractRunner::FlagUpdateName)) {
@@ -1910,19 +2005,19 @@ pClub IOF30Interface::readOrganization(gdioutput &gdi, const xmlobject &xclub, b
   if ( !saveToDB ) {
     if (clubId)
       pc = oe.getClubCreate(clubId, name);
-		else {
-			std::vector<pClub>c;
-			oe.getClubs(c, false);
-			for (unsigned int i = 0; i < c.size(); i++)
-				if (c[i]->getName() == name) {
-					pc = c[i];
-					break;
-				}
-		}
-		if (!pc && oe.useRunnerDb() && oe.getRunnerDatabase().getClub(name)) // Have match in the databse, so feel OK to add to this event (why wasn't DB used for search ?)
-			{
-			pc = new oClub(&oe, oe.getRunnerDatabase().getClub(name)->getId());
-			}
+    else {
+      std::vector<pClub>c;
+      oe.getClubs(c, false);
+      for (unsigned int i = 0; i < c.size(); i++)
+        if (c[i]->getName() == name) {
+          pc = c[i];
+          break;
+        }
+    }
+    if (!pc && oe.useRunnerDb() && oe.getRunnerDatabase().getClub(name)) // Have match in the databse, so feel OK to add to this event (why wasn't DB used for search ?)
+      {
+      pc = new oClub(&oe, oe.getRunnerDatabase().getClub(name)->getId());
+      }
 
     if (!pc) return false;
   }
@@ -2154,16 +2249,20 @@ void IOF30Interface::getAgeLevels(const vector<FeeInfo> &fees, const vector<int>
         redIx = ix[k];
       if (fees[normalIx] < fees[ix[k]])
         normalIx = ix[k];
+    }
 
+    for (size_t k = 0; k < ix.size(); k++) {
       const wstring &to = fees[ix[k]].toBirthDate;
       const wstring &from = fees[ix[k]].fromBirthDate;
 
-      if (!from.empty() && (youthLimit.empty() || youthLimit > from))
+      if (!from.empty() && (youthLimit.empty() || youthLimit > from) && fees[ix[k]].fee == fees[redIx].fee)
         youthLimit = from;
 
-      if (!to.empty() && (seniorLimit.empty() || seniorLimit > to))
+      if (!to.empty() && (seniorLimit.empty() || seniorLimit > to) && fees[ix[k]].fee == fees[redIx].fee)
         seniorLimit = to;
     }
+
+    
   }
 }
 
@@ -2213,38 +2312,38 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
 
   pClass pc = 0;
 
-	if (name.length() > 0) {
-		pc = oe.getClass(name);
-		if (!pc) {
-			pc = oe.addClass(name, 0, oe.getClass(classId) ? 0 : classId);
-		}		
-	}
-	else {
-		pc = oe.getClass(classId);
-		if (!pc) {
-				oClass c(&oe, classId);
-				pc = oe.addClass(c);
-		}
-	}
+  if (name.length() > 0) {
+    pc = oe.getClass(name);
+    if (!pc) {
+      pc = oe.addClass(name, 0, oe.getClass(classId) ? 0 : classId);
+    }
+  }
+  else {
+    pc = oe.getClass(classId);
+    if (!pc) {
+        oClass c(&oe, classId);
+        pc = oe.addClass(c);
+    }
+  }
 
  /* if (classId) {
     pc = oe.getClass(classId);
 
     if (!pc) {
-			if (name.length() > 0)
-				pc = oe.getClass(name);
-			if (!pc) {
-				oClass c(&oe, classId);
-				pc = oe.addClass(c);
-			}
+      if (name.length() > 0)
+        pc = oe.getClass(name);
+      if (!pc) {
+        oClass c(&oe, classId);
+        pc = oe.addClass(c);
+      }
     }
   }
-	else {
+  else {
     if (name.length() > 0)
-			pc = oe.getClass(name);
-		if (!pc)
-			pc = oe.addClass(name);
-	}*/
+      pc = oe.getClass(name);
+    if (!pc)
+      pc = oe.addClass(name);
+  }*/
 
   oDataInterface DI = pc->getDI();
 
@@ -2258,9 +2357,7 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
   }
   xmlList legs;
   xclass.getObjects("Leg", legs);
-
-//  if (!legs.empty()) {  Eventor sending Leg info for individual races :(
-  if (legs.size() > 1) {
+  if (!legs.empty()) {
     vector<LegInfo> &legInfo = teamClassConfig[pc->getId()];
     if (legInfo.size() < legs.size())
       legInfo.resize(legs.size());
@@ -2377,7 +2474,8 @@ void IOF30Interface::setupRelayClasses(const map<int, vector<LegInfo> > &teamCla
     if (classId > 0) {
       pClass pc = oe.getClass(classId);
       if (!pc) {
-        pc = oe.getClassCreate(classId, L"tmp" + itow(classId));
+        set<wstring> dmy;
+        pc = oe.getClassCreate(classId, L"tmp" + itow(classId), dmy);
       }
       setupRelayClass(pc, legs);
     }
@@ -2390,7 +2488,6 @@ void IOF30Interface::setupRelayClass(pClass pc, const vector<LegInfo> &legs) {
     for (size_t k = 0; k < legs.size(); k++) {
       nStage += legs[k].maxRunners;
     }
-
     if (int(pc->getNumStages())>=nStage)
       return; // Do nothing
     
@@ -2457,6 +2554,123 @@ int IOF30Interface::parseISO8601Time(const xmlobject &xo) {
 
   return oe.getRelativeTime(date, time, zone);
 }
+
+void IOF30Interface::getLocalDateTime(const string &date, const string &time,
+                                      string &dateOut, string &timeOut) {
+  int zIx = -1;
+  for (size_t k = 0; k < time.length(); k++) {
+    if (time[k] == '+' || time[k] == '-' || time[k] == 'Z') {
+      if (zIx == -1)
+        zIx = k;
+      else;
+      // Bad format
+    }
+  }
+
+  if (zIx == -1) {
+    dateOut = date;
+    timeOut = time;
+    return;
+  }
+
+  string timePart = time.substr(0, zIx);
+  string zone =  time.substr(zIx);
+  wstring wTime(timePart.begin(), timePart.end());
+
+  SYSTEMTIME st;
+  memset(&st, 0, sizeof(SYSTEMTIME));
+
+  int atime = convertAbsoluteTimeISO(wTime);
+  int idate = convertDateYMS(date, st, true);
+  if (idate != -1) {
+    if (zone == "Z" || zone == "z") {
+      st.wHour = atime / 3600;
+      st.wMinute = (atime / 60) % 60;
+      st.wSecond = atime % 60;
+
+      SYSTEMTIME localTime;
+      memset(&localTime, 0, sizeof(SYSTEMTIME));
+      SystemTimeToTzSpecificLocalTime(0, &st, &localTime);
+
+      char bf[64];
+      sprintf_s(bf, "%02d:%02d:%02d", localTime.wHour, localTime.wMinute, localTime.wSecond);
+      timeOut = bf;
+      sprintf_s(bf, "%d-%02d-%02d", localTime.wYear, localTime.wMonth, localTime.wDay);
+      dateOut = bf;
+    }
+    else {
+      dateOut = date;
+      timeOut = time;
+    }
+  }
+}
+
+void IOF30Interface::getLocalDateTime(const wstring &datetime, wstring &dateOut, wstring &timeOut) {
+  size_t t = datetime.find_first_of('T');
+  if (t != dateOut.npos) {
+    wstring date = datetime.substr(0, t);
+    wstring time = datetime.substr(t + 1);
+    getLocalDateTime(date, time, dateOut, timeOut);
+  }
+  else {
+    dateOut = datetime;
+    timeOut = L"";
+  }
+}
+
+void IOF30Interface::getLocalDateTime(const wstring &date, const wstring &time,
+                                      wstring &dateOut, wstring &timeOut) {
+  int zIx = -1;
+  for (size_t k = 0; k < time.length(); k++) {
+    if (time[k] == '+' || time[k] == '-' || time[k] == 'Z') {
+      if (zIx == -1)
+        zIx = k;
+      else;
+      // Bad format
+    }
+  }
+
+  if (zIx == -1) {
+    dateOut = date;
+    timeOut = time;
+    return;
+  }
+
+  wstring timePart = time.substr(0, zIx);
+  wstring zone = time.substr(zIx);
+  wstring wTime(timePart.begin(), timePart.end());
+
+  SYSTEMTIME st;
+  memset(&st, 0, sizeof(SYSTEMTIME));
+
+  int atime = convertAbsoluteTimeISO(wTime);
+  int idate = convertDateYMS(date, st, true);
+  if (idate != -1) {
+    if (zone == L"Z" || zone == L"z") {
+      st.wHour = atime / 3600;
+      st.wMinute = (atime / 60) % 60;
+      st.wSecond = atime % 60;
+
+      SYSTEMTIME localTime;
+      memset(&localTime, 0, sizeof(SYSTEMTIME));
+      SystemTimeToTzSpecificLocalTime(0, &st, &localTime);
+
+      atime = localTime.wHour * 3600 + localTime.wMinute * 60 + localTime.wSecond;
+      wchar_t bf[64];
+      wsprintf(bf, L"%02d:%02d:%02d", localTime.wHour, localTime.wMinute, localTime.wSecond);
+      timeOut = bf;
+      wsprintf(bf, L"%d-%02d-%02d", localTime.wYear, localTime.wMonth, localTime.wDay);
+      dateOut = bf;
+      //dateOut = itow(localTime.wYear) + L"-" + itow(localTime.wMonth) + L"-" + itow(localTime.wDay);
+      //timeOut = itow(localTime.wHour) + L":" + itow(localTime.wMinute) + L":" + itow(localTime.wSecond);
+    }
+    else {
+      dateOut = date;
+      timeOut = time;
+    }
+  }
+}
+
 
 void IOF30Interface::getProps(vector<wstring> &props) const {
   props.push_back(L"xmlns");
@@ -2719,7 +2933,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
   }
 
   if (teamMember)
-    writeLegOrder(xml, rPerson);
+    writeLegOrder(xml, rPerson.getClassRef(false), rPerson.getLegNumber());
 
   wstring bib = rPerson.getBib();
   if (!bib.empty())
@@ -2803,13 +3017,13 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
 
       xml.endTag();
     }
-
-    pCourse crs = r.getCourse(!unrollLoops);
+    bool doUnroll = unrollLoops && r.getNumShortening() == 0;
+    pCourse crs = r.getCourse(!doUnroll);
     if (crs) {
       if (includeCourse)
         writeCourse(xml, *crs);
 
-      const vector<SplitData> &sp = r.getSplitTimes(unrollLoops);
+      const vector<SplitData> &sp = r.getSplitTimes(doUnroll);
       if (r.getStatus()>0 && r.getStatus() != StatusDNS && 
                              r.getStatus() != StatusCANCEL && 
                              r.getStatus() != StatusNotCompetiting) {
@@ -3184,6 +3398,44 @@ void IOF30Interface::writePersonStart(xmlparser &xml, const oRunner &r, bool inc
   xml.endTag();
 }
 
+void IOF30Interface::writeTeamNoPersonStart(xmlparser &xml, const oTeam &t, int leg, bool includeRaceNumber) {
+  xml.startTag("TeamMemberStart");
+
+  const pClub pc = t.getClubRef();
+  pClass cls = t.getClassRef(false);
+  if (pc && !pc->isVacant())
+    writeClub(xml, *pc, false);
+
+  {
+    if (!includeRaceNumber || (getStageNumber() == 0 && (cls && cls->getLegRunnerIndex(leg)==0)))
+      xml.startTag("Start");
+    else {
+      int rn = getStageNumber();
+      if (rn == 0)
+        rn = 1;
+      if (includeStageRaceInfo)
+        rn += cls->getLegRunnerIndex(leg);
+
+      xml.startTag("Start", "raceNumber", itos(rn));
+    }
+    
+    writeLegOrder(xml, cls, leg);
+
+    wstring bib = t.getBib();
+    if (!bib.empty())
+      xml.write("BibNumber", bib);
+    int startTime = 0;
+    if (cls && cls->getStartType(leg) == StartTypes::STTime)
+      startTime = cls->getStartData(leg);
+    if (startTime > 0)
+      xml.write("StartTime", oe.getAbsDateTimeISO(startTime, true, useGMT));
+
+    xml.endTag();
+  }
+
+  xml.endTag();
+}
+
 void IOF30Interface::writeTeamStart(xmlparser &xml, const oTeam &t) {
   xml.startTag("TeamStart");
 
@@ -3197,9 +3449,13 @@ void IOF30Interface::writeTeamStart(xmlparser &xml, const oTeam &t) {
   if (!bib.empty())
     xml.write("BibNumber", bib);
 
+  pClass cls = t.getClassRef(false);
+
   for (int k = 0; k < t.getNumRunners(); k++) {
     if (t.getRunner(k))
       writePersonStart(xml, *t.getRunner(k), true, true);
+    else if (cls && !cls->isOptional(k))
+      writeTeamNoPersonStart(xml, t, k, includeStageRaceInfo);
   }
 
   writeAssignedFee(xml, t, 0);
@@ -3221,7 +3477,7 @@ void IOF30Interface::writeStart(xmlparser &xml, const oRunner &r,
     xml.startTag("Start", "raceNumber", itos(rn));
   }
   if (teamMember)
-    writeLegOrder(xml, r);
+    writeLegOrder(xml, r.getClassRef(false), r.getLegNumber());
 
   wstring bib = r.getBib();
   if (!bib.empty())
@@ -3242,12 +3498,11 @@ void IOF30Interface::writeStart(xmlparser &xml, const oRunner &r,
   xml.endTag();
 }
 
-void IOF30Interface::writeLegOrder(xmlparser &xml, const oRunner &r) const {
+void IOF30Interface::writeLegOrder(xmlparser &xml, const oClass *pc, int legNo) const {
   // Team member race result
-  int legNumber, legOrder;
-  const oClass *pc = r.getClassRef(false);
+  int legNumber, legOrder;  
   if (pc) {
-    bool par = pc->splitLegNumberParallel(r.getLegNumber(), legNumber, legOrder);
+    bool par = pc->splitLegNumberParallel(legNo, legNumber, legOrder);
     xml.write("Leg", legNumber + 1);
     if (par)
       xml.write("LegOrder", legOrder + 1);
@@ -3340,7 +3595,8 @@ bool IOF30Interface::readXMLCompetitorDB(const xmlobject &xCompetitor) {
   return true;
 }
 
-void IOF30Interface::writeXMLCompetitorDB(xmlparser &xml, const RunnerWDBEntry &rde) const {
+void IOF30Interface::writeXMLCompetitorDB(xmlparser &xml, const RunnerDB &db, 
+                                          const RunnerWDBEntry &rde) const {
   wstring s = rde.getSex();
 
   xml.startTag("Competitor");
@@ -3377,9 +3633,18 @@ void IOF30Interface::writeXMLCompetitorDB(xmlparser &xml, const RunnerWDBEntry &
 
 
   if (rde.dbe().clubNo > 0) {
-    xml.startTag("Organisation");
-    xml.write("Id", rde.dbe().clubNo);
-    xml.endTag();
+    pClub clb = db.getClub(rde.dbe().clubNo);
+    if (clb) {
+      uint64_t extId = clb->getExtIdentifier();
+      if (extId != 0) {
+        xml.startTag("Organisation");
+        xml.write("Id", int(extId));
+        xml.endTag();
+      }
+      else {
+        writeClub(xml, *clb, false);
+      }
+    }
   }
 
   xml.endTag(); // Competitor
@@ -3630,7 +3895,7 @@ void IOF30Interface::bindClassCourse(oClass &pc, const vector< vector<pCourse> >
     for (size_t k = 0; k < crs.size(); k++) {
       pc.clearStageCourses(k);
       for (size_t j = 0; j < crs[k].size(); j++) {
-        pc.addStageCourse(k, crs[k][j]->getId());
+        pc.addStageCourse(k, crs[k][j]->getId(), -1);
       }
     }
   }
@@ -3737,7 +4002,7 @@ void IOF30Interface::writeRunnerDB(const RunnerDB &db, xmlparser &xml) const {
   const vector<RunnerWDBEntry> &rdb = db.getRunnerDB();
   for (size_t k = 0; k < rdb.size(); k++) {
     if (!rdb[k].isRemoved())
-      writeXMLCompetitorDB(xml, rdb[k]);
+      writeXMLCompetitorDB(xml, db, rdb[k]);
   }
 
   xml.endTag();

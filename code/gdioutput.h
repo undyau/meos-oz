@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -122,7 +122,7 @@ protected:
   bool startDoc(PrinterObject &po);
 
   bool getSelectedItem(ListBoxInfo &lbi);
-  bool doPrint(PrinterObject &po, PageInfo &pageInfo, pEvent oe);
+  bool doPrint(PrinterObject &po, PageInfo &pageInfo, pEvent oe, bool respectPageBreak);
 
   PrinterObject *po_default;
 
@@ -183,6 +183,8 @@ protected:
   HWND hWndTab;
 
   HBRUSH Background;
+
+  mutable map<pair<int, wstring>, int> fontHeightCache;
 
   map<wstring, GDIImplFontSet> fonts;
   const GDIImplFontSet &getCurrentFont() const;
@@ -329,7 +331,8 @@ public:
   static const wstring &widen(const string &input);
   static const string &narrow(const wstring &input);
   
-  const string &toUTF8(const wstring &input) const;
+  static const string &toUTF8(const wstring &input);
+  static const wstring &fromUTF8(const string &input);
 
   //void setEncoding(FontEncoding encoding);
   //FontEncoding getEncoding() const;
@@ -400,16 +403,8 @@ public:
   void disableTables();
 
   void pasteText(const char *id);
-
-  bool writeHTML(const wstring &file, const wstring &title, int refreshTimeOut) const;
-  bool writeTableHTML(const wstring &file, const wstring &title, int refreshTimeOut) const;
-  bool writeTableHTML(ostream &fout, 
-                      const wstring &title,
-                      bool simpleFormat,
-                      int refreshTimeOut) const;
-
-  void print(pEvent oe, Table *t=0, bool printMeOSHeader=true, bool noMargin=false);
-  void print(PrinterObject &po, pEvent oe, bool printMeOSHeader=true, bool noMargin=false);
+  void print(pEvent oe, Table *t = 0, bool printMeOSHeader = true, bool noMargin = false, bool respectPageBreak = true);
+  void print(PrinterObject &po, pEvent oe, bool printMeOSHeader = true, bool noMargin=false, bool respectPageBreak = true);
   void printSetup(PrinterObject &po);
   void destroyPrinterDC(PrinterObject &po);
 
@@ -488,12 +483,12 @@ public:
 
   void updateScrollbars() const;
 
-  void SetOffsetY(int oy){OffsetY=oy;}
-  void SetOffsetX(int ox){OffsetX=ox;}
-  int GetPageY(){return max(MaxY, 100)+60;}
-  int GetPageX(){return max(MaxX, 100)+100;}
-  int GetOffsetY(){return OffsetY;}
-  int GetOffsetX(){return OffsetX;}
+  void setOffsetY(int oy) {OffsetY=oy;}
+  void setOffsetX(int ox) {OffsetX=ox;}
+  int getPageY() const;
+  int getPageX() const;
+  int getOffsetY() const {return OffsetY;}
+  int getOffsetX() const {return OffsetX;}
 
   void RenderString(TextInfo &ti, const wstring &text, HDC hDC);
   void RenderString(TextInfo &ti, HDC hDC=0);
@@ -556,6 +551,8 @@ public:
 
   int getItemDataByName(const char *id, const char *name) const;
   bool selectItemByData(const char *id, int data);
+  bool selectItemByIndex(const char *id, int index);
+
   void removeSelected(const char *id);
 
   bool selectItemByData(const string &id, int data) {
@@ -586,6 +583,9 @@ public:
   /** Return a selected item*/
   bool getSelectedItem(const string &id, ListBoxInfo &lbi);
 
+  /** Get number of items in a list box.'*/
+  int getNumItems(const char *id);
+
   /** Return the selected data in first, second indicates if data was available*/
   pair<int, bool> getSelectedItem(const string &id);
   pair<int, bool> getSelectedItem(const char *id);
@@ -598,9 +598,7 @@ public:
   bool clearList(const string &id);
 
   bool hasField(const string &id) const;
-  /*const wstring &getText(const wchar_t *id, bool acceptMissing = false) const {
-    return getText(toNarrow(id).c_str(), acceptMissing); 
-  }*/
+  
   const wstring &getText(const char *id, bool acceptMissing = false) const;
   
   BaseInfo &getBaseInfo(const char *id) const;
@@ -617,6 +615,8 @@ public:
 
     // Insert text and notify "focusList"
   bool insertText(const string &id, const wstring &text);
+
+  int getFontHeight(int format, const wstring &fontFace) const;
 
   // The html version should be UTF-8.
   void copyToClipboard(const string &html,
@@ -753,7 +753,7 @@ public:
   void setDBErrorState(bool state);
   friend int TablesCB(gdioutput *gdi, int type, void *data);
   friend class Table;
-  friend gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x, int max_y);
+  friend gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x, int max_y, bool fixedSize);
 
   gdioutput(const string &tag, double _scale);
   gdioutput(double _scale, HWND hWndTarget, const PrinterObject &defprn);

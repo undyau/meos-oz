@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -68,8 +68,8 @@ protected:
   vector<int> legLengths;
 
   int tMapsRemaining;
-  mutable int tMapsUsed;
-  mutable int tMapsUsedNoVacant;
+  mutable int tMapsUsed = -1;
+  mutable int tMapsUsedNoVacant = -1;
 
   // Get an identity sum based on controls
   int getIdSum(int nControls);
@@ -103,6 +103,7 @@ public:
   wstring getRadioName(int courseControlId) const;
 
   bool hasControl(const oControl *ctrl) const;
+  bool hasControlCode(int code) const;
 
   /// Returns course specific id for specified control (taking duplicats of the control into account)
   int getCourseControlId(int controlIx) const;
@@ -119,6 +120,8 @@ public:
   int getCommonControl() const;
   void setCommonControl(int ctrlId);
 
+  int getNumLoops() const;
+
   bool operator<(const oCourse &b) const {return Name<b.Name;}
 
   void setNumberMaps(int nm);
@@ -127,19 +130,20 @@ public:
   int getNumUsedMaps(bool noVacant) const;
 
   //Get a loop course adapted to a card.
-  pCourse getAdapetedCourse(const oCard &card, oCourse &tmpCourse) const;
+  pCourse getAdapetedCourse(const oCard &card, oCourse &tmpCourse, int &numShorten) const;
 
   // Returns true if this course is adapted to specific punches
   bool isAdapted() const;
 
-  // Returns the next shorter course, if any, null otherwise
-  pCourse getShorterVersion() const;
+  // Returns true of shortening is active and the next shorter course, if any, null otherwise. 
+  // (true, nullptr) is used to indicate self-shortening course (with loops)
+  pair<bool, pCourse> getShorterVersion() const;
 
   // Returns the next longer course, if any, null otherwise. Note that this method is slow.
   pCourse getLongerVersion() const;
 
   // Set a shorter version of the course.
-  void setShorterVersion(pCourse shorter);
+  void setShorterVersion(bool activeShortening, pCourse shorter);
 
   // Returns a map for an adapted course to the original control order
   const vector<int> &getMapToOriginalOrder() const {return tMapToOriginalOrder;}
@@ -207,7 +211,9 @@ public:
   pControl addControl(int Id);
   void Set(const xmlobject *xo);
 
-  void getControls(vector<pControl> &pc);
+  void getControls(vector<pControl> &pc) const;
+  vector<int> getControlNumbers() const;
+
   string getControls() const;
   string getLegLengths() const;
 

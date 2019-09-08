@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -394,9 +394,9 @@ void MeosSQL::upgradeDB(const string &db, oDataContainer const * dc) {
       query.execute(sql);
     }
   }
-  else if (db == "oRunner") {
+  else if (db == "oRunner" || db == "oTeam") {
     if (!eCol.count("InputTime")) {
-      string sql = "ALTER TABLE oRunner ";
+      string sql = "ALTER TABLE " + db + " ";
       sql += "ADD COLUMN " + C_INT("InputTime");
       sql += "ADD COLUMN " + C_INT("InputStatus");
       sql += "ADD COLUMN " + C_INT("InputPoints");
@@ -526,7 +526,7 @@ bool MeosSQL::openDB(oEvent *oe)
     query << C_START("oCard")
       << C_INT("CardNo")
       << C_UINT("ReadId")
-      << C_STRING("Punches", 1024) << C_END();
+      << C_STRING("Punches", 16*190) << C_END();
 
     query.execute();
 
@@ -562,7 +562,6 @@ bool MeosSQL::openDB(oEvent *oe)
     // Ugrade oRunner
     upgradeDB("oControl", oe->oControlData);
 
-
     query.reset();
     query << C_START("oCourse")
       << C_STRING("Name")
@@ -581,6 +580,7 @@ bool MeosSQL::openDB(oEvent *oe)
       << C_INT("Club") << C_INT("Class")
       << C_INT("StartTime") << C_INT("FinishTime")
       << C_INT("Status") << C_INT("StartNo")
+      << C_INT("InputTime") << C_INT("InputStatus") << C_INT("InputPoints") << C_INT("InputPlace")
       << oe->oTeamData->generateSQLDefinition() << C_END();
     query.execute();
 
@@ -1169,8 +1169,8 @@ OpFailStatus MeosSQL::SyncRead(oEvent *oe) {
       while (row = res.fetch_row()) {
         oControl c(oe, row["Id"]);
         storeControl(row, c);
-        oe->Controls.push_back(c);
-
+        oe->addControl(c);
+        
         oe->sqlUpdateControls = max(c.sqlUpdated, oe->sqlUpdateControls);
         oe->sqlCounterControls = max(c.counter, oe->sqlCounterControls);
       }
@@ -1195,7 +1195,7 @@ OpFailStatus MeosSQL::SyncRead(oEvent *oe) {
       set<int> tmp;
       while (row = res.fetch_row()) {
         oCourse c(oe, row["Id"]);
-        storeCourse(row, c, tmp);
+        storeCourse(row, c, tmp, false);
         oe->addCourse(c);
 
         oe->sqlUpdateCourses = max(c.sqlUpdated, oe->sqlUpdateCourses);
@@ -1220,7 +1220,7 @@ OpFailStatus MeosSQL::SyncRead(oEvent *oe) {
       Row row;
       while (row = res.fetch_row()) {
         oClass c(oe, row["Id"]);
-        storeClass(row, c, false);
+        storeClass(row, c, false, false);
 
         c.changed = false;
         c.reChanged = false;
@@ -1281,7 +1281,7 @@ OpFailStatus MeosSQL::SyncRead(oEvent *oe) {
       Row row;
       while (row = res.fetch_row()) {
         oRunner r(oe, row["Id"]);
-        storeRunner(row, r, false, false, false);
+        storeRunner(row, r, false, false, false, false);
         assert(!r.changed);
         oe->addRunner(r, false);
 
@@ -1313,7 +1313,7 @@ OpFailStatus MeosSQL::SyncRead(oEvent *oe) {
       while (row = res.fetch_row()) {
         oTeam t(oe, row["Id"]);
 
-        storeTeam(row, t, false);
+        storeTeam(row, t, false, false);
 
         pTeam at = oe->addTeam(t, false);
 
@@ -1431,6 +1431,7 @@ OpFailStatus MeosSQL::SyncRead(oEvent *oe) {
   }
 
   oe->runnerDB->setDataDate(dateTime);
+  processMissingObjects();
 
   return retValue;
 }
@@ -1516,7 +1517,7 @@ void MeosSQL::storePunch(const Row &row, oFreePunch &p, bool rehash)
 }
 
 OpFailStatus MeosSQL::storeClass(const Row &row, oClass &c,
-                                  bool readCourses)
+                                 bool readCourses, bool allowSubRead)
 {
   OpFailStatus success = opStatusOK;
 
@@ -1527,11 +1528,13 @@ OpFailStatus MeosSQL::storeClass(const Row &row, oClass &c,
   c.importLegMethod(lm);
 
   set<int> cid;
-  vector< vector<int> > multip;
+  vector<vector<int>> multip;
   oClass::parseCourses(multi, multip, cid);
+  
   int classCourse =  row["Course"];
   if (classCourse != 0)
     cid.insert(classCourse);
+  
   if (!readCourses) {
     for (set<int>::iterator clsIt = cid.begin(); clsIt != cid.end(); ++clsIt) {
       if (!c.oe->getCourse(*clsIt))
@@ -1539,12 +1542,26 @@ OpFailStatus MeosSQL::storeClass(const Row &row, oClass &c,
     }
   }
 
-  if (readCourses)
-    success = min(success, syncReadClassCourses(&c, cid, readCourses));
+  if (readCourses) {
+    if (allowSubRead) {
+      success = min(success, syncReadClassCourses(&c, cid, readCourses));
+    }
+    else {
+      // Cannot read from database here. Add implicitly added courses
+      for (int x : cid) {
+        if (c.oe->getCourse(x) == nullptr) {
+          oCourse oc(c.oe, x);
+          oc.setImplicitlyCreated();
+          addedFromDatabase(c.oe->addCourse(oc));
+        }
+      }
+    }
+  }
+
   if (classCourse != 0)
     c.Course = c.oe->getCourse(classCourse);
   else
-    c.Course = 0;
+    c.Course = nullptr;
 
   c.importCourses(multip);
 
@@ -1563,8 +1580,8 @@ OpFailStatus MeosSQL::storeClass(const Row &row, oClass &c,
 }
 
 OpFailStatus MeosSQL::storeCourse(const Row &row, oCourse &c,
-                                  set<int> &readControls)
-{
+                                  set<int> &readControls,
+                                  bool allowSubRead) {
   OpFailStatus success = opStatusOK;
 
   c.Name = fromUTF((string)row["Name"]);
@@ -1577,12 +1594,16 @@ OpFailStatus MeosSQL::storeCourse(const Row &row, oCourse &c,
       // Might have been created during last call.
       // Then just read to update
       if (!c.Controls[i]->existInDB()) {
-        c.Controls[i]->changed = false;
-        success = min(success, syncRead(true, c.Controls[i]));
+        c.Controls[i]->setImplicitlyCreated();
+        if (allowSubRead) {
+          c.Controls[i]->changed = false;
+          success = min(success, syncRead(true, c.Controls[i]));
+        }
+        addedFromDatabase(c.Controls[i]);
       }
-      else
+      else {
         readControls.insert(c.Controls[i]->getId());
-        //success = min(success, syncRead(false, c.Controls[i]));
+      }
     }
   }
 
@@ -1602,7 +1623,8 @@ OpFailStatus MeosSQL::storeCourse(const Row &row, oCourse &c,
 OpFailStatus MeosSQL::storeRunner(const Row &row, oRunner &r,
                                   bool readCourseCard,
                                   bool readClassClub,
-                                  bool readRunners)
+                                  bool readRunners,
+                                  bool allowSubRead)
 {
   OpFailStatus success = opStatusOK;
   oEvent *oe=r.oe;
@@ -1641,10 +1663,15 @@ OpFailStatus MeosSQL::storeRunner(const Row &row, oRunner &r,
     set<int> controlIds;
     if (!r.Course) {
       oCourse oc(oe,  row["Course"]);
-      success = min(success, syncReadCourse(true, &oc, controlIds));
-      r.Course = oe->addCourse(oc);
+      oc.setImplicitlyCreated();
+      if (allowSubRead)
+        success = min(success, syncReadCourse(true, &oc, controlIds));
+      if (!oc.isRemoved()) {
+        r.Course = oe->addCourse(oc);
+        addedFromDatabase(r.Course);
+      }
     }
-    else if (readCourseCard)
+    else if (readCourseCard && allowSubRead)
       success = min(success, syncReadCourse(false, r.Course, controlIds));
 
     if (readCourseCard)
@@ -1657,10 +1684,15 @@ OpFailStatus MeosSQL::storeRunner(const Row &row, oRunner &r,
 
     if (!r.Class) {
       oClass oc(oe, row["Class"]);
-      success = min(success, syncRead(true, &oc, readClassClub));
-      r.Class = oe->addClass(oc);
+      oc.setImplicitlyCreated();
+      if (allowSubRead)
+        success = min(success, syncRead(true, &oc, readClassClub));
+      if (!oc.isRemoved()) {
+        r.Class = oe->addClass(oc);
+        addedFromDatabase(r.Class);
+      }
     }
-    else if (readClassClub)
+    else if (readClassClub && allowSubRead)
       success = min(success, syncRead(false, r.Class, true));
 
     if (r.tInTeam && r.tInTeam->Class!=r.Class)
@@ -1673,10 +1705,15 @@ OpFailStatus MeosSQL::storeRunner(const Row &row, oRunner &r,
 
     if (!r.Club) {
       oClub oc(oe, row["Club"]);
-      success = min(success, syncRead(true, &oc));
-      r.Club = oe->addClub(oc);
+      oc.setImplicitlyCreated();
+      if (allowSubRead)
+        success = min(success, syncRead(true, &oc));
+      if (!oc.isRemoved()) {
+        r.Club = oe->addClub(oc);
+        addedFromDatabase(r.Club);
+      }
     }
-    else if (readClassClub)
+    else if (readClassClub && allowSubRead)
       success = min(success, syncRead(false, r.Club));
   }
   else r.Club=0;
@@ -1688,12 +1725,18 @@ OpFailStatus MeosSQL::storeRunner(const Row &row, oRunner &r,
 
     if (!r.Card){
       oCard oc(oe, row["Card"]);
-      oe->Cards.push_back(oc);
-      r.Card = &oe->Cards.back();
-      r.Card->changed = false;
-      success = min(success, syncRead(true, r.Card));
+      oc.setImplicitlyCreated();
+      if (allowSubRead)
+        success = min(success, syncRead(true, &oc));
+      if (!oc.isRemoved()) {
+        r.Card = oe->addCard(oc);
+        r.Card->changed = false;
+      }
+      else {
+        addedFromDatabase(r.Card);
+      }
     }
-    else if (readCourseCard)
+    else if (readCourseCard && allowSubRead)
       success = min(success, syncRead(false, r.Card));
   }
   else r.Card=0;
@@ -1717,10 +1760,18 @@ OpFailStatus MeosSQL::storeRunner(const Row &row, oRunner &r,
         pRunner pr = oe->getRunner(rid, 0);
         if (pr==0) {
           oRunner or(oe, rid);
-          success = min(success, syncRead(true, &or, false, readCourseCard));
-          pr = oe->addRunner(or, false);
+          or.setImplicitlyCreated();
+          if (allowSubRead)
+            success = min(success, syncRead(true, &or, false, readCourseCard));
+          if (!or.isRemoved()) {
+            pr = oe->addRunner(or , false);
+            addedFromDatabase(pr);
+          }
+          else {
+            r.multiRunnerId[i] = 0;
+          }
         }
-        else
+        else if (allowSubRead)
           success = min(success, syncRead(false, pr, false, readCourseCard));
       }
     }
@@ -1736,7 +1787,7 @@ OpFailStatus MeosSQL::storeRunner(const Row &row, oRunner &r,
 }
 
 OpFailStatus MeosSQL::storeTeam(const Row &row, oTeam &t,
-                                bool readRecursive)
+                                bool readRecursive, bool allowSubRead)
 {
   oEvent *oe=t.oe;
   OpFailStatus success = opStatusOK;
@@ -1751,8 +1802,14 @@ OpFailStatus MeosSQL::storeTeam(const Row &row, oTeam &t,
   t.sName=fromUTF((string)row["Name"]);
   t.StartNo=row["StartNo"];
   t.tStartTime  =  t.startTime = row["StartTime"];
-  t.FinishTime=row["FinishTime"];
+  t.FinishTime = row["FinishTime"];
   t.tStatus = t.status = RunnerStatus(int(row["Status"]));
+  
+  t.inputTime = row["InputTime"];
+  t.inputPoints = row["InputPoints"];
+  t.inputStatus = RunnerStatus(int(row["InputStatus"]));
+  t.inputPlace = row["InputPlace"];
+
   storeData(t.getDI(), row, oe->dataRevision);
 
   if (oldSno != t.StartNo || oldBib != t.getBib())
@@ -1772,10 +1829,15 @@ OpFailStatus MeosSQL::storeTeam(const Row &row, oTeam &t,
 
       if (!t.Class) {
         oClass oc(oe, classId);
-        success = min(success, syncRead(true, &oc, readRecursive));
-        t.Class = oe->addClass(oc);
+        oc.setImplicitlyCreated();
+        if (allowSubRead)
+          success = min(success, syncRead(true, &oc, readRecursive));
+        if (!oc.isRemoved()) {
+          t.Class = oe->addClass(oc);
+          addedFromDatabase(t.Class);
+        }
       }
-      else if (readRecursive)
+      else if (readRecursive && allowSubRead)
         success = min(success, syncRead(false, t.Class, readRecursive));
     }
     else t.Class=0;
@@ -1786,10 +1848,15 @@ OpFailStatus MeosSQL::storeTeam(const Row &row, oTeam &t,
 
       if (!t.Club) {
         oClub oc(oe, clubId);
-        success = min(success, syncRead(true, &oc));
-        t.Club = oe->addClub(oc);
+        oc.setImplicitlyCreated();
+        if (allowSubRead)
+          success = min(success, syncRead(true, &oc));
+        if (!oc.isRemoved()) {
+          t.Club = oe->addClub(oc);
+          addedFromDatabase(t.Club);
+        }
       }
-      else if (readRecursive)
+      else if (readRecursive && allowSubRead)
         success = min(success, syncRead(false, t.Club));
     }
     else t.Club = 0;
@@ -1802,19 +1869,24 @@ OpFailStatus MeosSQL::storeTeam(const Row &row, oTeam &t,
     for (size_t k=0;k<rns.size(); k++) {
       if (rns[k]>0) {
         pRns[k] = oe->getRunner(rns[k], 0);
-
         if (!pRns[k]) {
           oRunner or(oe, rns[k]);
-          success = min(success, syncRead(true, &or, readRecursive, readRecursive));
+          or.setImplicitlyCreated();
+          if (allowSubRead)
+            success = min(success, syncRead(true, &or, readRecursive, readRecursive));
 
           if (or.sName.empty()) {
             or.sName = L"@AutoCorrection";
             oRunner::getRealName(or.sName, or.tRealName);
           }
-          pRns[k] = oe->addRunner(or, false);
-          assert(pRns[k] && !pRns[k]->changed);
+
+          if (!or.isRemoved()) {
+            pRns[k] = oe->addRunner(or , false);
+            addedFromDatabase(pRns[k]);
+            assert(pRns[k] && !pRns[k]->changed);
+          }
         }
-        else if (readRecursive)
+        else if (readRecursive && allowSubRead)
           success = min(success, syncRead(false, pRns[k]));
       }
     }
@@ -1910,7 +1982,7 @@ OpFailStatus MeosSQL::syncUpdate(oRunner *r, bool forceWriteAll)
 
   mysqlpp::Query queryset = con.query();
   queryset << " Name=" << quote << toString(r->sName) << ", "
-      << " CardNo=" << r->CardNo << ", "
+      << " CardNo=" << r->cardNumber << ", "
       << " StartNo=" << r->StartNo << ", "
       << " StartTime=" << r->startTime << ", "
       << " FinishTime=" << r->FinishTime << ", "
@@ -1944,7 +2016,10 @@ OpFailStatus MeosSQL::syncRead(bool forceRead, oRunner *r)
 }
 
 string MeosSQL::andWhereOld(oBase *ob) {
-  return " AND (Counter!=" + itos(ob->counter) + " OR Modified!='" + ob->sqlUpdated + "')";
+  if (ob->sqlUpdated.empty())
+    return " AND Counter!=" + itos(ob->counter);
+  else
+    return " AND (Counter!=" + itos(ob->counter) + " OR Modified!='" + ob->sqlUpdated + "')";
 }
 
 OpFailStatus MeosSQL::syncRead(bool forceRead, oRunner *r, bool readClassClub, bool readCourseCard)
@@ -1975,7 +2050,7 @@ OpFailStatus MeosSQL::syncRead(bool forceRead, oRunner *r, bool readClassClub, b
       if (r->changed)
         success=opStatusWarning;
 
-      success = min (success, storeRunner(row, *r, readCourseCard, readClassClub, true));
+      success = min (success, storeRunner(row, *r, readCourseCard, readClassClub, true, true));
 
       r->oe->dataRevision++;
       r->Modified.update();
@@ -2002,7 +2077,7 @@ OpFailStatus MeosSQL::syncRead(bool forceRead, oRunner *r, bool readClassClub, b
       }
       if (r->Club && readClassClub)
         syncRead(false, r->Club);
-
+ 
       if (r->changed)
         return syncUpdate(r, false);
 
@@ -2113,7 +2188,11 @@ OpFailStatus MeosSQL::syncUpdate(oTeam *t, bool forceWriteAll) {
       << " Class=" << t->getClassId(false) << ", "
       << " Club=" << t->getClubId() << ", "
       << " StartNo=" << t->getStartNo() << ", "
-      << " Status=" << t->status
+      << " Status=" << t->status << ", "
+      << " InputTime=" << t->inputTime << ", "
+      << " InputStatus=" << t->inputStatus << ", "
+      << " InputPoints=" << t->inputPoints << ", "
+      << " InputPlace=" << t->inputPlace  
       << t->getDI().generateSQLSet(forceWriteAll);
 
   //wstring str = L"write team " + t->sName + L"\n";
@@ -2155,7 +2234,7 @@ OpFailStatus MeosSQL::syncRead(bool forceRead, oTeam *t, bool readRecursive)
       if (t->changed)
         success=opStatusWarning;
 
-      storeTeam(row, *t, readRecursive);
+      storeTeam(row, *t, readRecursive, true);
       t->oe->dataRevision++;
       t->Modified.update();
       t->changed = false;
@@ -2244,7 +2323,7 @@ OpFailStatus MeosSQL::syncRead(bool forceRead, oClass *c, bool readCourses)
       if (c->changed)
         success=opStatusWarning;
 
-      storeClass(row, *c, readCourses);
+      storeClass(row, *c, readCourses, true);
       c->oe->dataRevision++;
       c->Modified.update();
       c->changed = false;
@@ -2304,8 +2383,10 @@ OpFailStatus MeosSQL::syncReadClassCourses(oClass *c, const set<int> &courses,
       pCourse pc = oe->getCourse(id);
       if (!pc) {
         oCourse oc(oe, id);
+        oc.setImplicitlyCreated();
         success = min(success, syncReadCourse(true, &oc, controlIds));
-        oe->addCourse(oc);
+        if (!oc.isRemoved())
+          addedFromDatabase(oe->addCourse(oc));
       }
       else if (pc->changed || isOld(counter, modified, pc)) {
         success = min(success, syncReadCourse(false, pc, controlIds));
@@ -2584,7 +2665,7 @@ OpFailStatus MeosSQL::syncReadCourse(bool forceRead, oCourse *c, set<int> &readC
       if (c->changed)
         success = opStatusWarning;
 
-      storeCourse(row, *c, readControls);
+      storeCourse(row, *c, readControls, true);
       c->oe->dataRevision++;
       c->Modified.update();
       c->changed=false;
@@ -2779,6 +2860,12 @@ OpFailStatus MeosSQL::syncUpdate(mysqlpp::Query &updateqry,
         Result res=query.store();
         if (res && res.num_rows()==0)
           setId = true;
+        else if (ob->isImplicitlyCreated()) {
+          return opStatusWarning;//XXX Should we read this object?
+        }
+      }
+      else {
+        assert(!ob->isImplicitlyCreated());
       }
 
       query.reset();
@@ -3691,6 +3778,11 @@ bool MeosSQL::skipSynchronize(const oBase &entity) const {
   notskipped++;
   return false;
 }
+namespace {
+  int encode(oListId id) {
+    return int(id);
+  }
+}
 
 int MeosSQL::getModifiedMask(oEvent &oe) {
   try {
@@ -3710,23 +3802,23 @@ int MeosSQL::getModifiedMask(oEvent &oe) {
       int e = r["oEvent"];
 
       if (ctrl > oe.sqlCounterControls)
-        res |= oLControlId;
+        res |= encode(oListId::oLControlId);
       if (crs > oe.sqlCounterCourses)
-        res |= oLCourseId;
+        res |= encode(oListId::oLCourseId);
       if (cls > oe.sqlCounterClasses)
-        res |= oLClassId;
+        res |= encode(oListId::oLClassId);
       if (card > oe.sqlCounterCards)
-        res |= oLCardId;
+        res |= encode(oListId::oLCardId);
       if (club > oe.sqlCounterClubs)
-        res |= oLClubId;
+        res |= encode(oListId::oLClubId);
       if (punch > oe.sqlCounterPunches)
-        res |= oLPunchId;
+        res |= encode(oListId::oLPunchId);
       if (runner > oe.sqlCounterRunners)
-        res |= oLRunnerId;
+        res |= encode(oListId::oLRunnerId);
       if (t > oe.sqlCounterTeams)
-        res |= oLTeamId;
+        res |= encode(oListId::oLTeamId);
       if (e > oe.counter)
-        res |= oLEventId;
+        res |= encode(oListId::oLEventId);
 
       return res;
     }
@@ -3734,4 +3826,98 @@ int MeosSQL::getModifiedMask(oEvent &oe) {
   catch(...) {
   }
   return -1;
+}
+
+void MeosSQL::addedFromDatabase(oBase *object) {
+  assert(object);
+  if (object && !object->existInDB()) {
+    missingObjects.push_back(object);
+  }
+}
+
+void MeosSQL::processMissingObjects() {
+  if (!missingObjects.empty()) {
+    auto cpyMissing = missingObjects;
+    missingObjects.clear();
+    for (oBase *obj : cpyMissing) {
+      obj->changed = true;
+      syncRead(true, obj);
+      obj->changed = false;
+      assert(obj->existInDB());
+      {
+        oRunner *r = dynamic_cast<oRunner *>(obj);
+        if (r && r->getName().empty()) {
+          r->setName(L"@AutoCorrection", false);
+          syncUpdate(r, false);
+        }
+      }
+      {
+        oTeam *t = dynamic_cast<oTeam *>(obj);
+        if (t && t->getName().empty()) {
+          t->setName(L"@AutoCorrection", false);
+          syncUpdate(t, false);
+        }
+      }
+      {
+        oClass *cls = dynamic_cast<oClass *>(obj);
+        if (cls && cls->getName().empty()) {
+          cls->setName(L"@AutoCorrection");
+          syncUpdate(cls, false);
+        }
+      }
+      {
+        oCourse *crs = dynamic_cast<oCourse *>(obj);
+        if (crs && crs->getName().empty()) {
+          crs->setName(L"@AutoCorrection");
+          syncUpdate(crs, false);
+        }
+      }
+      {
+        oClub *clb = dynamic_cast<oClub *>(obj);
+        if (clb && clb->getName().empty()) {
+          clb->setName(L"@AutoCorrection");
+          syncUpdate(clb, false);
+        }
+      }
+    }
+  }
+  missingObjects.clear();
+}
+
+OpFailStatus MeosSQL::syncRead(bool forceRead, oBase *obj) {
+  OpFailStatus ret = OpFailStatus::opStatusFail;
+
+  if (typeid(*obj) == typeid(oRunner)) {
+    ret = syncRead(forceRead, (oRunner *)obj);
+  }
+  else if (typeid(*obj) == typeid(oClass)) {
+    ret = syncRead(forceRead, (oClass *)obj);
+  }
+  else if (typeid(*obj) == typeid(oCourse)) {
+    ret = syncRead(forceRead, (oCourse *)obj);
+  }
+  else if (typeid(*obj) == typeid(oControl)) {
+    ret = syncRead(forceRead, (oControl *)obj);
+  }
+  else if (typeid(*obj) == typeid(oClub)) {
+    ret = syncRead(forceRead, (oClub *)obj);
+  }
+  else if (typeid(*obj) == typeid(oCard)) {
+    ret = syncRead(forceRead, (oCard *)obj);
+  }
+  else if (typeid(*obj) == typeid(oFreePunch)) {
+    ret = syncRead(forceRead, (oFreePunch *)obj, true);
+  }
+  else if (typeid(*obj) == typeid(oTeam)) {
+    ret = syncRead(forceRead, (oTeam *)obj);
+  }
+  else if (typeid(*obj) == typeid(oEvent)) {
+    ret = SyncRead((oEvent *)obj);
+  }
+  else 
+    throw std::exception("Database error");
+
+  processMissingObjects();
+
+  return ret;
 }

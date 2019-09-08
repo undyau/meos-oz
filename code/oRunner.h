@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -141,7 +141,14 @@ protected:
   bool tEntryTouched;
 
   void changedObject();
+
+  mutable pair<bool, int> tPreventRestartCache = { false, -1 };
 public:
+
+  /** Return true if the runner/team should not be part av restart in a relay etc.*/
+  bool preventRestart() const;
+  void preventRestart(bool state);
+
   /** Call this method after doing something to just this
       runner/team that changed the time/status etc, that effects
       the result. May make a global evaluation of the class.
@@ -174,7 +181,8 @@ public:
     FlagFeeSpecified = 8,
     FlagUpdateClass = 16,
     FlagUpdateName = 32,
-    FlagAutoDNS = 64,
+    FlagAutoDNS = 64, // The competitor was set to DNS by the in-forest algorithm
+    FlagAddedViaAPI = 128, // Added by the REST api entry.
   };
 
   bool hasFlag(TransferFlags flag) const;
@@ -189,6 +197,12 @@ public:
   // Set default fee, from class
   // a non-zero fee is changed only if resetFee is true
   void addClassDefaultFee(bool resetFees);
+
+  /** Returns fee from the class. */
+  int getDefaultFee() const;
+
+  /** Returns the currently assigned fee. */
+  int getEntryFee() const;
 
   /** Returns true if the entry fee is a late fee. */
   bool hasLateEntryFee() const;
@@ -223,7 +237,7 @@ public:
   int getInputPlace() const {return inputPlace;}
 
   bool isVacant() const;
-
+  
   bool wasSQLChanged() const {return sqlChanged;}
 
   /** Use -1 for all, PunchFinish or controlId */
@@ -336,10 +350,10 @@ public:
   /// Get total status for this running (including team/earlier races)
   virtual RunnerStatus getTotalStatus() const;
 
-  virtual const wstring &getStatusS() const;
+  const wstring &getStatusS(bool formatForPrint) const;
   wstring getIOFStatusS() const;
 
-  virtual const wstring &getTotalStatusS() const;
+  const wstring &getTotalStatusS(bool formatForPrint) const;
   wstring getIOFTotalStatusS() const;
 
   void setSpeakerPriority(int pri);
@@ -353,6 +367,13 @@ public:
 
   oAbstractRunner(oEvent *poe, bool loading);
   virtual ~oAbstractRunner() {};
+
+  struct DynamicValue {
+    int dataRevision;
+    int value;
+    bool isOld(const oEvent &oe) const;
+    void update(const oEvent &oe, int v);
+  };
 
   friend class oListInfo;
   friend class GeneralResult;
@@ -396,7 +417,7 @@ class oRunner : public oAbstractRunner
 protected:
   pCourse Course;
 
-  int CardNo;
+  int cardNumber;
   pCard Card;
 
   vector<pRunner> multiRunner;
@@ -405,7 +426,7 @@ protected:
   wstring tRealName;
 
   //Can be changed by apply
-  mutable int tPlace;
+  mutable DynamicValue tPlace;
   mutable int tCoursePlace;
   mutable int tTotalPlace;
   mutable int tLeg;
@@ -479,6 +500,35 @@ protected:
   mutable vector<int> tPlaceLegAcc;
   mutable vector<int> tAfterLegAcc;
 
+  // Used to calculate temporary split time results
+  struct OnCourseResult {
+    OnCourseResult(int courseControlId,
+                   int controlIx,
+                   int time) : courseControlId(courseControlId), 
+                               controlIx(controlIx), time(time) {}
+    int courseControlId;
+    int controlIx;
+    int time;
+    int place;
+    int after;
+  };
+  mutable pair<int, int> currentControlTime;
+
+  struct OnCourseResultCollection {
+    bool hasAnyRes = false;
+    vector<OnCourseResult> res;
+    void clear() { hasAnyRes = false; res.clear(); }
+    void emplace_back(int courseControlId,
+                      int controlIx,
+                      int time) {
+      res.emplace_back(courseControlId, controlIx, time);
+      hasAnyRes = true;
+    }
+    bool empty() const { return hasAnyRes == false; }
+  };
+
+  mutable OnCourseResultCollection tOnCourseResults;
+
   // Rogainig results. Control and punch time
   vector< pair<pControl, int> > tRogaining;
   int tRogainingPoints;
@@ -515,6 +565,12 @@ protected:
   bool isHiredCard(int card) const;
 
 public:
+  // Returns true if there are radio control results, provided result calculation oEvent::ResultType::PreliminarySplitResults was invoked.
+  bool hasOnCourseResult() const { return !tOnCourseResults.empty() || getFinishTime() > 0 || getStatus() != RunnerStatus::StatusUnknown; }
+  
+  /** Returns a check time (or zero for no time). */
+  int getCheckTime() const;
+
   /** Get a runner reference (drawing) */
   pRunner getReference() const;
   
@@ -548,6 +604,8 @@ public:
 
   // Returns public unqiue identifier of runner's race (for binding card numbers etc.)
   int getRaceIdentifier() const;
+
+  bool isAnnonumousTeamMember() const;
 
   // Get entry date of runner (or its team)
   wstring getEntryDate(bool useTeamEntryDate = true) const;
@@ -629,14 +687,14 @@ public:
   void setTemporary() {isTemporaryObject=true;}
 
   /** Init from dbrunner */
-  void init(const RunnerWDBEntry &entry);
+  void init(const RunnerWDBEntry &entry, bool updateOnlyExt);
 
   /** Use db to pdate runner */
   bool updateFromDB(const wstring &name, int clubId, int classId,
                     int cardNo, int birthYear, bool forceUpdate);
 
   void printSplits(gdioutput &gdi) const;
-	void printLabel(gdioutput &gdi) const;
+  void printLabel(gdioutput &gdi) const;
 
   void printStartInfo(gdioutput &gdi) const;
 
@@ -660,6 +718,8 @@ public:
   // which should be more stable.
   void setBib(const wstring &bib, int bibNumerical, bool updateStartNo, bool setTmpOnly);
   void setStartNo(int no, bool setTmpOnly);
+  // Update and synch start number for runner and team.
+  void updateStartNo(int no);
 
   pRunner nextNeedReadout() const;
 
@@ -734,7 +794,7 @@ public:
   int getCardId(){if (Card) return Card->Id; else return 0;}
 
   bool operator<(const oRunner &c) const;
-  bool static CompareSINumber(const oRunner &a, const oRunner &b){return a.CardNo<b.CardNo;}
+  bool static CompareCardNumber(const oRunner &a, const oRunner &b) { return a.cardNumber < b.cardNumber; }
 
   bool evaluateCard(bool applyTeam, vector<int> &missingPunches, int addpunch=0, bool synchronize=false);
   void addPunches(pCard card, vector<int> &missingPunches);
@@ -748,7 +808,7 @@ public:
 
   bool isHiredCard() const;
 
-  int getCardNo() const {return tParentRunner && CardNo == 0 ? tParentRunner->CardNo : CardNo;}
+  int getCardNo() const { return tParentRunner && cardNumber == 0 ? tParentRunner->cardNumber : cardNumber; }
   void setCardNo(int card, bool matchCard, bool updateFromDatabase = false);
   /** Sets the card to a given card. An existing card is marked as unpaired.
       CardNo is updated. Returns id of old card (or 0).
@@ -770,6 +830,9 @@ public:
 
   // Return true if the input name is considered equal to output name
   bool matchName(const wstring &pname) const;
+
+  /** Formats extra line for runner []-syntax, or if r is null, checks validity and throws on error.*/
+  static wstring formatExtraLine(pRunner r, const wstring &input);
 
   virtual ~oRunner();
 

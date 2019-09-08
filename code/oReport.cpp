@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -216,7 +216,7 @@ void oEvent::generateCompetitionReport(gdioutput &gdi)
     }
   }
 
-	generateRunnersPerCourse(gdi);
+  generateRunnersPerCourse(gdi);
 }
 
 void oEvent::generateStatisticsPart(gdioutput &gdi, const vector<ClassMetaType> &type,
@@ -403,7 +403,7 @@ void oEvent::generatePreReport(gdioutput &gdi) {
   deque<pRunner> si_duplicate;
 
   if (Runners.size()>1){
-    Runners.sort(oRunner::CompareSINumber);
+    Runners.sort(oRunner::CompareCardNumber);
     map<int, vector<pRunner> > initDup;
 
     r_it=Runners.begin();
@@ -462,20 +462,22 @@ void oEvent::generatePreReport(gdioutput &gdi) {
   }
   if (!no_class.empty()) gdi.addStringUT(1, Ellipsis);
 
-  gdi.dropLine();
-  swprintf_s(bf, lang.tl("Löpare utan bana: %d.").c_str(), no_course.size());
-  gdi.addStringUT(1, bf);
-  i=0;
+  if (getMeOSFeatures().withCourses(this)) {
+    gdi.dropLine();
+    swprintf_s(bf, lang.tl("Löpare utan bana: %d.").c_str(), no_course.size());
+    gdi.addStringUT(1, bf);
+    i = 0;
 
-  while(!no_course.empty() && ++i<20){
-    pRunner r=no_course.front();
-    no_course.pop_front();
-    wstring name = r->getClass(true) + L": " + r->getName();
-    if (!r->getClub().empty())
-      name += L" ("+ r->getClub()+ L")";
-    gdi.addStringUT(0, name);
+    while (!no_course.empty() && ++i < 20) {
+      pRunner r = no_course.front();
+      no_course.pop_front();
+      wstring name = r->getClass(true) + L": " + r->getName();
+      if (!r->getClub().empty())
+        name += L" (" + r->getClub() + L")";
+      gdi.addStringUT(0, name);
+    }
+    if (!no_course.empty()) gdi.addStringUT(1, Ellipsis);
   }
-  if (!no_course.empty()) gdi.addStringUT(1, Ellipsis);
 
   if (oe->getMeOSFeatures().hasFeature(MeOSFeatures::Clubs)) {
     gdi.dropLine();
@@ -569,10 +571,8 @@ void oEvent::generatePreReport(gdioutput &gdi) {
     }
   }
 
-  // Clear markers
-  for (r_it=Runners.begin(); r_it != Runners.end(); ++r_it)
-    r_it->_objectmarker=0;
-
+  map<int, int> objectMarkers;
+  
   //List all competitors not in a team.
   if (oe->hasTeam()) {
     for (t_it=Teams.begin(); t_it != Teams.end(); ++t_it) {
@@ -583,7 +583,9 @@ void oEvent::generatePreReport(gdioutput &gdi) {
       if (pc){
         for(unsigned i=0;i<pc->getNumStages();i++){
           pRunner r=t_it->getRunner(i);
-          if (r) r->_objectmarker++;
+          if (r) {
+            ++objectMarkers[r->getId()];
+          }
         }
       }
     }
@@ -592,11 +594,11 @@ void oEvent::generatePreReport(gdioutput &gdi) {
     gdi.addString("", 1, "Löpare som förekommer i mer än ett lag:");
     bool any = false;
     for (r_it=Runners.begin(); r_it != Runners.end(); ++r_it){
-      if (r_it->_objectmarker>1) {
+      if (objectMarkers[r_it->getId()] > 1) {
         wstring name = r_it->getClass(true) + L": " + r_it->getName();
         if (!r_it->getClub().empty())
           name += L" (" + r_it->getClub() + L")";
-    
+
         gdi.addStringUT(0, name);
         any = true;
       }
@@ -614,7 +616,7 @@ void oEvent::generatePreReport(gdioutput &gdi) {
   for (r_it=Runners.begin(); r_it != Runners.end(); ++r_it) {
     if (r_it->isRemoved())
       continue;
-    if (r_it->_objectmarker==0){ //Only consider runners not in a team.
+    if (objectMarkers.count(r_it->getId()) == 0){ //Only consider runners not in a team.
       gdi.addStringUT(y, x+tab[0], 0, r_it->getClass(true), tab[1]-tab[0]);
       wstring name = r_it->getName();
       if (!r_it->getClub().empty())
@@ -672,24 +674,24 @@ void oEvent::generatePreReport(gdioutput &gdi) {
 
 void oEvent::generateRunnersPerCourse(gdioutput &gdi)
 {
-	map<wstring, int> count;
-	for (oCourseList::iterator it = Courses.begin(); it != Courses.end(); ++it) 
-			count[it->getName()] = 0;
-	for (oRunnerList::iterator it = Runners.begin(); it != Runners.end(); ++it) 
+  map<wstring, int> count;
+  for (oCourseList::iterator it = Courses.begin(); it != Courses.end(); ++it) 
+      count[it->getName()] = 0;
+  for (oRunnerList::iterator it = Runners.begin(); it != Runners.end(); ++it) 
       if (it->Class->Course)
-				count[it->Class->Course->getName()] = 1 + count[it->Class->Course->getName()];
+        count[it->Class->Course->getName()] = 1 + count[it->Class->Course->getName()];
 
-	gdi.dropLine();
-	gdi.addString("", boldText, lang.tl("Banor"));
+  gdi.dropLine();
+  gdi.addString("", boldText, lang.tl("Banor"));
   int xp = gdi.getCX();
   int yp = gdi.getCY();
 
   gdi.addString("", yp, xp+200, textRight|fontMedium, lang.tl("kartor"));
 
-	for (map<wstring, int>::iterator i = count.begin(); i != count.end(); i++)
-	{
-		yp += gdi.getLineHeight();
-		gdi.addStringUT(yp, xp, 0, i->first);
-		gdi.addStringUT(yp, xp+200, 0, itos(i->second));
-	}
+  for (map<wstring, int>::iterator i = count.begin(); i != count.end(); i++)
+  {
+    yp += gdi.getLineHeight();
+    gdi.addStringUT(yp, xp, 0, i->first);
+    gdi.addStringUT(yp, xp+200, 0, itos(i->second));
+  }
 }

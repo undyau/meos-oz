@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -31,15 +31,17 @@ class csvparser;
 struct AutoCompleteRecord;
 
 class TabSI :  public TabBase, AutoCompleteHandler {
-  public:
-    enum SIMode {
+public:
+  enum SIMode {
     ModeReadOut,
     ModeAssignCards,
-    ModeCheckCards,
+    ModeCheckCards,    
     ModeEntry,
-    ModeCardData
+    ModeCardData,
+    ModeRegisterCards,
   };
-
+ 
+  void setMode(SIMode m) { mode = m; }
 private:
   /** Try to automatcally assign a class to runner (if none is given)
       Return true if runner has a class on exist */
@@ -71,6 +73,11 @@ private:
   vector<SICard> cards;
   vector<wstring> filterDate;
 
+  set<int> warnedClassOutOfMaps;
+  
+  shared_ptr<GuiHandler> resetHiredCardHandler;
+  GuiHandler *getResetHiredCardHandler();
+
   int runnerMatchedId;
   bool printErrorShown;
   void printProtected(PrinterObject& po, gdioutput &gdi, gdioutput &gdiprint);
@@ -92,7 +99,8 @@ private:
   int inputId;
 
   void showCheckCardStatus(gdioutput &gdi, const string &cmd);
-  
+  void showRegisterHiredCards(gdioutput &gdi);
+
   wstring getCardInfo(bool param, vector<int> &count) const;
   // Formatting for card tick off
   bool checkHeader;
@@ -117,6 +125,7 @@ private:
 
   map<int, CardNumberFlags> checkedCardFlags;
   void checkCard(gdioutput &gdi, const SICard &sic, bool updateAll);
+  void registerHiredCard(gdioutput &gdi, const SICard &sic);
 
   void showReadPunches(gdioutput &gdi, vector<PunchInfo> &punches, set<string> &dates);
   void showReadCards(gdioutput &gdi, vector<SICard> &cards);
@@ -132,15 +141,16 @@ private:
   // Insert card without converting times and with/without runner
   void processInsertCard(const SICard &csic);
 
-
   void generateSplits(const pRunner r, gdioutput &gdi);
-	void generateLabel(const pRunner r, gdioutput &gdi);
+  void generateLabel(const pRunner r, gdioutput &gdi);
   int logcounter;
   csvparser *logger;
 
   string insertCardNumberField;
 
   void insertSICardAux(gdioutput &gdi, SICard &sic);
+
+  pRunner getRunnerForCardSplitPrint(const SICard &sic) const;
 
   // Ask if card is to be overwritten
   bool askOverwriteCard(gdioutput &gdi, pRunner r) const;
@@ -228,7 +238,7 @@ public:
 
   static SportIdent &getSI(const gdioutput &gdi);
   void printerSetup(gdioutput &gdi);
-	void labelPrinterSetup(gdioutput &gdi);
+  void labelPrinterSetup(gdioutput &gdi);
 
   void generateStartInfo(gdioutput &gdi, const oRunner &r);
   bool hasPrintStartInfo() const {return printStartInfo;}
@@ -248,7 +258,7 @@ public:
   TabType getType() const {return TSITab;}
 
   void insertSICard(gdioutput &gdi, SICard &sic);
-
+  void clearQueue() { CardQueue.clear(); }
   void refillComPorts(gdioutput &gdi);
 
   bool loadPage(gdioutput &gdi);

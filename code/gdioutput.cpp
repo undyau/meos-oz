@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -102,7 +102,8 @@ EventInfo::EventInfo() : callBack(0), keyEvent(KC_NONE) {}
 bool gdioutput::skipTextRender(int format) {
   format &= 0xFF;
   return format == pageNewPage ||
-         format == pagePageInfo;
+         format == pagePageInfo ||
+         format == pageNewChapter;
 }
 
 #ifndef MEOSDB
@@ -117,6 +118,7 @@ gdioutput::gdioutput(const string &_tag, double _scale) :
 
   isTestMode = false;
 }
+extern gdioutput *gdi_main;
 
 gdioutput::gdioutput(double _scale, HWND hWnd, const PrinterObject &prndef) :
   recorder((Recorder *)0, false) {
@@ -125,8 +127,12 @@ gdioutput::gdioutput(double _scale, HWND hWnd, const PrinterObject &prndef) :
   tabs = 0;
   setWindow(hWnd);
   constructor(_scale);
-
-  isTestMode = false;
+  if (gdi_main) {
+    isTestMode = gdi_main->isTestMode;
+    if (isTestMode)
+      cmdAnswers.swap(gdi_main->cmdAnswers);
+  }
+  else isTestMode = false;
 }
 
 void gdioutput::constructor(double _scale)
@@ -174,7 +180,7 @@ void gdioutput::constructor(double _scale)
 void gdioutput::setFont(int size, const wstring &font)
 {
   //setEncoding(enc);
-  double s = 1+size*sqrt(double(size))*0.2;
+  double s = 1 + double(size)*0.25;// 1 + size * sqrt(double(size))*0.2;
   initCommon(s, font);
 }
 
@@ -305,6 +311,7 @@ void gdioutput::initCommon(double _scale, const wstring &font)
 
   Background=CreateSolidBrush(GetSysColor(COLOR_WINDOW));
 
+  fontHeightCache.clear();
   fonts[currentFont].init(scale, currentFont, L"");
 }
 
@@ -840,10 +847,37 @@ TextInfo &gdioutput::addStringUT(int yp, int xp, int format, const string &text,
   return addStringUT(yp, xp, format, widen(text), xlimit, cb, fontFace);
 }
 
+int gdioutput::getFontHeight(int format, const wstring &fontFace) const {
+  format = format & 0xFF;
+  auto res = fontHeightCache.find(make_pair(format, fontFace));
+
+  if (res != fontHeightCache.end())
+    return res->second;
+
+  TextInfo TI;
+  TI.format = format;
+  TI.xp = 0;
+  TI.yp = 0;
+  TI.text = L"M1y|";
+  TI.xlimit = 100;
+  TI.callBack = 0;
+  TI.font = fontFace;
+  calcStringSize(TI);
+  int h = TI.textRect.bottom - TI.textRect.top;
+  fontHeightCache.emplace(make_pair(format, fontFace), h);
+  return h;
+}
+
 TextInfo &gdioutput::addStringUT(int yp, int xp, int format, const wstring &text,
                                  int xlimit, GUICALLBACK cb, const wchar_t *fontFace)
 {
-  TextInfo TI;
+  bool skipBBCalc = (format & skipBoundingBox) == skipBoundingBox;
+  format &= ~skipBoundingBox;
+
+  TL.emplace_back();
+  TextInfo &TI = TL.back();
+  itTL = TL.begin();
+
   TI.format=format;
   TI.xp=xp;
   TI.yp=yp;
@@ -853,24 +887,38 @@ TextInfo &gdioutput::addStringUT(int yp, int xp, int format, const wstring &text
   if (fontFace)
     TI.font = fontFace;
   if (!skipTextRender(format)) {
-    HDC hDC=GetDC(hWndTarget);
+    
+    if (skipBBCalc) {
+      assert(xlimit > 0);
+      int h = getFontHeight(format, fontFace);
+      TI.textRect.left = xp;
+      TI.textRect.top = yp;
+      TI.textRect.right = xp + xlimit;
+      TI.textRect.bottom = yp + h;
+      TI.realWidth = xlimit;
 
-    if (hWndTarget && !manualUpdate)
-      RenderString(TI, hDC);
-    else
-      calcStringSize(TI, hDC);
-
-    if (xlimit == 0 || (format & (textRight|textCenter)) == 0) {
-      updatePos(TI.textRect.right+OffsetX, TI.yp, scaleLength(10),
-                            TI.textRect.bottom - TI.textRect.top + scaleLength(2));
+      updatePos(TI.textRect.right + OffsetX, TI.yp, scaleLength(10),
+                TI.textRect.bottom - TI.textRect.top + scaleLength(2));
     }
     else {
-      updatePos(TI.xp, TI.yp, TI.realWidth + scaleLength(10),
-                            TI.textRect.bottom - TI.textRect.top + scaleLength(2));
+      HDC hDC = GetDC(hWndTarget);
+
+      if (hWndTarget && !manualUpdate)
+        RenderString(TI, hDC);
+      else
+        calcStringSize(TI, hDC);
+
+      if (xlimit == 0 || (format & (textRight | textCenter)) == 0) {
+        updatePos(TI.textRect.right + OffsetX, TI.yp, scaleLength(10),
+                  TI.textRect.bottom - TI.textRect.top + scaleLength(2));
+      }
+      else {
+        updatePos(TI.xp, TI.yp, TI.realWidth + scaleLength(10),
+                  TI.textRect.bottom - TI.textRect.top + scaleLength(2));
+      }
+      ReleaseDC(hWndTarget, hDC);
     }
-
-    ReleaseDC(hWndTarget, hDC);
-
+  
     if (renderOptimize && !TL.empty()) {
       if (TL.back().yp > TI.yp)
         renderOptimize=false;
@@ -882,9 +930,6 @@ TextInfo &gdioutput::addStringUT(int yp, int xp, int format, const wstring &text
     TI.textRect.bottom = yp;
     TI.textRect.top = yp;
   }
-
-  TL.push_back(TI);
-  itTL=TL.begin();
 
   return TL.back();
 }
@@ -1010,14 +1055,11 @@ ButtonInfo &gdioutput::addButton(int x, int y, const string &id, const wstring &
   HANDLE bm = 0;
   int width = 0;
   if (text[0] == '@') {
-    HINSTANCE hInst = GetModuleHandle(0);//(HINSTANCE)GetWindowLong(hWndTarget, GWL_HINSTANCE);
-    int ir = _wtoi(text.c_str() + 1);
-   // bm = LoadImage(hInst, MAKEINTRESOURCE(ir), IMAGE_BITMAP, 0, 0, LR_DEFAULTCOLOR);
-    bm = LoadBitmap(hInst, MAKEINTRESOURCE(ir));// , IMAGE_BITMAP, 0, 0, LR_DEFAULTCOLOR);
+    HINSTANCE hInst = GetModuleHandle(0);    int ir = _wtoi(text.c_str() + 1);
+    bm = LoadBitmap(hInst, MAKEINTRESOURCE(ir));
 
     SIZE size;
     size.cx = 24;
-    //GetBitmapDimensionEx(bm, &size);
     width = size.cx+4;
   }
   else {
@@ -1025,6 +1067,13 @@ ButtonInfo &gdioutput::addButton(int x, int y, const string &id, const wstring &
     HDC hDC = GetDC(hWndTarget);
     SelectObject(hDC, getGUIFont());
     wstring ttext = lang.tl(text);
+    int tts = ttext.size();
+    if (tts > 2 && ttext[0] == '<' && ttext[1] == '<') {
+      ttext = L"?" + ttext.substr(2);
+    }
+    else if (tts > 2 && ttext[tts-1] == '>' && ttext[tts-2] == '>') {
+      ttext = ttext.substr(0, tts-2) + L"?";
+    }
     if (lang.capitalizeWords())
       capitalizeWords(ttext);
     GetTextExtentPoint32(hDC, ttext.c_str(), ttext.length(), &size);
@@ -1094,6 +1143,13 @@ ButtonInfo &gdioutput::addButton(int x, int y, int w, const string &id,
 
   ButtonInfo bi;
   wstring ttext = lang.tl(text);
+  int tts = ttext.size();
+  if (tts > 2 && ttext[0] == '<' && ttext[1] == '<') {
+    ttext = L"?" + ttext.substr(2);
+  }
+  else if (tts > 2 && ttext[tts - 1] == '>' && ttext[tts - 2] == '>') {
+    ttext = ttext.substr(0, tts - 2) + L"?";
+  }
   if (lang.capitalizeWords())
     capitalizeWords(ttext);
   int height = getButtonHeight();
@@ -1559,7 +1615,7 @@ ListBoxInfo &gdioutput::addSelection(int x, int y, const string &id, int width, 
   lbi.xp=x;
   lbi.yp=y;
   lbi.width = scale*width;
-  lbi.height = scale*height;
+  lbi.height = scale*30;
   lbi.id=id;
   lbi.callBack=cb;
 
@@ -1773,6 +1829,26 @@ bool gdioutput::getSelectedItem(ListBoxInfo &lbi) {
   return true;
 }
 
+int gdioutput::getNumItems(const char *id) {
+  for (auto &lbi : LBI) {
+    if (lbi.id == id) {
+      if (lbi.IsCombo) {
+        return SendMessage(lbi.hWnd, CB_GETCOUNT, 0, 0);
+      }
+      else {
+        return SendMessage(lbi.hWnd, LB_GETCOUNT, 0, 0);
+      }
+    }
+  }
+
+#ifdef _DEBUG
+  string err = string("Internal Error, identifier not found: X#") + id;
+  throw std::exception(err.c_str());
+#endif
+
+  return 0;
+}
+
 int gdioutput::getItemDataByName(const char *id, const char *name) const{
   wstring wname = recodeToWide(name);
   list<ListBoxInfo>::const_iterator it;
@@ -1858,6 +1934,61 @@ bool gdioutput::selectItemByData(const char *id, int data)
               return true;
             }
           }
+        }
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+bool gdioutput::selectItemByIndex(const char *id, int index) {
+  for (auto it = LBI.begin(); it != LBI.end(); ++it) {
+    if (it->id == id) {
+      if (it->IsCombo) {
+        if (index == -1) {
+          SendMessage(it->hWnd, CB_SETCURSEL, -1, 0);
+          it->data = 0;
+          it->text = L"";
+          it->original = L"";
+          it->originalIdx = -1;
+          return true;
+        }
+        else {
+          SendMessage(it->hWnd, CB_SETCURSEL, index, 0);
+          int data = SendMessage(it->hWnd, CB_GETITEMDATA, index, 0);
+          it->data = data;
+          it->originalIdx = data;
+          TCHAR bf[1024];
+          if (SendMessage(it->hWnd, CB_GETLBTEXT, index, LPARAM(bf)) != CB_ERR) {
+            it->text = bf;
+            it->original = bf;
+          }
+          return true;
+        }
+        return false;
+      }
+      else {
+        if (index == -1) {
+          SendMessage(it->hWnd, LB_SETCURSEL, -1, 0);
+          it->data = 0;
+          it->text = L"";
+          it->original = L"";
+          it->originalIdx = -1;
+          return true;
+        }
+        else {
+          SendMessage(it->hWnd, LB_SETCURSEL, index, 0);
+          int data = SendMessage(it->hWnd, LB_GETITEMDATA, index, 0);
+
+          it->data = data;
+          it->originalIdx = data;
+          TCHAR bf[1024];
+          if (SendMessage(it->hWnd, LB_GETTEXT, index, LPARAM(bf)) != LB_ERR) {
+            it->text = bf;
+            it->original = bf;
+          }
+          return true;
         }
         return false;
       }
@@ -2389,6 +2520,11 @@ LRESULT gdioutput::ProcessMsgWrp(UINT iMessage, LPARAM lParam, WPARAM wParam)
     }
   }
   else if (iMessage==WM_LBUTTONDOWN) {
+    if (autoCompleteInfo) {
+      autoCompleteInfo.reset();
+      return 0;
+    }
+
     list<InfoBox>::iterator it=IBox.begin();
 
     POINT pt;
@@ -3093,6 +3229,11 @@ bool gdioutput::hasField(const string &id) const
       return true;
   }
 
+  for (auto &tl : TL) {
+    if (tl.id == id)
+      return true;
+  }
+
   return false;
 }
 
@@ -3646,8 +3787,8 @@ void gdioutput::refreshSmartFromSnapshot(bool allowMoveOffset) {
       }
     }
 
-    int maxOffsetY=max<int>(GetPageY()-clientRC.bottom, 0);
-    int maxOffsetX=max<int>(GetPageX()-clientRC.right, 0);
+    int maxOffsetY=max<int>(getPageY()-clientRC.bottom, 0);
+    int maxOffsetX=max<int>(getPageX()-clientRC.right, 0);
     int noy = OffsetY - offset.second;
     int nox = OffsetX - offset.first;
     if ((offset.first != 0 && nox>0 && nox<maxOffsetX) || (offset.second != 0 && noy>0 && noy<maxOffsetY) ) {
@@ -5210,8 +5351,8 @@ bool gdioutput::clipOffset(int PageX, int PageY, int &MaxOffsetX, int &MaxOffset
   int oy=OffsetY;
   int ox=OffsetX;
 
-  MaxOffsetY=max(GetPageY()-PageY, 0);
-  MaxOffsetX=max(GetPageX()-PageX, 0);
+  MaxOffsetY=max(getPageY()-PageY, 0);
+  MaxOffsetX=max(getPageX()-PageX, 0);
 
   if (OffsetY<0) OffsetY=0;
   else if (OffsetY>MaxOffsetY)
@@ -5851,7 +5992,7 @@ int gdioutput::setHighContrastMaxWidth() {
   OutputDebugString("Set high contrast\n");
 #endif
 
-  double w = GetPageX();
+  double w = getPageX();
   double s = rc.right / w;
   if (!highContrast || (fabs(s-1.0) > 1e-3 && (s * scale) >= 1.0) ) {
     lockRefresh = true;
@@ -5974,15 +6115,13 @@ void gdioutput::liftCommandLock() const {
 }
 
 int gdioutput::getLineHeight(gdiFonts font, const wchar_t *face) const {
-  TextInfo ti;
-  ti.xp = 0;
-  ti.yp = 0;
-  ti.format = font;
-  ti.text = L"&abc_M|!I";
-  if (face)
-    ti.font = face;
-  calcStringSize(ti);
-  return (11*(ti.textRect.bottom - ti.textRect.top))/10;
+  int h;
+  if (face == nullptr)
+    h = getFontHeight(font, _EmptyWString);
+  else
+    h = getFontHeight(font, face);
+
+  return (11*h)/10;
 }
 
 GDIImplFontSet::GDIImplFontSet() {
@@ -6436,12 +6575,18 @@ const string &gdioutput::recodeToNarrow(const wstring &input) {
 
   return output;
 }
-/*
-const string &gdioutput::toUTF8(const string &input) const {
-  return toUTF8(toWide(input));
-}*/
 
-const string &gdioutput::toUTF8(const wstring &winput) const {
+const wstring &gdioutput::fromUTF8(const string &input) {
+  wstring &output = StringCache::getInstance().wget();
+  size_t alloc = input.length() + 1;
+  output.resize(alloc);
+  wchar_t *ptr = &output[0];
+  int wlen = MultiByteToWideChar(CP_UTF8, 0, input.c_str(), input.length(), ptr, alloc);
+  ptr[wlen] = 0;
+  output.resize(wlen);
+  return output;
+}
+const string &gdioutput::toUTF8(const wstring &winput)  {
   string &output = StringCache::getInstance().get();
   size_t alloc = winput.length()*4+32;
   output.resize(alloc);
@@ -6920,9 +7065,17 @@ AutoCompleteInfo &gdioutput::addAutoComplete(const string &key) {
   POINT pt;
   int height = scaleLength(200);
   pt.x = rc.right;
-  pt.y = min(rc.top, rcMain.bottom-height);
+  //pt.y = min(rc.top, rcMain.bottom-height);
+  pt.y = rc.bottom;
+  if (pt.y + height > rcMain.bottom)
+    pt.y = rc.top - height;
+  
   ScreenToClient(hWndTarget, &pt);
-  // TODO Place window
+  if (pt.y < 0) { //Fallback
+    pt.x = rc.right;
+    pt.y = min(rc.top, rcMain.bottom - height);
+    ScreenToClient(hWndTarget, &pt);
+  }
 
   if (autoCompleteInfo && autoCompleteInfo->matchKey(key)) {
     return *autoCompleteInfo;
@@ -6943,4 +7096,22 @@ AutoCompleteInfo &gdioutput::addAutoComplete(const string &key) {
 
 void gdioutput::clearAutoComplete(const string &key) {
   autoCompleteInfo.reset();
+}
+
+int gdioutput::getPageY() const {
+  if (hideBG || backgroundColor1 != -1)
+    return max(MaxY, 100);
+  else
+    return max(MaxY, 100) + scaleLength(60); 
+}
+
+int gdioutput::getPageX() const { 
+  int xlimit = 100;
+  for (auto &b : BI)
+    xlimit = max(b.xp + b.width, xlimit);
+
+  if (hideBG || backgroundColor1 != -1 || xlimit >= MaxX)
+    return max(MaxX, xlimit);
+  else
+    return max(MaxX, xlimit) + scaleLength(60); 
 }

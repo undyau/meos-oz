@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -51,6 +51,9 @@ enum EPostType
   lClassStartTimeRange,
   lClassLength,
   lClassResultFraction,
+  lClassAvailableMaps,
+  lClassTotalMaps,
+  lClassNumEntries,
   lCourseLength,
   lCourseName,
   lCourseClimb,
@@ -66,6 +69,7 @@ enum EPostType
   lPatrolClubNameNames, // Single runner's club or combination of patrol clubs
   lRunnerFinish,
   lRunnerTime,
+  lRunnerGrossTime,
   lRunnerTimeStatus,
   lRunnerTotalTime,
   lRunnerTimePerKM,
@@ -82,9 +86,10 @@ enum EPostType
   lRunnerGeneralPlace,
   lRunnerGeneralTimeAfter,
   lRunnerTimeAfter,
-  lRunnerMissedTime,
+  lRunnerLostTime,
   lRunnerPlace,
   lRunnerStart,
+  lRunnerCheck,
   lRunnerStartCond,
   lRunnerStartZero,
   lRunnerClub,
@@ -112,10 +117,12 @@ enum EPostType
   lRunnerNationality,
   lRunnerPhone,
   lRunnerFee,
+  lRunnerExpectedFee,
   lRunnerPaid,
   lRunnerPayMethod,
   lRunnerEntryDate,
   lRunnerEntryTime,
+  lRunnerId,
 
   lTeamName,
   lTeamStart,
@@ -134,6 +141,7 @@ enum EPostType
   lTeamPointAdjustment,
 
   lTeamTime,
+  lTeamGrossTime,
   lTeamStatus,
   lTeamClub,
   lTeamRunner,
@@ -150,12 +158,21 @@ enum EPostType
   lTeamPlaceDiff,
 
   lPunchNamedTime,
+  lPunchNamedSplit,
+  lPunchName,
+
   lPunchTime,
   lPunchControlNumber,
   lPunchControlCode,
   lPunchLostTime,
   lPunchControlPlace,
   lPunchControlPlaceAcc,
+
+  lPunchSplitTime,
+  lPunchTotalTime,
+  lPunchTotalTimeAfter,
+  lPunchAbsTime,
+  lPunchTimeSinceLast,
 
   lResultModuleTime,
   lResultModuleNumber,
@@ -180,6 +197,8 @@ enum EPostType
   lTotalCounter,
   lSubCounter,
   lSubSubCounter,
+
+  lLineBreak,
   lLastItem
 };
 
@@ -240,7 +259,10 @@ enum EFilterList
   EFilterExcludeDNS,
   EFilterExcludeCANCEL,
   EFilterVacant,
-  EFilterOnlyVacant,
+  EFilterOnlyVacant,  
+  EFilterAnyResult, // With any (radio) punch on a leg
+  EFilterAPIEntry, // Entry via API
+  EFilterWrongFee,
   _EFilterMax
 };
 
@@ -252,6 +274,8 @@ enum ESubFilterList
   ESubFilterVacant,
   ESubFilterSameParallel,
   ESubFilterSameParallelNotFirst,
+  ESubFilterNotFinish,
+  ESubFilterNamedControl,
   _ESubFilterMax
 };
 
@@ -274,6 +298,7 @@ struct oPrintPost {
   GDICOLOR color;
   int dx;
   int dy;
+  mutable int xlimit = 0;
   int legIndex;
   bool linearLegIndex;
   gdiFonts getFont() const {return gdiFonts(format & 0xFF);}
@@ -303,6 +328,7 @@ struct oListParam {
       a.useControlIdResultTo == useControlIdResultTo &&
       a.filterMaxPer == filterMaxPer &&
       a.pageBreak == pageBreak &&
+      a.showHeader == showHeader &&
       a.showInterTimes == showInterTimes &&
       a.showSplitTimes == showSplitTimes &&
       a.inputNumber == inputNumber &&
@@ -311,8 +337,18 @@ struct oListParam {
       a.bgColor == bgColor &&
       a.bgColor2 == bgColor2 &&
       a.bgImage == bgImage &&
-      a.legNumber == legNumber;
+      a.legNumber == legNumber &&
+      a.nColumns == nColumns &&
+      a.timePerPage == timePerPage &&
+      a.screenMode == screenMode &&
+      a.animate == animate &&
+      a.htmlRows == htmlRows &&
+      a.htmlScale == htmlScale &&
+      a.htmlTypeTag == htmlTypeTag;
   }
+
+  wstring getContentsDescriptor(const oEvent &oe) const;
+
   EStdListType listCode;
   GUICALLBACK cb;
   set<int> selection;
@@ -323,6 +359,7 @@ struct oListParam {
   int useControlIdResultFrom;
   int filterMaxPer;
   bool pageBreak;
+  bool showHeader = true;
   bool showInterTimes;
   bool showSplitTimes;
   bool splitAnalysis;
@@ -333,9 +370,10 @@ struct oListParam {
   int nextList; // 1-based index of next list (in the container, MetaListParam::listParam) for linked lists
   int previousList; // 1-based index of previous list (in the container, MetaListParam::listParam) for linked lists. Not serialized
 
+  mutable bool lineBreakControlList = false;
   mutable int relayLegIndex; // Current index of leg (or -1 for entire team)
   mutable wstring defaultName; // Initialized when generating list
-  // Generate a large-size list (supported as input when supportLarge is true)
+  // generate a large-size list (supported as input when supportLarge is true)
   bool useLargeSize;
   bool saved;
 
@@ -350,6 +388,10 @@ struct oListParam {
   int timePerPage;
   int margin;
   int screenMode;// 0 normal window, 1 = page by page, 2 = scroll
+
+  int htmlRows;
+  double htmlScale;
+  string htmlTypeTag; // free, table, or template tag.
 
   void updateDefaultName(const wstring &pname) const {defaultName = pname;}
   void setCustomTitle(const wstring &t) {title = t;}
@@ -384,6 +426,8 @@ struct oListParam {
     return legNumber >= 0 ? legNumber : 1000;
   }
 
+  int sourceParam = -1;
+
 private:
    int legNumber;
 };
@@ -393,7 +437,8 @@ public:
   enum EBaseType {EBaseTypeRunner,
                   EBaseTypeTeam,
                   EBaseTypeClub,
-                  EBaseTypePunches,
+                  EBaseTypeCoursePunches,
+                  EBaseTypeAllPunches,
                   EBaseTypeNone,
                   EBaseTypeRunnerGlobal,  // Used only in metalist (meaning global, not classwise)
                   EBaseTypeRunnerLeg,  // Used only in metalist, meaning legwise
@@ -411,9 +456,20 @@ public:
     Coursewise
   };
 
+  enum class PunchMode {
+    NoPunch,
+    SpecificPunch,
+    AnyPunch
+  };
   static bool addRunners(EBaseType t) {return t == EBaseTypeRunner || t == EBaseTypeClub;}
   static bool addTeams(EBaseType t) {return t == EBaseTypeTeam || t == EBaseTypeClub;}
   static bool addPatrols(EBaseType t) {return t == EBaseTypeTeam || t == EBaseTypeClub;}
+
+  // Return true if the runner should be skipped
+  bool filterRunner(const oRunner &r) const;
+  bool filterRunnerResult(GeneralResult *gResult, const oRunner &r) const;
+
+  GeneralResult *applyResultModule(oEvent &oe, vector<pRunner> &rlist) const;
 
   const wstring &getName() const {return Name;}
 protected:
@@ -426,6 +482,7 @@ protected:
   bool calcCourseClassResults;
   bool calcTotalResults;
   bool rogainingResults;
+  bool calculateLiveResults;
 
   oListParam lp;
 
@@ -436,7 +493,8 @@ protected:
   vector<char> listPostSubFilter;
   list<oPrintPost> subListPost;
   bool fixedType;
-  bool needPunches;
+  
+  PunchMode needPunches;
   string resultModule;
   set<string> additionalModules;
 
@@ -469,10 +527,13 @@ public:
   ResultType resType;
 
 
-  bool needPunchCheck() const {return needPunches;}
+  PunchMode needPunchCheck() const {return needPunches;}
   void setCallback(GUICALLBACK cb);
   int getLegNumberCoded() const {return lp.getLegNumberCoded();}
 
+  bool supportUpdateClasses() const {
+    return supportClasses && next.empty();
+  }
 
   EStdListType getListCode() const {return lp.listCode;}
   oPrintPost &addHead(const oPrintPost &pp) {
@@ -514,7 +575,7 @@ public:
                       gdiFonts font,
                       const wchar_t *fontFace = 0,
                       bool large = false, 
-                      int minSize = 0);
+                      int minSize = 0) const;
 
 
   int getMaxCharWidth(const oEvent *oe, 
@@ -524,7 +585,7 @@ public:
                       gdiFonts font,
                       const wchar_t *fontFace = 0,
                       bool large = false, 
-                      int minSize = 0) {
+                      int minSize = 0) const {
     vector< pair<EPostType, wstring> > typeFormats(1, make_pair(type, formats));
     return getMaxCharWidth(oe, oe->gdiBase(), clsSel, typeFormats, font, fontFace, largeSize, minSize);
   }

@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -344,7 +344,7 @@ void renderRowSpeakerList(const oSpeakerObject &r, const oSpeakerObject *next_r,
   if (r.finishStatus<=1 || r.finishStatus==r.status)
     row.push_back(SpeakerString(normalText, names));
   else
-    row.push_back(SpeakerString(normalText, names + L" ("+ oEvent::formatStatus(r.finishStatus) +L")"));
+    row.push_back(SpeakerString(normalText, names + L" ("+ oEvent::formatStatus(r.finishStatus, true) +L")"));
 
   row.push_back(SpeakerString(normalText, r.club));
 
@@ -410,7 +410,7 @@ void renderRowSpeakerList(const oSpeakerObject &r, const oSpeakerObject *next_r,
   else{
     //gdi.addStringUT(y, x+dx[4], textRight, oEvent::formatStatus(r.status)).setColor(colorDarkRed);
     row.push_back(SpeakerString());
-    row.push_back(SpeakerString(textRight, oEvent::formatStatus(r.status)));
+    row.push_back(SpeakerString(textRight, oEvent::formatStatus(r.status, true)));
     row.back().color = colorDarkRed;
     row.push_back(SpeakerString());
   }
@@ -528,7 +528,7 @@ void oEvent::speakerList(gdioutput &gdi, int ClassId, int leg, int ControlId,
   if (refresh)
     gdi.takeShownStringsSnapshot();
 
-  int storedY = gdi.GetOffsetY();
+  int storedY = gdi.getOffsetY();
   int storedHeight = gdi.getHeight();
 
   gdi.restoreNoUpdate("SpeakerList");
@@ -537,7 +537,7 @@ void oEvent::speakerList(gdioutput &gdi, int ClassId, int leg, int ControlId,
   gdi.pushX(); gdi.pushY();
   gdi.updatePos(0,0,0, storedHeight);
   gdi.popX(); gdi.popY();
-  gdi.SetOffsetY(storedY);
+  gdi.setOffsetY(storedY);
 
   gdi.setData("ClassId", ClassId);
   gdi.setData("ControlId", ControlId);
@@ -786,7 +786,7 @@ void oEvent::playPrewarningSounds(const wstring &basedir, set<int> &controls)
   for (it=punches.rbegin(); it!=punches.rend() && !it->hasBeenPlayed; ++it) {
 
     if (controls.count(it->Type)==1 || controls.empty()) {
-      pRunner r = getRunnerByCardNo(it->CardNo, it->getAdjustedTime());
+      pRunner r = getRunnerByCardNo(it->CardNo, it->getAdjustedTime(), oEvent::CardLookupProperty::ForReadout);
 
       if (r){
         wchar_t wave[20];
@@ -1742,7 +1742,7 @@ void oEvent::getResultEvents(const set<int> &classFilter, const set<int> &punchF
 
   for (oFreePunchList::const_iterator it = punches.begin(); it != punches.end(); ++it) {
     const oFreePunch &fp = *it;
-    if (fp.isRemoved() || fp.tRunnerId == 0 || fp.Type == oPunch::PunchCheck || fp.Type == oPunch::PunchStart)
+    if (fp.isRemoved() || fp.tRunnerId == 0 || fp.Type == oPunch::PunchCheck || fp.Type == oPunch::PunchStart || fp.Type == oPunch::HiredCard)
       continue;
 
     pRunner r = getRunner(fp.tRunnerId, 0);

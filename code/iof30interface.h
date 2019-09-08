@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -64,6 +64,8 @@ class IOF30Interface {
   // Include data on stage number
   bool includeStageRaceInfo;
   void operator=(const IOF30Interface &);
+
+  set<wstring> matchedClasses;
 
   struct LegInfo {
     int maxRunners;
@@ -214,6 +216,8 @@ class IOF30Interface {
                            const vector<pTeam> &t);
 
   void writePersonStart(xmlparser &xml, const oRunner &r, bool includeCourse, bool teamMember);
+  
+  void writeTeamNoPersonStart(xmlparser &xml, const oTeam &t, int leg, bool includeRaceNumber);
 
   void writeTeamStart(xmlparser &xml, const oTeam &t);
 
@@ -222,13 +226,13 @@ class IOF30Interface {
 
 
   pCourse haveSameCourse(const vector<pRunner> &r) const;
-  void writeLegOrder(xmlparser &xml, const oRunner &r) const;
+  void writeLegOrder(xmlparser &xml, const oClass *pc, int legNo) const;
 
   // Returns zero if no stage number
   int getStageNumber();
 
   bool readXMLCompetitorDB(const xmlobject &xCompetitor);
-  void writeXMLCompetitorDB(xmlparser &xml, const RunnerWDBEntry &rde) const;
+  void writeXMLCompetitorDB(xmlparser &xml, const RunnerDB &db, const RunnerWDBEntry &rde) const;
 
   int getStartIndex(const wstring &startId);
 
@@ -270,6 +274,13 @@ public:
   IOF30Interface(oEvent *oe, bool forceSplitFee);
   virtual ~IOF30Interface() {}
 
+  static void getLocalDateTime(const wstring &datetime, wstring &dateOut, wstring &timeOut);
+
+  static void getLocalDateTime(const wstring &date, const wstring &time,
+                               wstring &dateOut, wstring &timeOut);
+  static void getLocalDateTime(const string &date, const string &time,
+                               string &dateOut, string &timeOut);
+
   void getIdTypes(vector<string> &types);
   void setPreferredIdType(const string &type);
 
@@ -282,6 +293,8 @@ public:
                      const set<int> &stageFilter, int &entRead, int &entFail, int &entRemoved);
 
   void readStartList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
+
+  void readServiceRequestList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
 
   void readClassList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
 

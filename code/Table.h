@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -52,7 +52,10 @@ class TableCell
   RECT absPos;
 
   DWORD id;
-  oBase *owner;
+
+  bool hasOwner() const { return ownerRef && ownerRef->get() != nullptr; };
+  oBase *getOwner() const { return ownerRef ? ownerRef->get() : nullptr; }
+  shared_ptr<oBase::oBaseReference> ownerRef;
   bool canEdit;
   CellType type;
 

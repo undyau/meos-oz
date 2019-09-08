@@ -1,6 +1,6 @@
 /************************************************************************
 MeOS - Orienteering Software
-Copyright (C) 2009-2018 Melin Software HB
+Copyright (C) 2009-2019 Melin Software HB
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,10 +34,17 @@ Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 #include "oListInfo.h"
 #include "TabList.h"
 #include "generalresult.h"
+#include "HTMLWriter.h"
+#include "RunnerDB.h"
+#include "image.h"
 
 using namespace restbed;
 
 vector< shared_ptr<RestServer> > RestServer::startedServers;
+
+const wstring &wideParam(const string &param) {
+  return gdioutput::fromUTF8(param);
+}
 
 shared_ptr<RestServer> RestServer::construct() {
   shared_ptr<RestServer> obj(new RestServer());
@@ -81,12 +88,18 @@ static void method_handler(const shared_ptr< restbed::Session > session) {
 
 void RestServer::handleRequest(const shared_ptr<restbed::Session> &session) {
   const auto request = session->get_request();
-  size_t content_length = request->get_header("Content-Length", 0);
-
+  string path = request->get_path();
+  
+  size_t content_length = request->get_header("Content-Length", 0);  
   chrono::time_point<chrono::system_clock> start, end;
   start = chrono::system_clock::now();
   
   auto param = request->get_query_parameters();
+
+  if (path == "/" && !root.empty()) {
+    param = rootMap;
+  }
+
   auto answer = RestServer::addRequest(param);
   {
     unique_lock<mutex> mlock(lock);
@@ -101,9 +114,17 @@ void RestServer::handleRequest(const shared_ptr<restbed::Session> &session) {
 
   session->fetch(content_length, [request, answer](const shared_ptr< Session > session, const Bytes & body)
   {
-    session->close(restbed::OK, answer->answer, { { "Content-Length", itos(answer->answer.length()) },
-                                                  { "Connection", "close" },
-                                                  { "Access-Control-Allow-Origin", "*" }  });
+    if (answer->image.empty()) {
+      session->close(restbed::OK, answer->answer, { { "Content-Length", itos(answer->answer.length()) },
+                                                    { "Connection", "close" },
+                                                    { "Access-Control-Allow-Origin", "*" } });
+    }
+    else {
+      session->close(restbed::OK, answer->image, { { "Content-Type", "image/png"},
+                                                   { "Content-Length", itos(answer->image.size()) },
+                                                   { "Connection", "close" },
+                                                   { "Access-Control-Allow-Origin", "*" } });
+    }
   });
 }
 
@@ -116,7 +137,28 @@ void RestServer::startThread(int port) {
   resource->set_method_handler("GET", method_handler);
   restService->publish(resource);
   
+
+  auto resourceRoot = make_shared<MeOSResource>(this);
+  resourceRoot->set_path("/");
+  resourceRoot->set_method_handler("GET", method_handler);
+  restService->publish(resourceRoot);
+  
   restService->start(settings);
+}
+
+void RestServer::setRootMap(const string &rmap) {
+  root = rmap;
+  vector<string> sp;
+  rootMap.clear();
+  split(rmap, "&", sp);
+  for (string arg : sp) {
+    vector<string> sp2;
+    split(arg, "=", sp2);
+    if (sp2.size() == 1)
+      rootMap.emplace(sp2[0], "");
+    else if (sp2.size() == 2)
+      rootMap.emplace(sp2[0], sp2[1]);
+  }
 }
 
 void RestServer::startService(int port) {
@@ -169,17 +211,20 @@ void RestServer::compute(oEvent &ref) {
   waitForCompletion.notify_all();
 }
 
+extern wchar_t programPath[MAX_PATH];
 
 void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventRequest> &rq) {
   if (rq->parameters.empty()) {
-    rq->answer = "<html><head>"
+    rq->answer = "<!DOCTYPE html><html><head>"
       "<meta http-equiv=\"Content-Type\" content=\"text/html; charset = UTF-8\">"
       "<title>MeOS Information Service</title>"
       "</head>"
       "<body>"
-      "<h2>MeOS</h2><p>" + ref.gdiBase().toUTF8(lang.tl(getMeosFullVersion())) + "<p>"
+      "<img src=\"/meos?image=meos\" alt=\"MeOS\">"
+      "<p>" + ref.gdiBase().toUTF8(lang.tl(getMeosFullVersion())) + "<p>"
       "<ul>\n";
 
+    rq->answer += "<h2>" + ref.gdiBase().toUTF8(lang.tl("Listor")) + "</h2>";
     vector<oListParam> lists;
     TabList::getPublicLists(ref, lists);
     map<EStdListType, oListInfo> listMap;
@@ -217,6 +262,49 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
     //  "<li><a href=\"?html=1&startlist=1\">Startlista</a></li>"
     rq->answer += "</ul>\n";
 
+
+    string entryLinks = "<h2>" + ref.gdiBase().toUTF8(lang.tl(L"Direktanmälan", true)) + "</h2>";
+    entryLinks += "<a href=\"?enter\">"+ref.gdiBase().toUTF8(lang.tl("Anmäl")) + "</a><br>";
+    
+    entryLinks += "<hr>";
+
+    rq->answer += entryLinks;
+
+    vector<pRunner> runners;
+    ref.getRunners(-1, -1, runners, false);
+    string sRunnerId, sRunnerBib, sRunnerCard, sRunnerName, sRunnerClub, sRunnerClubId;
+    for (pRunner r : runners) {
+      if (sRunnerId.empty())
+        sRunnerId = itos(r->getId());
+
+      if (sRunnerClub.empty()) {
+        sRunnerName = gdioutput::toUTF8(r->getName());
+        sRunnerClub = gdioutput::toUTF8(r->getClub());
+        if (r->getClubId())
+          sRunnerClubId = gdioutput::toUTF8(r->getClubRef()->getExtIdentifierString());
+      }
+
+      if (sRunnerCard.empty() && r->getCardNo() > 0)
+        sRunnerCard = itos(r->getCardNo());
+
+      if (sRunnerBib.empty() && !r->getBib().empty())
+        sRunnerBib = gdioutput::recodeToNarrow(r->getBib());
+    }
+    if (sRunnerId.empty())
+      sRunnerId = "1";
+    if (sRunnerCard.empty())
+      sRunnerCard = "12345";
+    if (sRunnerBib.empty())
+      sRunnerBib = "100";
+    if (sRunnerClub.empty())
+      sRunnerClub = "Lost and Found";
+    if (sRunnerName.empty())
+      sRunnerName = "Charles Kinsley";
+
+
+    string sRunnerDbName, sRunnerDbId, sRunnerDbClub;
+    //oe.getRunnerDatabase().
+
     HINSTANCE hInst = GetModuleHandle(0);
     HRSRC hRes = FindResource(hInst, MAKEINTRESOURCE(132), RT_HTML);
     HGLOBAL res = LoadResource(hInst, hRes);
@@ -230,8 +318,44 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
           htmlS += "&lt;";
         else if (*html == '#')
           htmlS += "&amp;";
+        else if (*html == '%') {
+          string key;
+          char *pKey = html + 1;
+          resSize--;
+          while (*pKey != '%' && resSize > 0) {
+            key += *pKey;
+            ++pKey;
+            resSize--;
+          }
+          if (key == "runnerid") {
+            htmlS += sRunnerId;
+          }
+          else if (key == "card") {
+            htmlS += sRunnerCard;
+          }
+          else if (key == "bib") {
+            htmlS += sRunnerBib;
+          }
+          else if (key == "name") {
+            htmlS += sRunnerName;
+          }
+          else if (key == "club") {
+            htmlS += sRunnerClub;
+          }
+          else if (key == "dbname") {
+            htmlS += sRunnerName.substr(0, sRunnerName.size() / 2);
+          }
+          else if (key == "dbclub") {
+            htmlS += sRunnerClub;
+          }
+          else if (key == "clubid") {
+            htmlS += sRunnerClubId;
+          }
+          html = pKey;
+        }
         else
           htmlS += *html;
+
         ++html;
         resSize--;
       }
@@ -241,9 +365,53 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
 
     rq->answer += "\n</body></html>\n";
   }
+  else if (rq->parameters.count("entry") > 0) {
+    newEntry(ref, rq->parameters, rq->answer);
+  }
   else if (rq->parameters.count("get") > 0) {
     string what = rq->parameters.find("get")->second;
     getData(ref, what, rq->parameters, rq->answer);    
+  }
+  else if (rq->parameters.count("lookup") > 0) {
+    string what = rq->parameters.find("lookup")->second;
+    lookup(ref, what, rq->parameters, rq->answer);
+  }
+  else if (rq->parameters.count("page") > 0) {
+    string what = rq->parameters.find("page")->second;
+    auto &writer = HTMLWriter::getWriter(HTMLWriter::TemplateType::Page, what);
+    writer.getPage(ref, rq->answer);
+  }
+  else if (rq->parameters.count("enter") > 0) {
+    auto &writer = HTMLWriter::getWriter(HTMLWriter::TemplateType::Page, "entryform");
+    writer.getPage(ref, rq->answer);
+  }
+  else if (rq->parameters.count("image") > 0) {
+    ifstream fin;
+    string image = rq->parameters.find("image")->second;
+    if (imageCache.count(image)) {
+      rq->image = imageCache[image];
+    }
+    if (image == "meos") {      
+      imageCache[image] = rq->image = Image::loadResourceToMemory(MAKEINTRESOURCE(513), _T("PNG"));
+    }
+    else {
+      wchar_t fn[260];
+      if (image.find_first_of("\\/.?*") == string::npos) {
+        wstring par = wideParam(image) + L".png";
+        getUserFile(fn, par.c_str());
+        fin.open(fn, ios::binary);
+        if (fin.good()) {
+          fin.seekg(0, ios::end);
+          int p2 = (int)fin.tellg();
+          fin.seekg(0, ios::beg);
+          rq->image.resize(p2);
+          fin.read((char *)&rq->image[0], rq->image.size());
+          fin.close();
+
+          imageCache[image] = rq->image;
+        }
+      }
+    }
   }
   else if (rq->parameters.count("html") > 0) {
     string stype = rq->parameters.count("type") ? rq->parameters.find("type")->second : _EmptyString;
@@ -260,7 +428,8 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
       }
       ref.generateList(gdiPrint, true, *res->second.second, false);
       wstring exportFile = getTempFile();
-      gdiPrint.writeHTML(exportFile, ref.getName(), 30);
+      HTMLWriter::write(gdiPrint, exportFile, ref.getName(), 30, res->second.first, ref);
+
       ifstream fin(exportFile.c_str());
       string rbf;
       while (std::getline(fin, rbf)) {
@@ -533,6 +702,7 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
         throw meosException("Invalid limit: " + param.find("limit")->second);
     }
 
+    bool inclRunnersInForest = param.count("allrunners")>0;
     if (param.count("type")) {
       string type = param.find("type")->second;
 
@@ -645,7 +815,8 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
         r.swap(r2);
       }
 
-      GeneralResult::calculateIndividualResults(r, controlId, totalResult, resTag, resType, inputNumber, oe, results);
+      GeneralResult::calculateIndividualResults(r, controlId, totalResult, inclRunnersInForest, resTag, resType, inputNumber, oe, results);
+
 
       if (resType ==  oListInfo::Classwise)
         sort(results.begin(), results.end());
@@ -758,6 +929,66 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
 
     }
   }
+  else if (what == "status") {
+    InfoMeosStatus iStatus;
+    if (oe.empty()) {
+      iStatus.setEventNameId(L"");	// no event
+      iStatus.setOnDatabase(false);
+    }
+    else {
+      iStatus.setEventNameId(oe.getNameId(0));	// id of event
+      iStatus.setOnDatabase(oe.isClient());	// onDatabase
+    }
+
+    iStatus.serialize(out, false);
+    okRequest = true;
+  }
+  else if (what == "entryclass") {
+    okRequest = true;
+    vector<pClass> classes;
+    xmlparser mem;
+    mem.openMemoryOutput(false);
+    mem.startTag("EntryClasses", "xmlns", "http://www.melin.nu/mop");
+    if (epClass != EntryPermissionClass::None) {
+      oe.getClasses(classes, true);
+      for (auto cls : classes) {
+        if (epClass == EntryPermissionClass::Any || cls->getAllowQuickEntry()) {
+          mem.startTag("Class", "id", itow(cls->getId()));
+          mem.write("Name", cls->getName());
+          for (auto &f : cls->getAllFees())
+            mem.write("Fee", f.first);
+          pCourse crs = cls->getCourse(true);
+          if (crs) {
+            int len = crs->getLength();
+            if (len > 0)
+              mem.write("Length", len);
+          }
+          int lowAge = cls->getDCI().getInt("LowAge");
+          if (lowAge > 0)
+            mem.write("MinAge", lowAge);
+          int highAge = cls->getDCI().getInt("HighAge");
+          if (highAge > 0)
+            mem.write("MaxAge", highAge);
+          auto sex = cls->getDCI().getString("Sex");
+          if (!sex.empty())
+            mem.write("Sex", sex);
+
+          auto start = cls->getStart();
+          if (!start.empty())
+            mem.write("Start", start);
+
+          if (cls->getNumberMaps() > 0) {
+            int numMaps = cls->getNumRemainingMaps(false);
+            mem.write("AvailableStarts", numMaps);
+          }
+          mem.endTag();
+        }
+      }
+    }
+    mem.endTag();
+    mem.getMemoryOutput(answer);
+  }
+
   if (out.size() > 0) {
     xmlparser mem;
     mem.openMemoryOutput(false);
@@ -816,4 +1047,356 @@ void RestServer::getStatistics(Statistics &s) {
   if (s.numRequests > 0) {
     s.averageResponseTime /= s.numRequests;
   }
+}
+
+void RestServer::lookup(oEvent &oe, const string &what, const multimap<string, string> &param, string &answer) {
+  bool okRequest = false;
+  if (what == "competitor") {
+    vector<pRunner> runners;
+    if (param.count("card") > 0) {
+      int card = atoi(param.find("card")->second.c_str());
+      int time = 0;
+      if (param.count("running") && param.find("running")->second == "true") {
+        time = oe.getRelativeTime(getLocalTime());
+        if (time < 0)
+          time = 0;
+      }
+      
+      oe.getRunnersByCardNo(card, false, oEvent::CardLookupProperty::Any, runners);
+    }
+    if (param.count("name") > 0) {
+      wstring club;
+      if (param.count("club"))
+        club = wideParam(param.find("club")->second);
+
+      pRunner r = oe.getRunnerByName(wideParam(param.find("name")->second), club);
+      if (r)
+        runners.push_back(r);
+    }
+    if (param.count("id") > 0) {
+      pRunner r = oe.getRunner(atoi(param.find("id")->second.c_str()), 0);
+      if (r)
+        runners.push_back(r);
+    }
+    if (param.count("bib") > 0) {
+      pRunner r = oe.getRunnerByBibOrStartNo(wideParam(param.find("bib")->second), true);
+      if (r)
+        runners.push_back(r);
+    }
+
+    xmlparser xml;
+    xml.openMemoryOutput(false);
+    xml.startTag("Competitors", "xmlns", "http://www.melin.nu/mop");
+    
+    for (auto r : runners) {
+      xml.startTag("Competitor", "id", itos(r->getId()));
+      xml.write("Name", r->getName());
+      xml.write("ExternalId", r->getExtIdentifierString());
+      xml.write("Club", { make_pair("id", itow(r->getClubId())) }, r->getClub());
+      xml.write("Class", { make_pair("id", itow(r->getClassId(true))) }, r->getClass(true));
+      xml.write("Card", r->getCardNo());
+      xml.write("Status", {make_pair("code", itow(r->getStatus()))}, r->getStatusS(true));
+      xml.write("Start", r->getStartTimeS());
+      if (r->getFinishTime() > 0) {
+        xml.write("Finish", r->getFinishTimeS());
+        xml.write("RunningTime", r->getRunningTimeS());
+        xml.write("Place", r->getPlaceS());
+        xml.write("TimeAfter", formatTime(r->getTimeAfter()));
+      }
+      if (r->getTeam()) {
+        xml.write("Team", { make_pair("id", itow(r->getTeam()->getId())) }, r->getTeam()->getName());
+        pClass cls = r->getClassRef(false);
+        if (cls)
+          xml.write("Leg", cls->getLegNumber(r->getLegNumber()));
+      }
+      if ((r->getFinishTime() > 0 || r->getCard() != nullptr) && r->getCourse(false)) {
+        auto &sd = r->getSplitTimes(false);
+        vector<int> after;
+        r->getLegTimeAfter(after);
+        vector<int> afterAcc;
+        r->getLegTimeAfterAcc(afterAcc);
+        vector<int> delta;
+        r->getSplitAnalysis(delta);
+
+        auto crs = r->getCourse(true);
+        int ix = 0;
+        xml.startTag("Splits");
+        vector<pair<string, wstring>> analysis = { make_pair("lost", L""),
+                                                   make_pair("behind", L""),
+                                                   make_pair("mistake", L""),
+                                                   make_pair("leg", L""),
+                                                   make_pair("total", L""), };
+        for (auto &s : sd) {
+          auto ctrl = crs->getControl(ix);
+          if (ctrl) {
+            xml.startTag("Control", "number", itow(ix+1));
+            xml.write("Name", ctrl->getName());
+            if (s.hasTime()) {
+              xml.write("Time", formatTime(s.time - r->getStartTime()));
+              
+              if (size_t(ix) < delta.size() && size_t(ix) < after.size() && size_t(ix) < afterAcc.size()) {
+                if (after[ix] > 0)
+                  analysis[0].second = formatTime(after[ix]);
+                else
+                  analysis[0].second = L"";
+
+                if (afterAcc[ix] > 0)
+                  analysis[1].second = formatTime(afterAcc[ix]);
+                else
+                  analysis[1].second = L"";
+
+                if (delta[ix] > 0)
+                  analysis[2].second = formatTime(delta[ix]);
+                else
+                  analysis[2].second = L"";
+
+                int place = r->getLegPlace(ix);
+                analysis[3].second = place > 0 ? itow(place) : L"";
+                 
+                int placeAcc = r->getLegPlaceAcc(ix);
+                analysis[4].second = placeAcc > 0 ? itow(placeAcc) : L"";
+
+                xml.write("Analysis", analysis, L"");
+              }
+            }
+            else if (!s.isMissing())
+              xml.write("Time", "Unknown");
+            xml.endTag();
+            ix++; 
+          }
+        }
+        xml.endTag();
+      }
+      xml.endTag();
+    }
+    
+    xml.endTag();
+    xml.getMemoryOutput(answer);
+  }
+  else if (what == "dbcompetitor") {
+    vector<RunnerWDBEntry *> wdb;
+    if (param.count("card") > 0) {
+      int card = atoi(param.find("card")->second.c_str());
+      auto res = oe.getRunnerDatabase().getRunnerByCard(card);
+      if (res)
+        wdb.push_back(res);
+    }
+    if (param.count("name") > 0) {
+      int clubId = 0;
+      if (param.count("club")) {
+        wstring club = wideParam(param.find("club")->second);
+        pClub clb = oe.getRunnerDatabase().getClub(club);
+        if (clb)
+          clubId = clb->getId();
+      }
+      wstring name = wideParam(param.find("name")->second);
+      auto res = oe.getRunnerDatabase().getRunnerSuggestions(name, clubId, 20);
+      for (auto &r : res)
+        wdb.push_back(r.first);
+    }
+    if (param.count("id") > 0) {
+      long long id = oBase::converExtIdentifierString(wideParam(param.find("id")->second));
+      auto res = oe.getRunnerDatabase().getRunnerById(id);
+      if (res)
+        wdb.push_back(res);
+    }
+    
+    xmlparser xml;
+    xml.openMemoryOutput(false);
+    xml.startTag("DatabaseCompetitors", "xmlns", "http://www.melin.nu/mop");
+    for (auto &r : wdb) {
+      wstring name = r->getGivenName() + L" " + r->getFamilyName();
+      wchar_t bf[16];
+      oBase::converExtIdentifierString(r->getExtId(), bf);
+
+      xml.startTag("Competitor", "id", bf);
+      xml.write("Name", name);
+      if (r->dbe().clubNo > 0) {
+        wstring club;
+        if (oe.getRunnerDatabase().getClub(r->dbe().clubNo, club)) {
+          xml.write("Club", { make_pair("id", itow(r->dbe().clubNo)) }, club);
+        }
+      }
+      xml.write("Card", r->dbe().cardNo);
+      xml.write("Nationality", r->getNationality());
+      wstring sex = r->getSex();
+      if (!sex.empty())
+        xml.write("Sex", sex);
+      if (r->dbe().birthYear > 0) 
+        xml.write("BirthYear", itow(r->dbe().birthYear));
+
+      xml.endTag();
+    }
+    xml.endTag();
+    xml.getMemoryOutput(answer);
+  }
+  else if (what == "dbclub") {
+    vector<oClub *> clubs;
+    
+    if (param.count("name") > 0) {
+      wstring club = wideParam(param.find("name")->second);
+      clubs = oe.getRunnerDatabase().getClubSuggestions(club, 20);
+    }
+    if (param.count("id") > 0) {
+      long long id = oBase::converExtIdentifierString(wideParam(param.find("id")->second));
+      auto res = oe.getRunnerDatabase().getClub(int(id));
+      if (res)
+        clubs.push_back(res);
+    }
+
+    xmlparser xml;
+    xml.openMemoryOutput(false);
+    xml.startTag("DatabaseClubs", "xmlns", "http://www.melin.nu/mop");
+    for (auto &c : clubs) {
+      xml.startTag("Club", "id", c->getExtIdentifierString());
+      xml.write("Name", c->getName());
+      xml.endTag();
+    }
+    xml.endTag();
+    xml.getMemoryOutput(answer);
+  }
+}
+
+void RestServer::setEntryPermission(EntryPermissionClass epClass, EntryPermissionType epType) {
+  this->epClass = epClass;
+  this->epType = epType;
+}
+
+void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, string &answer) {
+  xmlparser xml;
+  xml.openMemoryOutput(false);
+  xml.startTag("Answer", "xmlns", "http://www.melin.nu/mop");
+
+  bool permissionDenied = false;
+  wstring error;
+
+  if (epClass == EntryPermissionClass::None || epType == EntryPermissionType::None)
+    permissionDenied = true;
+  
+  if (!permissionDenied) {
+    wstring name, club;
+    long long extId = 0;
+    int clubId = 0;
+    RunnerWDBEntry *dbr = nullptr;
+    if (param.count("id")) {
+      extId = oBase::converExtIdentifierString(wideParam(param.find("id")->second));
+      dbr = oe.getRunnerDatabase().getRunnerById(extId);
+      if (dbr) {
+        clubId = dbr->dbe().clubNo;
+      }
+    }
+    else if(param.count("name"))
+      name = wideParam(param.find("name")->second);
+
+    if (param.count("club")) 
+      club = wideParam(param.find("club")->second);
+
+    pClub existingClub = oe.getClub(club);
+
+    if (epType != EntryPermissionType::Any) {
+      if (extId == 0) {
+        int clubExtId = 0;
+        if (existingClub)
+          clubExtId = (int)existingClub->getExtIdentifier();
+        else if (!club.empty()) {
+          pClub dbClub = oe.getRunnerDatabase().getClub(club);
+          if (dbClub) {
+            clubExtId = dbClub->getId();
+          }
+        }
+        dbr = oe.getRunnerDatabase().getRunnerByName(name, clubExtId, 0);
+        if (dbr)
+          extId = dbr->getExtId();
+      }
+    }
+
+    if (existingClub)
+      clubId = existingClub->getId();
+
+    int classId = 0;
+    if (param.count("class"))
+      classId = atoi(param.find("class")->second.c_str());
+
+    auto cls = oe.getClass(classId);
+    if (cls == nullptr) {
+      error = L"Okänd klass";
+    }
+    else if (epClass != EntryPermissionClass::Any && !cls->getAllowQuickEntry()) {
+      permissionDenied = true;
+    }
+    else {
+      int nm = cls->getNumRemainingMaps(false);
+      if (nm != numeric_limits<int>::min() && nm<=0) {
+        error = L"Klassen är full";
+      }
+    }
+
+    if (epType != EntryPermissionType::Any && extId == 0) {
+      error = L"Anmälan måste hanteras manuellt";
+    }
+
+    if (epType == EntryPermissionType::InDbExistingClub && clubId == 0) {
+      error = L"Anmälan måste hanteras manuellt";
+    }
+    
+    int cardNo = 0;
+    if (param.count("card"))
+      cardNo = atoi(param.find("card")->second.c_str());
+
+    if (cardNo <= 0) {
+      error = L"Ogiltigt bricknummer X#" + itow(cardNo);
+    }
+    else {
+      vector<pRunner> runners;
+      oe.getRunnersByCardNo(cardNo, true, oEvent::CardLookupProperty::CardInUse, runners);
+      for (auto r : runners) {
+        if (!r->getCard()) {
+          error = L"Bricknummret är upptaget (X)#" + r->getCompleteIdentification();
+        }
+      }
+    }
+
+    if (!permissionDenied && error.empty()) {
+      pRunner r = oe.addRunner(name, club, classId, cardNo, 0, true);
+      if (r && dbr) {
+        r->init(*dbr, true);
+      }
+      
+      if (r) {
+        r->setFlag(oRunner::FlagAddedViaAPI, true);
+        r->addClassDefaultFee(true);
+        r->synchronize();
+        r->markClassChanged(-1);
+        xml.write("Status", "OK");
+        xml.write("Fee", r->getDCI().getInt("Fee"));
+        xml.write("Info", r->getClass(true) + L", " + r->getCompleteIdentification(false));
+      }
+    }
+  }
+  if (permissionDenied) {
+    xml.write("Status", "Failed");
+    xml.write("Info", lang.tl("Permission denied"));
+  }
+  else if (!error.empty()) {
+    xml.write("Status", "Failed");
+    xml.write("Info", lang.tl(error));
+  }
+
+  xml.endTag();
+  xml.getMemoryOutput(answer);
+}
+
+vector<pair<wstring, size_t>> RestServer::getPermissionsPersons() {
+  vector<pair<wstring, size_t>> res;
+  res.emplace_back(lang.tl("Anyone"), size_t(EntryPermissionType::Any));
+  res.emplace_back(lang.tl("Från löpardatabasen"), size_t(EntryPermissionType::InDbAny));
+  res.emplace_back(lang.tl("Från löpardatabasen i befintliga klubbar"), size_t(EntryPermissionType::InDbExistingClub));
+  return res;
+}
+
+vector<pair<wstring, size_t>> RestServer::getPermissionsClass() {
+  vector<pair<wstring, size_t>> res;
+  res.emplace_back(lang.tl("Alla"), size_t(EntryPermissionClass::Any));
+  res.emplace_back(lang.tl("Med direktanmälan"), size_t(EntryPermissionClass::DirectEntry));
+  return res;
 }

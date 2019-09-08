@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -56,7 +56,6 @@ using namespace std;
   Localizer lang;
 #endif
 
-extern "C"{
 
 int MEOSDB_API getMeosVersion()
 {
@@ -71,30 +70,41 @@ int getListMask(oEvent &oe) {
   return msql.getModifiedMask(oe);
 }
 
-bool MEOSDB_API msSynchronizeList(oEvent *oe, int lid)
+bool MEOSDB_API msSynchronizeList(oEvent *oe, oListId lid)
 {
   nSynchList++;
   if (nSynchList % 100 == 99)
     OutputDebugString(L"Synchronized 100 lists\n");
+  bool ret = false;
+  switch (lid) {
+  case oListId::oLRunnerId:
+    ret = msql.syncListRunner(oe);
+    break;
+  case oListId::oLClassId:
+    ret = msql.syncListClass(oe);
+    break;
+  case oListId::oLCourseId:
+    ret = msql.syncListCourse(oe);
+    break;
+  case oListId::oLControlId:
+    ret = msql.syncListControl(oe);
+    break;
+  case oListId::oLClubId:
+    ret = msql.syncListClub(oe);
+    break;
+  case oListId::oLCardId:
+    ret = msql.syncListCard(oe);
+    break;
+  case oListId::oLPunchId:
+    ret = msql.syncListPunch(oe);
+    break;
+  case oListId::oLTeamId:
+    ret = msql.syncListTeam(oe);
+    break;
+  }
 
-  if (lid==oLRunnerId)
-    return msql.syncListRunner(oe);
-  else if (lid==oLClassId)
-    return msql.syncListClass(oe);
-  else if (lid==oLCourseId)
-    return msql.syncListCourse(oe);
-  else if (lid==oLControlId)
-    return msql.syncListControl(oe);
-  else if (lid==oLClubId)
-    return msql.syncListClub(oe);
-  else if (lid==oLCardId)
-    return msql.syncListCard(oe);
-  else if (lid==oLPunchId)
-    return msql.syncListPunch(oe);
-  else if (lid==oLTeamId)
-    return msql.syncListTeam(oe);
-
-  return false;
+  msql.processMissingObjects();
+  return ret;
 }
 
 int MEOSDB_API msSynchronizeUpdate(oBase *obj)
@@ -139,38 +149,11 @@ int MEOSDB_API msSynchronizeRead(oBase *obj)
   if (nSynchEnt % 100 == 99)
     OutputDebugString(L"Synchronized 100 entities\n");
 
-  if (typeid(*obj)==typeid(oRunner)){
-    return msql.syncRead(false, (oRunner *) obj );
-  }
-  else if (typeid(*obj)==typeid(oClass)){
-    return msql.syncRead(false, (oClass *) obj);
-  }
-  else if (typeid(*obj)==typeid(oCourse)){
-    return msql.syncRead(false, (oCourse *) obj);
-  }
-  else if (typeid(*obj)==typeid(oControl)){
-    return msql.syncRead(false, (oControl *) obj);
-  }
-  else if (typeid(*obj)==typeid(oClub)){
-    return msql.syncRead(false, (oClub *) obj);
-  }
-  else if (typeid(*obj)==typeid(oCard)){
-    return msql.syncRead(false, (oCard *) obj);
-  }
-  else if (typeid(*obj)==typeid(oFreePunch)){
-    return msql.syncRead(false, (oFreePunch *) obj, true);
-  }
-  else if (typeid(*obj)==typeid(oTeam)){
-    return msql.syncRead(false, (oTeam *) obj);
-  }
-  else if (typeid(*obj)==typeid(oEvent)){
-    return msql.SyncRead((oEvent *) obj);
-  }
+  return msql.syncRead(false, obj);
 	else if(typeid(*obj)==typeid(oExtendedEvent)){
 		return msql.SyncRead((oEvent *) obj);
 	}
 
-  return 0;
 }
 
 // Removes (marks it as removed) an entry from the database.
@@ -235,7 +218,6 @@ bool MEOSDB_API msReConnect()
 }
 
 
-} //Extern "C"
 
 bool repairTables(const string &db, vector<string> &output) {
   return msql.repairTables(db, output);

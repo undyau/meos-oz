@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1828,6 +1828,20 @@ void capitalize(wstring &str) {
   }
 }
 
+bool checkValidDate(const wstring &date) {
+  SYSTEMTIME st;
+  if (convertDateYMS(date, st, false) <= 0)
+    return false;
+
+  st.wHour = 12;
+  SYSTEMTIME utc;
+  if (!TzSpecificLocalTimeToSystemTime(0, &st, &utc)) {
+    return false;
+  }
+
+  return true;
+}
+
 /** Return bias in seconds. UTC = local time + bias. */
 int getTimeZoneInfo(const wstring &date) {
   static wchar_t lastDate[16] = {0};
@@ -1838,12 +1852,14 @@ int getTimeZoneInfo(const wstring &date) {
   }
   wcscpy_s(lastDate, 16, date.c_str());
 //  TIME_ZONE_INFORMATION tzi;
-  SYSTEMTIME st, utc;
-  convertDateYMS(date, utc, false);
-  utc.wHour = 12;
-
-  SystemTimeToTzSpecificLocalTime(0, &utc, &st);
- // TzSpecificLocalTimeToSystemTime(0, &st, &utc);
+  SYSTEMTIME st;
+  convertDateYMS(date, st, false);
+  st.wHour = 12;
+  SYSTEMTIME utc;
+  if (!TzSpecificLocalTimeToSystemTime(0, &st, &utc)) {
+    lastValue = 0;
+    return 0;
+  }
 
   int datecode = ((st.wYear * 12 + st.wMonth) * 31) + st.wDay;
   int datecodeUTC = ((utc.wYear * 12 + utc.wMonth) * 31) + utc.wDay;

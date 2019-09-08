@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -146,7 +146,8 @@ void pdfwriter::generatePDF(const gdioutput &gdi,
                             const wstring &file,
                             const wstring &pageTitleW,
                             const wstring &authorW,
-                            const list<TextInfo> &tl) {
+                            const list<TextInfo> &tl,
+                            bool respectPageBreak) {
   checkWriteAccess(file);
   string pageTitle = gdi.narrow(pageTitleW); // XXX WCS
   string author = gdi.narrow(authorW);
@@ -204,31 +205,35 @@ void pdfwriter::generatePDF(const gdioutput &gdi,
   maxX *= scaleXFactor;
   float w = HPDF_Page_GetWidth(page);
   float h = HPDF_Page_GetHeight(page);
-  float scale = (w / maxX) * 0.85f;
+  float scale = (w / maxX) * 0.95f;
+  float fontScale = 1.5f;
 
   vector<RenderedPage> pages;
   PageInfo pageInfo;
-  pageInfo.topMargin = h * 0.05f;
+  pageInfo.topMargin = h * 0.03f;
   pageInfo.scaleX = scale * scaleXFactor;
-  pageInfo.scaleY = scale;
-  pageInfo.leftMargin = w * 0.07f;
+  pageInfo.scaleY = scale * 1.1f;
+  pageInfo.leftMargin = w * 0.03f;
   pageInfo.bottomMargin = pageInfo.topMargin * 1.0f;
   pageInfo.pageY = h;
   pageInfo.printHeader = true;
   pageInfo.yMM2PrintC = pageInfo.xMM2PrintC = 1199.551f / 420.f;
+  pageInfo.yMM2PrintC *= fontScale;
   pageInfo.xMM2PrintK = 0;
   pageInfo.yMM2PrintK = 0;
-
+  
   list<RectangleInfo> rectangles;
-  pageInfo.renderPages(tl, rectangles, true, pages);
+  pageInfo.renderPages(tl, rectangles, true, respectPageBreak, pages);
   for (size_t j = 0; j< pages.size(); j++) {
     wstring pinfo = pageInfo.pageInfo(pages[j]);
     if (!pinfo.empty()) {
       selectFont(page, fs, fontSmall, scale);
       HPDF_Page_BeginText (page);
-      float df = min(w, h) * 0.02f;
+      float df = min(w, h) * 0.04f;
       float sw = HPDF_Page_TextWidth(page, gdi.toUTF8(pinfo).c_str());
-      HPDF_Page_TextOut (page, w - sw - df , h - df * 2.5f, gdi.toUTF8(pinfo).c_str());
+      float sy = HPDF_Page_TextWidth(page, "MMM");
+
+      HPDF_Page_TextOut (page, w - sw - df , h - sy, gdi.toUTF8(pinfo).c_str());
       HPDF_Page_EndText(page);
     }
 
@@ -268,7 +273,7 @@ void pdfwriter::generatePDF(const gdioutput &gdi,
         }
       }
 
-      selectFont(page, fonts[info[k].ti.font], info[k].ti.format, scale);
+      selectFont(page, fonts[info[k].ti.font], info[k].ti.format, scale*fontScale);
       HPDF_Page_BeginText (page);
       float r = GetRValue(info[k].ti.color);
       float g = GetGValue(info[k].ti.color);
@@ -277,14 +282,14 @@ void pdfwriter::generatePDF(const gdioutput &gdi,
       string nt = gdi.toUTF8(info[k].ti.text);
         
       if (info[k].ti.format & textRight) {
-        float w = float(info[k].ti.xlimit) * scale;
+        float w = float(info[k].ti.xlimit) * scale*fontScale;
         float sw = HPDF_Page_TextWidth(page, nt.c_str());
         float space = info[k].ti.xlimit > 0 ? 2 * HPDF_Page_GetCharSpace(page) : 0;
         HPDF_Page_TextOut (page, info[k].xp + w - sw - space, h - info[k].yp,
                             nt.c_str());
       }
       else if (info[k].ti.format & textCenter) {
-        float w = float(info[k].ti.xlimit) * scale;
+        float w = float(info[k].ti.xlimit) * scale*fontScale;
         float sw = HPDF_Page_TextWidth(page, nt.c_str());
         HPDF_Page_TextOut (page, info[k].xp + w - sw/2, h - info[k].yp,
                             nt.c_str());

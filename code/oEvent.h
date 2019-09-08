@@ -2,16 +2,11 @@
 //
 //////////////////////////////////////////////////////////////////////
 
-#if !defined(AFX_OEVENT_H__CDA15578_CB62_4EAD_96B9_3037355F5D48__INCLUDED_)
-#define AFX_OEVENT_H__CDA15578_CB62_4EAD_96B9_3037355F5D48__INCLUDED_
-
-#if _MSC_VER > 1000
 #pragma once
-#endif // _MSC_VER > 1000
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -47,18 +42,8 @@
 #include <set>
 #include <map>
 
-#ifdef OLD
-  #include <hash_set>
-  #include <hash_map>
-
-#define unordered_multimap stdext::hash_multimap 
-#define unordered_map stdext::hash_map 
-#define unordered_set stdext::hash_set 
-
-#else
-  #include <unordered_map>
-  #include <unordered_set>
-#endif
+#include <unordered_map>
+#include <unordered_set>
 
 #define cVacantId 888888888
 #define cNoClubId 999999999
@@ -206,9 +191,9 @@ typedef bool (__cdecl* OPENDB_FCN)(void);
 typedef int  (__cdecl* SYNCHRONIZE_FCN)(oBase *obj);
 typedef bool (__cdecl* SYNCHRONIZELIST_FCN)(oBase *obj, int lid);
 
-enum oListId {oLRunnerId=1, oLClassId=2, oLCourseId=4,
-              oLControlId=8, oLClubId=16, oLCardId=32,
-              oLPunchId=64, oLTeamId=128, oLEventId=256};
+enum class oListId {oLRunnerId=1, oLClassId=2, oLCourseId=4,
+                    oLControlId=8, oLClubId=16, oLCardId=32,
+                    oLPunchId=64, oLTeamId=128, oLEventId=256};
 
 
 class Table;
@@ -366,7 +351,7 @@ protected:
   void updateFreeId();
   void updateFreeId(oBase *ob);
 
-  SortOrder CurrentSortOrder;
+  mutable SortOrder CurrentSortOrder;
 
   list<CompetitionInfo> cinfo;
   list<BackupInfo> backupInfo;
@@ -375,7 +360,6 @@ protected:
   MetaListContainer *listContainer;
   wchar_t CurrentFile[260];
   wstring currentNameId;
-
 
   static int dbVersion;
   string MySQLServer;
@@ -450,7 +434,7 @@ protected:
   void exportTeamSplits(xmlparser &xml, const set<int> &classes, bool oldStylePatrol);
 
   /** Set up transient data in classes */
-  void reinitializeClasses();
+  void reinitializeClasses() const;
 
   /** Analyze the result status of each class*/
   void analyzeClassResultStatus() const;
@@ -471,13 +455,19 @@ protected:
   /** Format a string for a list. */
   const wstring &formatListStringAux(const oPrintPost &pp, const oListParam &par,
                                     const pTeam t, const pRunner r, const pClub c,
-                                    const pClass pc, oCounter &counter) const;
+                                    const pClass pc, const oCounter &counter) const;
 
   /** Format a string that does not depend on team or runner*/
   const wstring &formatSpecialStringAux(const oPrintPost &pp, const oListParam &par,
                                         const pTeam t, int legIndex,                                   
                                         const pCourse pc, const pControl ctrl,  
-                                        oCounter &counter) const;
+                                        const oCounter &counter) const;
+
+  /** Format a string that depends on punches/card, not a course.*/
+  const wstring &formatPunchStringAux(const oPrintPost &pp, const oListParam &par,
+                                      const pTeam t, const pRunner r,
+                                      const oPunch *punch, oCounter &counter) const;
+
   void changedObject();
 
   mutable vector<GeneralResultCtr> generalResults;
@@ -495,12 +485,37 @@ public:
     Raw,
   };
 
+  /** What to draw */
+  enum class DrawType {
+    DrawAll, RemainingBefore, RemainingAfter,
+  };
+
+  /** Drawing algorithm. */
+  enum class DrawMethod {
+    NOMethod = -1,
+
+    Random = 1,
+    SOFT = 6,
+    MeOS = 2,
+
+    Clumped = 3,
+    Simultaneous = 4,
+    Seeded = 5,
+
+    Pursuit = 11,
+    ReversePursuit = 12
+  };
+
 private:
   NameMode currentNameMode;
 
 public:
-  NameMode getNameMode() const {return currentNameMode;};
-  NameMode setNameMode(NameMode newNameMode);
+
+  // Returns true if there is a class with restart time
+  bool hasAnyRestartTime() const;
+
+  NameMode getNameMode() const {return currentNameMode;}
+  NameMode setNameMode(NameMode newNameMode) { currentNameMode = newNameMode; }
 
   /// Get new punches since firstTime
   void getLatestPunches(int firstTime, vector<const oFreePunch *> &punches) const;
@@ -535,8 +550,7 @@ public:
 
   //Get list of runners in a class
   void getRunners(int classId, int courseId, vector<pRunner> &r, bool sortRunners = true);
-  void getRunnersByCard(int cardNo, vector<pRunner> &r);
-
+  
   void getTeams(int classId, vector<pTeam> &t, bool sortTeams = true);
 
   bool hasRank() const;
@@ -575,7 +589,7 @@ public:
   // Automatic draw of all classes
   void automaticDrawAll(gdioutput &gdi, const wstring &firstStart,
                         const wstring &minIntervall, const wstring &vacances,
-                        bool lateBefore, bool softMethod, int pairSize);
+                        bool lateBefore, DrawMethod method, int pairSize);
 
   // Restore a backup by renamning the file to .meos
   void restoreBackup();
@@ -587,7 +601,6 @@ public:
 
   void updateTabs(bool force = false, bool hide = false) const;
   bool useRunnerDb() const;
-  void useRunnerDb(bool use);
 
   int getFirstClassId(bool teamClass) const;
 
@@ -608,6 +621,8 @@ public:
   void applyEventFees(bool updateClassFromEvent,
                       bool updateFees, bool updateCardFees,
                       const set<int> &classFilter);
+  /** Return a positive base card fee, or -1 for no card fee. (Which is to be set as card fee on runners)*/
+  int getBaseCardFee() const;
 
   void listConnectedClients(gdioutput &gdi);
   void validateClients();
@@ -615,7 +630,7 @@ public:
 
   enum PredefinedTypes {PNoSettings, PPool, PForking, PPoolDrawn, PHunting,
                  PPatrol, PPatrolOptional, PPatrolOneSI, PRelay, PTwinRelay,
-                 PYouthRelay, PNoMulti};
+                 PYouthRelay, PTwoRacesNoOrder, PNoMulti};
 
   void fillPredefinedCmp(gdioutput &gdi, const string &name) const;
 
@@ -636,13 +651,11 @@ public:
 
 
   void calculateSplitResults(int controlIdFrom, int controlIdTo);
-  // Get total number of completed runner for given class and leg.
-  void getNumClassRunners(int id, int leg, int &total, int &finished, int &dns) const;
-
+  
   pTeam findTeam(const wstring &s, int lastId, unordered_set<int> &filter) const;
   pRunner findRunner(const wstring &s, int lastId, const unordered_set<int> &inputFilter, unordered_set<int> &filter) const;
 
-  static const wstring &formatStatus(RunnerStatus status);
+  static const wstring &formatStatus(RunnerStatus status, bool forPrint);
 
   inline bool useStartSeconds() const {return tUseStartSeconds;}
   void calcUseStartSeconds();
@@ -709,6 +722,10 @@ public:
   const wstring &formatSpecialString(const oPrintPost &pp, const oListParam &par,
                                     const pTeam t, int legIndex,
                                     const pCourse crs, const pControl ctrl, oCounter &counter) const;
+  
+  const wstring &formatPunchString(const oPrintPost &pp, const oListParam &par,
+                                   const pTeam t, const pRunner r, 
+                                   const oPunch *punch, oCounter &counter) const;
 
   void calculatePrintPostKey(const list<oPrintPost> &ppli, gdioutput &gdi, const oListParam &par,
                              const pTeam t, const pRunner r, const pClub c,
@@ -721,8 +738,10 @@ public:
  /** Format a print post. Returns true of output is not empty*/
   bool formatPrintPost(const list<oPrintPost> &ppli, PrintPostInfo &ppi, 
                        const pTeam t, const pRunner r, const pClub c,
-                       const pClass pc, const pCourse crs, const pControl ctrl, int legIndex);
-  void listGeneratePunches(const list<oPrintPost> &ppli, gdioutput &gdi, const oListParam &par,
+                       const pClass pc, const pCourse crs, 
+                       const pControl ctrl, const oPunch *punch, int legIndex);
+
+  void listGeneratePunches(const oListInfo &listInfo, gdioutput &gdi,
                            pTeam t, pRunner r, pClub club, pClass cls);
   void getListTypes(map<EStdListType, oListInfo> &listMap, int filter);
   void getListType(EStdListType type, oListInfo &li);
@@ -786,16 +805,34 @@ public:
   };
 
   void getResultEvents(const set<int> &classFilter, const set<int> &controlFilter, vector<ResultEvent> &results) const;
+
+  /** Compute results for split times while runners are on course.*/
+  void computePreliminarySplitResults(const set<int> &classes) const;
+
+  /** Synchronizes to server and checks if there are hired card data*/
+  bool hasHiredCardData();
+  bool isHiredCard(int cardNo) const;
+  void setHiredCard(int cardNo, bool flag);
+  vector<int> getHiredCards() const;
+  void clearHiredCards();
+
 protected:
   // Returns hash key for punch based on control id, and leg. Class is marked as changed if oldHashKey != newHashKey.
   int getControlIdFromPunch(int time, int type, int card,
                             bool markClassChanged, oFreePunch &punch);
 
-  static void drawSOFTMethod(vector<pRunner> &runners, bool handleBlanks=true);
   bool enumerateBackups(const wstring &file, const wstring &filetype, int type);
-  unordered_multimap<int, pRunner> cardHash;
   mutable multimap<int, oAbstractRunner*> bibStartNoToRunnerTeam;
+
+  mutable shared_ptr<unordered_multimap<int, pRunner>> cardToRunnerHash;
+  vector<pRunner> getCardToRunner(int cardNo) const;
+
+  mutable set<int>  hiredCardHash;
+  mutable int tHiredCardHashDataRevision = -1;
+  
   int tClubDataRevision;
+  int tCalcNumMapsDataRevision = -1;
+
   bool readOnly;
   virtual void writeExtraXml(xmlparser &xml){};
   virtual void readExtraXml(const xmlparser &xml) {};
@@ -819,9 +856,6 @@ public:
   int interpretCurrency(double val, const wstring &cur);
 
   void setupClubInfoData(); //Precalculate temporary data in club object
-
-  // Clears map if clear is true. A cleared map is not used. Map must be cleared after use, is not updated.
-  void setupCardHash(bool clear = false);
 
   void remove();
   bool canRemove() const;
@@ -849,10 +883,12 @@ public:
   void removeFreePunch(int id);
   pFreePunch getPunch(int id) const;
   pFreePunch getPunch(int runnerId, int courseControlId, int card) const;
-  void getPunchesForRunner(int runnerId, vector<pFreePunch> &punches) const;
+  void getPunchesForRunner(int runnerId, bool sort, vector<pFreePunch> &punches) const;
 
   //Returns true if data is changed.
   bool autoSynchronizeLists(bool syncPunches);
+   
+  bool synchronizeList(initializer_list<oListId> types);
   bool synchronizeList(oListId id, bool preSyncEvent = true, bool postSyncEvent = true);
 
   void generateInForestList(gdioutput &gdi, GUICALLBACK cb,
@@ -874,7 +910,7 @@ public:
   pCard getCardByNumber(int cno) const;
   bool isCardRead(const SICard &card) const;
   void getCards(vector<pCard> &cards);
-
+  int getNumCards() const { return Cards.size(); }
   /** Try to find the class that best matches the card.
       Negative return = missing controls
       Positve return = extra controls
@@ -984,9 +1020,10 @@ public:
   bool openRunnerDatabase(const wchar_t *file);
   bool saveRunnerDatabase(const wchar_t *file, bool onlyLocal);
 
-  enum ResultType {RTClassResult, RTTotalResult, RTCourseResult, RTClassCourseResult};
-  void calculateResults(ResultType result, bool includePreliminary = false);
-  void calculateRogainingResults(const set<int> &classSelection);
+  enum class ResultType {ClassResult, TotalResult, CourseResult, 
+                         ClassCourseResult, PreliminarySplitResults};
+  void calculateResults(const set<int> &classes, ResultType result, bool includePreliminary = false) const;
+  void calculateRogainingResults(const set<int> &classSelection) const;
 
   void calculateResults(list<oSpeakerObject> &rl);
   void calculateTeamResults(bool totalMultiday);
@@ -995,8 +1032,14 @@ public:
   void calculateTeamResultAtControl(const set<int> &classId, int leg, int controlId, bool totalResults);
 
   bool sortRunners(SortOrder so);
+  
+  bool sortRunners(SortOrder so, vector<const oRunner *> &runners) const;
+
   /** If linear leg is true, leg is interpreted as actual leg numer, otherwise w.r.t to parallel legs. */
   bool sortTeams(SortOrder so, int leg, bool linearLeg);
+
+  bool sortTeams(SortOrder so, int leg, bool linearLeg, vector<const oTeam *> &teams) const;
+
 
   pCard allocateCard(pRunner owner);
 
@@ -1005,13 +1048,9 @@ public:
 
   void loadDrawSettings(const set<int> &classes, DrawInfo &drawInfo, vector<ClassInfo> &cInfo) const;
 
-  enum DrawType {
-    drawAll, remainingBefore, remainingAfter,
-  };
-
-  void drawRemaining(bool useSOFTMethod, bool placeAfter);
+  void drawRemaining(DrawMethod method, bool placeAfter);
   void drawList(const vector<ClassDrawSpecification> &spec,
-                bool useSOFTMethod, int pairSize, DrawType drawType);
+                DrawMethod method, int pairSize, DrawType drawType);
   void drawListClumped(int classID, int firstStart, int interval, int vacances);
   void drawPersuitList(int classId, int firstTime, int restartTime,
                        int ropeTime, int interval, int pairSize,
@@ -1044,6 +1083,16 @@ public:
   pRunner addRunnerVacant(int classId);
 
   pRunner getRunner(int Id, int stage) const;
+
+  enum class CardLookupProperty {
+    Any, /** Does not include NotCompeting */
+    ForReadout, /** Runners with no card, even if status DNS.*/
+    IncludeNotCompeting,
+    CardInUse, /** Runners with no card, ignoring DNS runners*/
+    SkipNoStart,
+    OnlyMainInstance
+  };
+
   /** Get a competitor by cardNo.
       @param cardNo card number to look for.
       @param time if non-zero, try to find a runner actually running on the specified time, if there are multiple runners using the same card.
@@ -1051,17 +1100,14 @@ public:
       @param ignoreRunnersWithNoStart If true, never return a runner with status NoStart
       @return runner of null.
    */
-  pRunner getRunnerByCardNo(int cardNo, int time,
-                            bool onlyRunnerWithNoCard = false,
-                            bool ignoreRunnersWithNoStart = false) const;
+  pRunner getRunnerByCardNo(int cardNo, int time, CardLookupProperty prop) const;
   /** Get all competitors for a cardNo.
       @param cardNo card number to look for.
       @param ignoreRunnersWithNoStart If true, skip runners with status DNS
       @param skipDuplicates if true, only return the main instance of each runner (if several races)
       @param out runners using the card
    */
-  void getRunnersByCardNo(int cardNo, bool ignoreRunnersWithNoStart, 
-                          bool skipDuplicates, vector<pRunner> &out) const;
+  void getRunnersByCardNo(int cardNo, bool updateSort, CardLookupProperty prop, vector<pRunner> &out) const;
   /** Finds a runner by start number (linear search). If several runners has same bib/number try to get the right one:
        findWithoutCardNo false : find first that has not finished
        findWithoutCardNo true : find first with no card.
@@ -1124,11 +1170,15 @@ public:
   void updateClubsFromDB();
   void updateRunnersFromDB();
 
-  void fillFees(gdioutput &gdi, const string &name, bool withAuto) const;
+  void fillFees(gdioutput &gdi, const string &name, bool onlyDirect, bool withAuto) const;
   wstring getAutoClassName() const;
   pClass addClass(const wstring &pname, int CourseId = 0, int classId = 0);
   pClass addClass(oClass &c);
-  pClass getClassCreate(int Id, const wstring &createName);
+  /** Get a class if it exists, or create it. 
+      exactNames is a set of class names that must be matched exactly. 
+      It is extended with the name of the class added. The purpose is to allow very
+      similar (but distinct) names in a single imported file. */
+  pClass getClassCreate(int id, const wstring &createName, set<wstring> &exactNames);
   pClass getClass(const wstring &name) const;
   void getClasses(vector<pClass> &classes, bool sync) const;
   pClass getBestClassMatch(const wstring &name) const;
@@ -1169,15 +1219,19 @@ public:
   pCourse getCourse(int Id) const;
 
   void getCourses(vector<pCourse> &courses) const;
+
+  int getNumCourses() const { return Courses.size(); }
+
   /** Get controls. If calculateCourseControls, duplicate numbers are calculated for each control and course. */
   void getControls(vector<pControl> &controls, bool calculateCourseControls) const;
 
   void fillCourses(gdioutput &gdi, const string &id, bool simple = false);
   const vector< pair<wstring, size_t> > &fillCourses(vector< pair<wstring, size_t> > &out, bool simple = false);
 
-  void calculateNumRemainingMaps();
+  void calculateNumRemainingMaps(bool forceRecalculate);
 
   pControl getControl(int Id) const;
+  pControl getControlByType(int type) const;
   pControl getControl(int Id, bool create);
   enum ControlType {CTAll, CTRealControl, CTCourseControl};
 
@@ -1212,15 +1266,22 @@ protected:
   bool addXMLTeamEntry(const xmlobject &xentry, int ClubId);
   bool addXMLClass(const xmlobject &xclub);
   bool addXMLClub(const xmlobject &xclub, bool importToDB);
-  bool addXMLRank(const xmlobject &xrank, map<__int64, int> &externIdToRunnerId);
+  // Fill in the output map. Set flag to true if match is made on id, false if on name.
+  enum class RankStatus {
+    IdMatch,
+    NameMatch,
+    Ambivalent
+  };
+
+  bool addXMLRank(const xmlobject &xrank, const map<__int64, int> &externIdToRunnerId, map<int, pair<int, RankStatus>> &output);
   bool addXMLEvent(const xmlobject &xevent);
 
-  bool addXMLCourse(const xmlobject &xcourse, bool addClasses);
+  bool addXMLCourse(const xmlobject &xcourse, bool addClasses, set<wstring> &matchedClasses);
   /** type: 0 control, 1 start, 2 finish*/
   bool addXMLControl(const xmlobject &xcontrol, int type);
 
 public:
-	void calculateCourseRogainingResults(); // implemented in oExtendedEvent.cpp
+  void calculateCourseRogainingResults(); // implemented in oExtendedEvent.cpp
 
   GeneralResult &getGeneralResult(const string &tag, wstring &sourceFileOut) const;
   void getGeneralResults(bool onlyEditable, vector< pair<int, pair<string, wstring> > > &tagNameList, bool includeDateInName) const;
@@ -1254,6 +1315,9 @@ public:
                       vector<pTeam> &newEntries,
                       vector<pTeam> &notTransfered,
                       vector<pTeam> &noAssignmentTarget);
+
+
+  void transferListsAndSave(const oEvent &src);
 
   enum MultiStageType {
     MultiStageNone = 0,
@@ -1311,9 +1375,5 @@ public:
 
   friend class TestMeOS;
 
-  //const string &toNarrow(const wstring &in) const {return gdibase.toNarrow(in);}
-  //const wstring &toWide(const string &in) const {return gdibase.toWide(in);}
   const gdioutput &gdiBase() const {return gdibase;}
 };
-
-#endif // !defined(AFX_OEVENT_H__CDA15578_CB62_4EAD_96B9_3037355F5D48__INCLUDED_)

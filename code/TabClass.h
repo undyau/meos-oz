@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -75,14 +75,14 @@ class TabClass :
   map<int, ClassInfo> cInfoCache;
 
   DrawInfo drawInfo;
-  void setMultiDayClass(gdioutput &gdi, bool hasMulti, DrawMethod defaultMethod);
-  set<DrawMethod> getSupportedDrawMethods(bool multiDay) const;
+  void setMultiDayClass(gdioutput &gdi, bool hasMulti, oEvent::DrawMethod defaultMethod);
+  set<oEvent::DrawMethod> getSupportedDrawMethods(bool multiDay) const;
 
-  void drawDialog(gdioutput &gdi, DrawMethod method, const oClass &cls);
+  void drawDialog(gdioutput &gdi, oEvent::DrawMethod method, const oClass &cls);
 
   void pursuitDialog(gdioutput &gdi);
 
-  bool warnDrawStartTime(gdioutput &gdi, int time);
+  bool warnDrawStartTime(gdioutput &gdi, int time, bool absTime);
   bool warnDrawStartTime(gdioutput &gdi, const wstring &firstStart);
 
   void static clearPage(gdioutput &gdi, bool autoRefresh);
@@ -90,7 +90,7 @@ class TabClass :
   bool hasWarnedStartTime;
   bool hasWarnedDirect;
   bool tableMode;
-  DrawMethod lastDrawMethod;
+  oEvent::DrawMethod lastDrawMethod;
   int lastSeedMethod;
   bool lastSeedPreventClubNb;
   bool lastSeedReverse;
@@ -138,7 +138,9 @@ class TabClass :
 
   void updateSplitDistribution(gdioutput &gdi, int numInClass, int tot) const;
 
-  DrawMethod getDefaultMethod(const set<DrawMethod> &allowedValues) const;
+  oEvent::DrawMethod getDefaultMethod(const set<oEvent::DrawMethod> &allowedValues) const;
+
+  void createDrawMethod(gdioutput& gdi);
 
   void enableLoadSettings(gdioutput &gdi);
 
@@ -148,6 +150,7 @@ class TabClass :
   static vector< pair<wstring, size_t> > getPairOptions();
 
   void setLockForkingState(gdioutput &gdi, bool poolState, bool lockState);
+  void setLockForkingState(gdioutput &gdi, const oClass &c);
 
   void loadBasicDrawSetup(gdioutput &gdi, int &bx, int &by, const wstring& firstStart, 
                           int maxNumControl, const wstring& minInterval, const wstring& vacances, const set<int> &clsId);

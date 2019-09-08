@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2018 Melin Software HB
+    Copyright (C) 2009-2019 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -125,6 +125,18 @@ class InfoClass : public InfoBase {
     friend class InfoCompetition;
 };
 
+class InfoMeosStatus : public InfoBase {
+  protected:
+    wstring eventNameId; // event Name Id, actual name of the database, can also be matched in oevent table of meosmain
+    bool onDatabase; // true if currently on database
+  public:
+    void serialize(xmlbuffer &xml, bool diffOnly) const;
+    InfoMeosStatus();
+    virtual ~InfoMeosStatus() {}
+    void setEventNameId(const wstring &);
+    void setOnDatabase(const bool);
+};
+
 class InfoOrganization : public InfoBase {
   protected:
     wstring name;
@@ -215,6 +227,7 @@ protected:
     map<int, InfoOrganization> organizations;
     map<int, InfoCompetitor> competitors;
     map<int, InfoTeam> teams;
+    vector<pair<string, int>> deleteMap;
 
     void needCommit(InfoBase &obj);
    
@@ -228,10 +241,10 @@ protected:
     void includeCourse(bool inc) { withCourse = inc; }
 
     const vector<int> &getControls(int classId, int legNumber) const;
-    bool synchronize(oEvent &oe, bool onlyCmp, const set<int> &classes, const set<int> &ctrls);
+    bool synchronize(oEvent &oe, bool onlyCmp, const set<int> &classes, const set<int> &ctrls, bool allowDeletion);
     bool synchronize(oEvent &oe) {
       set<int> dmy;
-      return synchronize(oe, true, dmy, dmy);
+      return synchronize(oe, true, dmy, dmy, false);
     }
     void getCompleteXML(xmlbuffer &xml);
     void getDiffXML(xmlbuffer &xml);
