@@ -34,8 +34,6 @@
 #include "importformats.h"
 
 #include "meosexception.h"
-#include <locale>
-#include <codecvt>
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -1248,8 +1246,8 @@ bool csvparser::importCards(const oEvent &oe, const wstring &file, vector<SICard
 void csvparser::parseUnicode(const wstring &file, list< vector<wstring> > &data) {
   fin.open(file, ifstream::in | ifstream::binary);
   fin.seekg(0, ios_base::end);
-  size_t len = int(fin.tellg())-2;
-  if (len == 0)
+  int len = int(fin.tellg())-2;
+  if (len <= 0)
     return;
   fin.seekg(2); // BOM
   assert(len % 2 == 0);
@@ -1257,7 +1255,7 @@ void csvparser::parseUnicode(const wstring &file, list< vector<wstring> > &data)
   fin.read((char *)&bf[0], len);
   vector<wstring> rows;
   int spp = 0;
-  for (size_t k = 0; k < len / 2; k++) {
+  for (int k = 0; k < len / 2; k++) {
     if (bf[spp] == '\r')
       spp++;
     if (bf[k] == '\n') {
@@ -1269,7 +1267,7 @@ void csvparser::parseUnicode(const wstring &file, list< vector<wstring> > &data)
       rows.push_back(r);
     }
   }
-  if (size_t(spp + 1) < len / 2) {
+  if (spp + 1 < len / 2) {
     wstring r = &bf[spp];
     rows.push_back(r);
   }

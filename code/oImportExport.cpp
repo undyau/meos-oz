@@ -43,7 +43,6 @@
 #include "random.h"
 #include "SportIdent.h"
 #include "RunnerDB.h"
-
 #include "meos_util.h"
 #include "meos.h"
 #include "importformats.h"

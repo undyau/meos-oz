@@ -1,4 +1,4 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
     Copyright (C) 2009-2019 Melin Software HB
 
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -83,8 +83,8 @@ void RestService::settings(gdioutput &gdi, oEvent &oe, bool created) {
 
   //gdi.fillRight();
   gdi.pushX();
-  gdi.addCheckbox("AllowEntry", "TillÂt anm‰lan", 0, false).setHandler(this);
-  gdi.addSelection("PermissionPerson", 180, 200, 0, L"Vem fÂr anm‰la sig:");
+  gdi.addCheckbox("AllowEntry", "Till√•t anm√§lan", 0, false).setHandler(this);
+  gdi.addSelection("PermissionPerson", 180, 200, 0, L"Vem f√•r anm√§la sig:");
   gdi.addItem("PermissionPerson", RestServer::getPermissionsPersons());
   gdi.autoGrow("PermissionPerson");
   gdi.selectFirstItem("PermissionPerson");
@@ -106,7 +106,7 @@ void RestService::settings(gdioutput &gdi, oEvent &oe, bool created) {
     gdi.addInput("Port", itow(port), 10, 0, L"Port:", L"#http://localhost:[PORT]/meos");
   }
   else {
-    gdi.addString("", 0, "Server startad pÂ X#" + itos(port));
+    gdi.addString("", 0, "Server startad p√• X#" + itos(port));
     auto per = server->getEntryPermission();
     if (get<RestServer::EntryPermissionType>(per) != RestServer::EntryPermissionType::None)
       disablePermisson = false;
@@ -132,13 +132,13 @@ void RestService::status(gdioutput &gdi) {
   gdi.addString("", 1, name);
 
   if (server) {
-    gdi.addString("", 0, "Server startad pÂ X#" + itos(port));
+    gdi.addString("", 0, "Server startad p√• X#" + itos(port));
 
     RestServer::Statistics rs;
     server->getStatistics(rs);
-    gdi.addString("", 0, "Antal fˆrfrÂgningar: X.#" + itos(rs.numRequests));
+    gdi.addString("", 0, "Antal f√∂rfr√•gningar: X.#" + itos(rs.numRequests));
     gdi.addString("", 0, "Genomsnittlig svarstid: X ms.#" + itos(rs.averageResponseTime));
-    gdi.addString("", 0, "L‰ngsta svarstid: X ms.#" + itos(rs.maxResponseTime));
+    gdi.addString("", 0, "L√§ngsta svarstid: X ms.#" + itos(rs.maxResponseTime));
 
     gdi.dropLine(0.6);
     gdi.addButton("Update", "Uppdatera").setHandler(this);
@@ -164,7 +164,7 @@ void RestService::status(gdioutput &gdi) {
 
     /*
     if (get<RestServer::EntryPermissionType>(server->getEntryPermission()) != RestServer::EntryPermissionType::None) {
-      gdi.addString("", fontMediumPlus, "Anm‰lan");
+      gdi.addString("", fontMediumPlus, "Anm√§lan");
 
 
     }*/
@@ -175,7 +175,7 @@ void RestService::status(gdioutput &gdi) {
   gdi.fillRight();
   gdi.addButton("Stop", "Stoppa automaten", AutomaticCB).setExtra(getId());
   gdi.fillDown();
-  gdi.addButton("InfoService", "Inst‰llningar...", AutomaticCB).setExtra(getId());
+  gdi.addButton("InfoService", "Inst√§llningar...", AutomaticCB).setExtra(getId());
   gdi.popX();
 }
 

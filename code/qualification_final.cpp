@@ -1,4 +1,4 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
     Copyright (C) 2009-2019 Melin Software HB
 
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -108,7 +108,7 @@ void QualificationFinal::import(const wstring &file) {
       wstring name;
       cls.getObjectString("Name", name);
       if (name.empty())
-        throw meosException("Klassen måste ha ett namn.");
+        throw meosException("Klassen mÃ¥ste ha ett namn.");
       int classId = cls.getObjectInt("id");
       if (!(classId>0))
         throw meosException("Id must be a positive integer.");
@@ -539,13 +539,13 @@ void QualificationFinal::printScheme(oClass * cls, gdioutput &gdi) const {
       if (res != sourcePlaceToFinalOrder.end()) {
         if (classDefinition[res->second.first - 1].rankLevel)
           rankingBased = true;
-        dst.push_back(itow(place) + L". ? " + cname[res->second.first - 1]);
+        dst.push_back(itow(place) + L". âžž " + cname[res->second.first - 1]);
       }
       else break;
     }
 
     if (rankingBased) {
-      gdi.addString("", 0, L"X går vidare, klass enligt ranking#" +  itow(dst.size()));
+      gdi.addString("", 0, L"X gÃ¥r vidare, klass enligt ranking#" +  itow(dst.size()));
     }
     else {
       for (auto &c : dst) {

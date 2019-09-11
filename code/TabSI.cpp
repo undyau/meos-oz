@@ -4198,6 +4198,19 @@ void TabSI::handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) {
           directEntryGUI.updateFees(gdi, cls, getThisYear() - year);
         }
       }
+      if (r) {
+        if (gdi.hasField("Club") && r->dbe().clubNo) {
+          if (gdi.getText("Club").empty()) {
+            auto pclub = oe->getRunnerDatabase().getClub(r->dbe().clubNo);
+            if (pclub)
+              gdi.setText("Club", pclub->getName());
+          }
+        }
+        if (gdi.hasField("CardNo") && r->dbe().cardNo) {
+          if (gdi.getText("CardNo").empty())
+            gdi.setText("CardNo", r->dbe().cardNo);
+        }
+      }
     }
   }
   gdi.clearAutoComplete("");

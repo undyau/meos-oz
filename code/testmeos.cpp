@@ -137,7 +137,7 @@ void TestMeOS::runProtected(bool protect) const {
   oe_main->getPropertyInt("UseEventor", 1);  
   oe_main->setProperty("Interactive", 0);
   TabSI *tsi = dynamic_cast<TabSI*>(gdi_main->getTabs().get(TabType::TSITab));
- // tsi->setMode(TabSI::ModeReadOut);
+  tsi->setMode(TabSI::ModeReadOut);
   tsi->clearQueue();
   //string pmOrig = oe_main->getPropertyString("PayModes", "");
   //oe_main->setProperty("PayModes", "");

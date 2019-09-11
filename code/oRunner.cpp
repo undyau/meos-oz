@@ -2329,7 +2329,7 @@ void oRunner::setCardNo(int cno, bool matchCard, bool updateFromDatabase)
     if (oe->cardToRunnerHash && cno != 0 && isAddedToEvent() && !isTemporaryObject) {
       oe->cardToRunnerHash->emplace(cno, this);
     }
-    
+
     if (isAddedToEvent()) {
       oFreePunch::rehashPunches(*oe, oldNo, 0);
       oFreePunch::rehashPunches(*oe, cardNumber, 0);
@@ -4118,7 +4118,6 @@ void oRunner::printSplits(gdioutput &gdi) const {
   bool withSpeed = (oe->getDI().getInt("Analysis") & 2) == 0;
   bool withResult = (oe->getDI().getInt("Analysis") & 4) == 0;
   const bool wideFormat = oe->getPropertyInt("WideSplitFormat", 0) == 1;
-
   const int numCol = 4;
   pClass cls = getClassRef(true);
   if (cls && cls->getNoTiming()) {
