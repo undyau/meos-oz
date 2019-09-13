@@ -34,6 +34,8 @@
 #include "importformats.h"
 
 #include "meosexception.h"
+#include <locale>
+#include <codecvt>
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -293,7 +295,8 @@ bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
           pr->setClassId(pc->getId(), false);
 				}
 				else {
-					pc=event.getClassCreate(-1, converter.from_bytes(sp[ORclass]));
+					set<wstring> dmy;
+					pc=event.getClassCreate(-1, converter.from_bytes(sp[ORclass]), dmy);
 				}
 			}
 

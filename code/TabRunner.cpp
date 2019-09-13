@@ -898,7 +898,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
     else if (bi.id=="LabelPrint") {
       if(!runnerId)
         return 0;
-      pRunner r=oe->getRunner(runnerId, 0);pRunner r=oe->getRunner(runnerId, 0);
+      pRunner r=oe->getRunner(runnerId, 0);
       if(!r) return 0;
 
       gdioutput gdiprint(2.0,  gdi.getHWNDTarget(), labelPrinter);

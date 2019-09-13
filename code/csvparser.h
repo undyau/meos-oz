@@ -137,8 +137,8 @@ public:
 
   int importRanking(oEvent &oe, const wstring &file, vector<wstring> & problems);
 
-  int split(char *line, vector<char *> &split);
-  int split(wchar_t *line, vector<wchar_t *> &split);
+  static int split(char *line, vector<char *> &split, wchar_t sep = L';');
+  static int split(wchar_t *line, vector<wchar_t *> &split,  wchar_t sep = L';');
 
   enum class CSV {
     NoCSV,

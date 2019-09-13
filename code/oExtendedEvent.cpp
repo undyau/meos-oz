@@ -119,7 +119,7 @@ void oEvent::calculateCourseRogainingResults()
 
     if (invalidClass) {
       it->tTotalPlace = 0;
-      it->tPlace = 0;
+      it->tPlace.update(*this, 0);
     }
     else if(it->status==StatusOK) {
 			cPlace++;
@@ -132,12 +132,12 @@ void oEvent::calculateCourseRogainingResults()
 			cTime = cmpRes;
 
       if (useResults)
-			  it->tPlace = vPlace;
+			  it->tPlace.update(*this, vPlace);
       else
-        it->tPlace = 0;
+        it->tPlace.update(*this, 0);
 		}
 		else
-			it->tPlace = 99000 + it->status;
+			it->tPlace.update(*this, 99000 + it->status);
 	}
 }
 
@@ -300,9 +300,9 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
 		return false;
 	
 	if (byClass)
-		calculateResults(RTClassResult);
+		calculateResults(set<int>(), oEvent::ResultType::ClassResult);
 	else
-		calculateResults(RTCourseResult);
+		calculateResults(set<int>(), oEvent::ResultType::CourseResult);
 
 	if (IsSydneySummerSeries)
 		calculateCourseRogainingResults();

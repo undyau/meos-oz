@@ -4176,7 +4176,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
       withSpeed = false; // No leg lenghts available
   }
   gdi.addStringUT(normal, statInfo);
-  oe->calculateResults(oEvent::RTClassResult);
+  oe->calculateResults(set<int>(), oEvent::ResultType::ClassResult);
   if (getPlaceS().size())
     gdi.addStringUT(fontSmall, lang.tl("Aktuell klassposition") + L" in " + getClass(false) + L": " + getPlaceS());
   
@@ -4720,7 +4720,7 @@ void oRunner::printLabel(gdioutput &gdi) const {
         gdi.addStringUT(cy, cx+c2, boldHuge, getRunningTimeS());
       }
     else
-      gdi.addStringUT(cy, cx+c2, boldHuge,  getStatusS());
+      gdi.addStringUT(cy, cx+c2, boldHuge,  getStatusS(true));
   gdi.dropLine(-0.1);
   cy = gdi.getCY();
   gdi.addStringUT(cy, cx, fontMedium, getClub());

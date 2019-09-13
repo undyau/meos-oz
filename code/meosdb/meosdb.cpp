@@ -148,11 +148,10 @@ int MEOSDB_API msSynchronizeRead(oBase *obj)
   nSynchEnt++;
   if (nSynchEnt % 100 == 99)
     OutputDebugString(L"Synchronized 100 entities\n");
-
-  return msql.syncRead(false, obj);
-	else if(typeid(*obj)==typeid(oExtendedEvent)){
-		return msql.SyncRead((oEvent *) obj);
+	if(typeid(*obj)==typeid(oExtendedEvent)){
+		return msql.syncRead(false, (oEvent *) obj);
 	}
+	return msql.syncRead(false, obj);
 
 }
 

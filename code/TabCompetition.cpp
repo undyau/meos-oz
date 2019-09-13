@@ -1881,14 +1881,14 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       else if (filterIndex == ImportFormats::OE) {
         oe->exportOECSV(save.c_str(), cSVLanguageHeaderIndex, includeSplits);
       }
-      else if (filterIndex == ImportFormats::IOF30BYCOURSE || filterIndex == ImportFormats::IOF203BYCOURSE) {
-          ClassConfigInfo cnf;
-          oe->getClassConfigurationInfo(cnf);
-          if (!cnf.hasTeamClass()) {
-            oEvent::IOFVersion ver = filterIndex == ImportFormats::IOF30BYCOURSE ? oEvent::IOF30 : oEvent::IOF20;
-            static_cast<oExtendedEvent*>(oe)->exportCourseOrderedIOFSplits(ver, save.c_str(), true, set<int>(), -1);        
-          }
-      
+			else if (filterIndex == ImportFormats::IOF30BYCOURSE || filterIndex == ImportFormats::IOF203BYCOURSE) {
+				ClassConfigInfo cnf;
+				oe->getClassConfigurationInfo(cnf);
+				if (!cnf.hasTeamClass()) {
+					oEvent::IOFVersion ver = filterIndex == ImportFormats::IOF30BYCOURSE ? oEvent::IOF30 : oEvent::IOF20;
+					static_cast<oExtendedEvent*>(oe)->exportCourseOrderedIOFSplits(ver, save.c_str(), true, set<int>(), -1);
+					}
+			}
       else {
         oListParam par;
         par.listCode = EStdResultList;

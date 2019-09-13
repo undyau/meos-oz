@@ -943,7 +943,7 @@ bool oEvent::save(const wstring &fileIn) {
   xml.write("NameId", currentNameId);
   xml.write("Annotation", Annotation);
   xml.write("Id", Id);
-..writeExtraXml(xml);
+  writeExtraXml(xml);
   xml.write("Updated", Modified.getStamp());
 
   oEventData->write(this, xml);
