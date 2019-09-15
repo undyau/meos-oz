@@ -1,3 +1,6 @@
+  15 September 2019
+	Merge with MEOS 3.6.1089
+
   14 October 2018 3.5.916.0
 	Merge with MEOS 3.5.916
 
