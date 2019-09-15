@@ -111,7 +111,7 @@ void oSSSQuickStart::AddMeosOzCustomList(wstring a_ReportDef)
 						exepath[i] = '\0';
 						break;
 						}
-				wcscat(exepath,a_ReportDef.c_str());
+				wcscat_s(exepath,a_ReportDef.c_str());
 				if (fileExist(exepath))
 					CopyFile(exepath, path, true);
 				}
@@ -201,6 +201,7 @@ void oSSSQuickStart::CustomiseClasses()
   oClassList::iterator it;
   for (it=m_Event.Classes.begin();it!=m_Event.Classes.end();++it) 
 		{
+		it->setAllowQuickEntry(true);
 		if (it->getName().size() < 4)
 			{
 			wstring gender = it->getName().substr(it->getName().size()-1,1);
@@ -209,9 +210,10 @@ void oSSSQuickStart::CustomiseClasses()
 
 			int s(0);
 			time_t t = time(0);   // get time now
-			struct tm * now = localtime( & t );
+			struct tm now;
+			localtime_s(&now, &t);
 
-			if (now->tm_mon + 1 <=6)
+			if (now.tm_mon + 1 <=6)
 				s = 1; // for second half of season split over a year boundary, use last year's age
 			if (it->getName().size() == 2)
 				{

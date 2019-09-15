@@ -4,7 +4,7 @@
 4.  Sydney Summer Series - upload to itsdamp
 5.  Regular SL event 
 6.  Print Label still works
-7.  Australian stats in summary
+7.  Create event with score and line events mixed and check results.
 8.  Sydney Summer Series - loads custom results reports
 9.  SI number in output XML
 10. Test with server mode
@@ -16,4 +16,4 @@
 16. Check that Eventor is not setting mass start times for classes
 17. Export to RouteGadget (ie XML 2 result formatting)
 18. Export event to Eventor with XML 3 where the day of month is 1-9 (defect in MEOS 3.5)
-19. Create event with score and line events mixed and check results.
+

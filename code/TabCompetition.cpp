@@ -1387,7 +1387,8 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
         gdi.addItem("StartType", lang.tl("Lottad startlista"), SMDrawn);
         gdi.addItem("StartType", lang.tl("Fria starttider"), SMFree);
         gdi.addItem("StartType", lang.tl("Jag sköter lottning själv"), SMCustom);
-        gdi.selectFirstItem("StartType");
+        //gdi.selectFirstItem("StartType");
+				gdi.selectItemByData("StartType", SMCustom);
         gdi.fillDown();
         gdi.popX();
         gdi.dropLine(3);

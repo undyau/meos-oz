@@ -2980,15 +2980,11 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
     }
 
     xml.write("Status", formatStatus(r.getStatus()));
-    if (r.getClassRef(false)->isRogaining()) {
-        xml.write("Score", "type", L"Score", itow(r.getRogainingPoints(true)));
-        xml.write("Score", "type", L"Penalty", itow(r.getRogainingReduction()));
-    }
 
-    int rg = r.getRogainingPoints(false);
-    if (rg > 0) {
-      xml.write("Score", "type", L"Score", itow(rg));
-      xml.write("Score", "type", L"Penalty", itow(r.getRogainingReduction()));
+		int rg = r.getRogainingPoints(false);
+    if (rg > 0 || r.getClassRef(false)->isRogaining()) {
+        xml.write("Score", "type", L"Score", itow(rg));
+        xml.write("Score", "type", L"Penalty", itow(r.getRogainingReduction()));
     }
     if ( (r.getTeam() && r.getClassRef(false)->getClassType() != oClassPatrol && !teamsAsIndividual) || hasInputTime) {
       xml.startTag("OverallResult");
