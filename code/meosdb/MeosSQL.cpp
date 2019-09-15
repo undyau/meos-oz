@@ -3914,6 +3914,9 @@ OpFailStatus MeosSQL::syncRead(bool forceRead, oBase *obj) {
   else if (typeid(*obj) == typeid(oEvent)) {
     ret = SyncRead((oEvent *)obj);
   }
+	else if (typeid(*obj) == typeid(oExtendedEvent)) {
+		ret = SyncRead((oEvent *)obj);
+		}
   else 
     throw std::exception("Database error");
 
