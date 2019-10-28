@@ -71,7 +71,7 @@ int ListsCB(gdioutput *gdi, int type, void *data);
 
 TabCompetition::TabCompetition(oEvent *poe):TabBase(poe)
 {
-  eventorBase = poe->getPropertyString("EventorBase", L"https://eventor.orientering.se/api/");
+  eventorBase = poe->getPropertyString("EventorBase", L"hhttps://eventor.orienteering.asn.au/api/");
   iofExportVersion = L"&version=3.0";
   defaultServer=L"localhost";
   defaultName=L"meos";
