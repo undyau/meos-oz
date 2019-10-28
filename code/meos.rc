@@ -47,11 +47,20 @@ LANGUAGE LANG_NEUTRAL, SUBLANG_DEFAULT
 
 IDB_ECO                 BITMAP                  "bmp00001.bmp"
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// PNG
+//
+
+IDI_SPLASHIMAGE         PNG                     "meos.png"
+
+IDI_MEOSIMAGE           PNG                     "title.png"
+
 #endif    // Neutral (Default) resources
 /////////////////////////////////////////////////////////////////////////////
 
-IDI_SPLASHIMAGE PNG "meos.png"
-IDI_MEOSIMAGE PNG "title.png"
+
 /////////////////////////////////////////////////////////////////////////////
 // English (United States) resources
 
@@ -149,8 +158,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,6,1089,0
- PRODUCTVERSION 3,6,1089,0
+ FILEVERSION 3,6,1089,3
+ PRODUCTVERSION 3,6,1089,3
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -167,12 +176,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", " "
             VALUE "FileDescription", "meos"
-            VALUE "FileVersion", "3.6.1089.0"
+            VALUE "FileVersion", "3.6.1089.3"
             VALUE "InternalName", "meos"
             VALUE "LegalCopyright", "Copyright © 2007-2019"
             VALUE "OriginalFilename", "meos.exe"
             VALUE "ProductName", "  meos"
-            VALUE "ProductVersion", "3.6.1089.0"
+            VALUE "ProductVersion", "3.6.1089.3"
         END
     END
     BLOCK "VarFileInfo"

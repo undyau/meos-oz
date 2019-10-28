@@ -54,13 +54,17 @@ wstring getMajorVersion() {
   return L"3.6";
 }
 
+int getMinorVersion() {   // Used by MEOS-OZ only
+	return 3;
+	}
+
 wstring getMeosFullVersion() {
   wchar_t bf[256];
   wstring maj = getMajorVersion();
   if (getBuildType().empty())
-    swprintf_s(bf, L"Version X#%s.%d, %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getMeosDate().c_str());
+    swprintf_s(bf, L"Version X#%s.%d, %s (Meos-Oz %s.%d.%d)", maj.c_str(), getMeosBuild(), getMeosDate().c_str(), maj.c_str(), getMeosBuild(), getMinorVersion());
   else
-    swprintf_s(bf, L"Version X#%s.%d, %s, %s (+ minor Australian customisations)", maj.c_str(), getMeosBuild(), getBuildType().c_str(), getMeosDate().c_str());
+    swprintf_s(bf, L"Version X#%s.%d, %s, %s (Meos-Oz %s.%d.%d)", maj.c_str(), getMeosBuild(), getBuildType().c_str(), getMeosDate().c_str(), maj.c_str(), getMeosBuild(), getMinorVersion());
   return bf;
 }
 
