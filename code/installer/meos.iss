@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{5A8ACFDC-9E0A-4B59-9D8F-4013251EB156}
 AppName=MEOS-OZ
-AppVersion=3.6.1089.0
+AppVersion=3.6.1089.3
 AppPublisher=undy
 AppPublisherURL=https://github.com/undyau/meos-oz
 AppSupportURL=https://github.com/undyau/meos-oz
@@ -70,7 +70,7 @@ function VCRedistNeedsInstall: Boolean;
   key: String;
  begin
   Result := True;
-  key := 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
+  key := 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86';
   if RegQueryDWordValue(HKEY_LOCAL_MACHINE, key, 'Major', major) then begin
     if RegQueryDWordValue(HKEY_LOCAL_MACHINE, key, 'Minor', minor) then begin
       if RegQueryDWordValue(HKEY_LOCAL_MACHINE, key, 'Bld', bld) then begin

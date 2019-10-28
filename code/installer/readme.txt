@@ -1,3 +1,7 @@
+  28 October 2019 3.6.1089.3
+- Eventor API address defaulted to Swedish Eventor
+- Improve detection of required Microsoft run-time libraries
+
   15 September 2019
 	Merge with MEOS 3.6.1089
 
