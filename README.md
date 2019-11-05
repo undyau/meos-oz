@@ -3,12 +3,12 @@ MeOS - A Much Easier Orienteering System
 
 - MeOS project: www.melin.nu/meos
 - Source code for the MeOS project: https://github.com/melinsoftware/meos
-- Soure code for the MeOS-OZ project: https://github.com/undyau/meos-oz
+- Source code for the MeOS-OZ project: https://github.com/undyau/meos-oz
 
 ## MeOS-OZ differences from main Meos Project
 - XML export by course
 - Default language English
-- Defeault Eventor is Australian Eventor
+- Default Eventor is Australian Eventor
 - Support to print sticky label results
 - Fastest legs bold-printed on splits
 - Automated support for known ranges of rental SI cards

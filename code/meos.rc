@@ -158,8 +158,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,6,1089,3
- PRODUCTVERSION 3,6,1089,3
+ FILEVERSION 3,6,1089,4
+ PRODUCTVERSION 3,6,1089,4
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -176,12 +176,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", " "
             VALUE "FileDescription", "meos"
-            VALUE "FileVersion", "3.6.1089.3"
+            VALUE "FileVersion", "3.6.1089.4"
             VALUE "InternalName", "meos"
             VALUE "LegalCopyright", "Copyright © 2007-2019"
             VALUE "OriginalFilename", "meos.exe"
             VALUE "ProductName", "  meos"
-            VALUE "ProductVersion", "3.6.1089.3"
+            VALUE "ProductVersion", "3.6.1089.4"
         END
     END
     BLOCK "VarFileInfo"

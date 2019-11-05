@@ -1,4 +1,7 @@
-  28 October 2019 3.6.1089.3
+  5 November 2019 3.6.1089.4
+- Fix url for Australian Eventor API
+	
+	28 October 2019 3.6.1089.3
 - Eventor API address defaulted to Swedish Eventor
 - Improve detection of required Microsoft run-time libraries
 
