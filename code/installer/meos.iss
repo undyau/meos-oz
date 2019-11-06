@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{5A8ACFDC-9E0A-4B59-9D8F-4013251EB156}
 AppName=MEOS-OZ
-AppVersion=3.6.1089.4
+AppVersion=3.6.1089.5
 AppPublisher=undy
 AppPublisherURL=https://github.com/undyau/meos-oz
 AppSupportURL=https://github.com/undyau/meos-oz
@@ -27,7 +27,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "meos.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\Release\meos.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "libHaru.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "libmySQL.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "license.txt"; DestDir: "{app}"; Flags: ignoreversion

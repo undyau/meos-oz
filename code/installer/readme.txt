@@ -1,3 +1,9 @@
+  6 November 2019 3.6.1089.5
+- Start times published to Eventor were corrupted if using
+  UTC start times and start time offset from midnight is 
+	smaller than difference from UTC. 
+	Upstream issue: https://github.com/melinsoftware/meos/issues/28
+
   5 November 2019 3.6.1089.4
 - Fix url for Australian Eventor API
 	

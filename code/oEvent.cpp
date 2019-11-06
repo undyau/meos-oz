@@ -2389,7 +2389,7 @@ const wstring &oEvent::getTimeZoneString() const {
 
 wstring oEvent::getAbsDateTimeISO(DWORD time, bool includeDate, bool useGMT) const
 {
-  DWORD t = ZeroTime + time;
+  long t = ZeroTime + time;
   wstring dateS, timeS;
   if (int(t)<0) {
     dateS = L"2000-01-01";
