@@ -57,6 +57,7 @@ Download::Download()
   bytesToLoad = 1024;
 
   success = false;
+	doUpload = false;
 }
 
 Download::~Download()
@@ -78,6 +79,7 @@ void __cdecl SUThread(void *ptr)
 }
 
 bool Download::createDownloadThread() {
+	doUpload = false;
   doExit=false;
   hThread=_beginthread(SUThread, 0, this);
 
@@ -114,9 +116,14 @@ void Download::shutDown()
 void Download::initThread()
 {
   int status = true;
-  while(!doExit && status) {
-    status = doDownload();
-  }
+	if (!doUpload) {
+		while (!doExit && status) {
+			status = doDownload();
+		}
+	}
+	else 
+		status = postData(postUrlw, postDataw, false);
+
   hThread=0;
 }
 
@@ -602,7 +609,7 @@ void ListIpAddresses(vector<string>& ipAddrs)
   adapter_addresses = NULL;
 }
 
-void Download::postData(const wstring &url, const wstring &data, ProgressWindow &pw) {
+bool Download::postData(const wstring &url, const wstring &data, bool ui) {
   SetLastError(0);
   DWORD_PTR dw = 0;
   URL_COMPONENTS uc;
@@ -683,7 +690,7 @@ void Download::postData(const wstring &url, const wstring &data, ProgressWindow 
   if (hConnect)
 		InternetCloseHandle(hConnect);
 
-  if (!success) {
+  if (ui && !success) {
  		DWORD ec = GetLastError();
 
     wstring error = ec != 0 ? getErrorMessage(ec) : L"";
@@ -692,4 +699,25 @@ void Download::postData(const wstring &url, const wstring &data, ProgressWindow 
 		throw std::exception("Ett okänt fel inträffade.");
   }
 
+	return success;
+
  }
+
+void Download::setUploadData(wstring url, wstring data)
+{
+	postDataw = data;
+	postUrlw = url;
+}
+
+bool Download::createUploadThread() {
+	doUpload = true;
+	doExit = false;
+	hThread = _beginthread(SUThread, 0, this);
+
+	if (hThread == -1) {
+		hThread = 0;
+		return false;
+		}
+
+	return true;
+	}

@@ -30,7 +30,7 @@
 #include "oCard.h"
 #include "meos_util.h"
 
-#include "oEvent.h"
+#include "oExtendedEvent.h"
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -84,6 +84,7 @@ bool oBase::synchronize(bool writeOnly)
         changed = false;
     }
   }
+	static_cast<oExtendedEvent*>(oe)->checkForPeriodicEvents();
   return true;
 }
 
