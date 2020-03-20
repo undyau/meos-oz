@@ -8,14 +8,18 @@
 #include "Download.h"
 #include "progress.h"
 #include "csvparser.h"
+#include <time.h>
 
 
 oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
 {
-	IsSydneySummerSeries = 0;
+	IsSydneySummerSeries = false;
   SssEventNum = 0;
   SssSeriesPrefix = L"sss";
 	LoadedCards = false;
+	AutoUploadSssInterval = (time_t) getPropertyInt("AutoUploadSssInterval", 120);
+	LastAutoUploadSssTime = 0;
+	AutoUploadSss = false;
 }
 
 oExtendedEvent::~oExtendedEvent(void)
@@ -141,41 +145,86 @@ void oEvent::calculateCourseRogainingResults()
 	}
 }
 
-
-void oExtendedEvent::uploadSss(gdioutput &gdi)
+int oExtendedEvent::incUploadCounter()
 {
 	static int s_counter(0);
-	wstring url = gdi.getText("SssServer");
-	SssEventNum = gdi.getTextNo("SssEventNum", false);
-  SssSeriesPrefix = gdi.getText("SssSeriesPrefix",false);
-	if (SssEventNum == 0) {
-		gdi.alert(L"Invalid event number :" + gdi.getText("SssEventNum"));
-		return;
-		}
+	s_counter++;
 
+	return s_counter;
+}
+
+void oExtendedEvent::prepData4SssUpload(wstring& data)
+	{
 	wstring resultCsv = getTempFile();
-	ProgressWindow pw(gdibase.getHWNDTarget());
 	exportOrCSV(resultCsv.c_str(), false);
-	wstring data = (loadCsvToString(resultCsv));
-	data = string_replace(data, L"&",L"and");
-	data = L"Name=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Title=" + Name + L"&Subtitle=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Data=" + data + L"&Serial=" + to_wstring(s_counter++);
+	data = (loadCsvToString(resultCsv));
+	removeTempFile(resultCsv);
+	data = string_replace(data, L"&", L"and");
+	if (getIsSydneySummerSeries())
+		data = L"Name=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Title=" + Name + L"&Subtitle=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Data=" + data + L"&Serial=" + to_wstring(incUploadCounter());
+	else
+		data = L"Name=" + SssAltName + L"&Title=" + Name + L"&Subtitle=" + SssAltName + L"&Data=" + data + L"&Serial=" + to_wstring(incUploadCounter());
+	}
+
+void oExtendedEvent::uploadSssUnattended()
+{
+	wstring url = getPropertyString("SssServer", L"http://sportident.itsdamp.com/liveresult.php");
+	wstring data;
+	prepData4SssUpload(data);
+	Download dwl;
+	dwl.initInternet();
+	string result;
+	dwl.setUploadData(url, data);
+
+	dwl.createUploadThread(); 
+	LastAutoUploadSssTime = time(0);  // Pretend it worked even if I never check
+}
+
+void oExtendedEvent::uploadSss(gdioutput &gdi, bool automate)
+{
+
+	wstring url = gdi.getText("SssServer");
+	if (getIsSydneySummerSeries()) {
+		SssSeriesPrefix = gdi.getText("SssSeriesPrefix", false);
+		if (SssEventNum == 0) {
+			gdi.alert(L"Invalid event number :" + gdi.getText("SssEventNum"));
+			return;
+			}
+		SssEventNum = gdi.getTextNo("SssEventNum", false);
+		}
+	else {
+		SssAltName = gdi.getText("SssAltName", false);
+		if (SssAltName.empty()) {
+			gdi.alert(L"Invalid event label:" + gdi.getText("SssAltName"));
+			return;
+			}
+		}
+		
+
+	wstring data;
+	prepData4SssUpload(data);
+
 	Download dwl;
   dwl.initInternet();
 	string result;
   try {
-		dwl.postData(url, data, pw);
+		dwl.postData(url, data);
   }
   catch (std::exception &) {
-    removeTempFile(resultCsv);
     throw;
   }
 
-  dwl.createDownloadThread();
-  while (dwl.isWorking()) {
-    Sleep(100);
-	}
 	setProperty("SssServer",url);
-	gdi.alert(L"Completed upload of results to " + url);
+	if (automate) {
+		gdi.alert(L"Completed upload of results to " + url + L", will repeat");
+		setAutoUploadSss(true);
+		LastAutoUploadSssTime = time(0);
+	}
+	else {
+		gdi.alert(L"Completed upload of results to " + url);
+		setAutoUploadSss(false);
+		LastAutoUploadSssTime = time(0);
+	}
 }
 
 void oExtendedEvent::writeExtraXml(xmlparser &xml)
@@ -452,4 +501,25 @@ bool oExtendedEvent::isRentedCard(int card)
 		if (RentedCards.at(i) == card)
 			return true;
 	return false;
+}
+
+bool oExtendedEvent::getAutoUploadSss()
+{
+	return AutoUploadSss;
+}
+
+bool oExtendedEvent::setAutoUploadSss(bool automatic)
+{
+	AutoUploadSss = automatic;
+	return AutoUploadSss;
+}
+
+void oExtendedEvent::checkForPeriodicEvents()
+{
+	static DWORD lastUpdate = 0;
+	if (getAutoUploadSss()) {
+		time_t currentTime = time(0);
+		if (currentTime - LastAutoUploadSssTime > AutoUploadSssInterval)
+			uploadSssUnattended();
+	}
 }

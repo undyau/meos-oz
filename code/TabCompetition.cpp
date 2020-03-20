@@ -61,6 +61,7 @@
 #include <cassert>
 #include <cmath>
 #include <io.h>
+#include <time.h>
 
 void Setup(bool overwrite, bool overWriteall);
 void exportSetup();
@@ -212,7 +213,7 @@ void TabCompetition::loadSssUploadPage(gdioutput &gdi)
 {
   gdi.clearPage(false);
   showConnectionPage=true;    
-  gdi.addString("", boldLarge, "Summer Series Upload");
+  gdi.addString("", boldLarge, "Results Upload");
   gdi.pushX();
   gdi.dropLine();
   gdi.addString("", italicText, "Check the results in the Lists tab before doing the upload");
@@ -223,11 +224,28 @@ void TabCompetition::loadSssUploadPage(gdioutput &gdi)
 
   gdi.fillRight();
   gdi.addInput("SssServer", defaultSssServer, 30, 0, L"Upload server:", L"URL of server expecting upload");
-  gdi.addInput("SssSeriesPrefix", static_cast<oExtendedEvent*>(oe)->getSssSeriesPrefix(), 4, 0, L"Series");
-  gdi.addInput("SssEventNum", itow(static_cast<oExtendedEvent*>(oe)->getSssEventNum()), 4, 0, L"Number within series");
+	if (static_cast<oExtendedEvent*>(oe)->getIsSydneySummerSeries()) {
+		gdi.addInput("SssSeriesPrefix", static_cast<oExtendedEvent*>(oe)->getSssSeriesPrefix(), 4, 0, L"Series");
+		gdi.addInput("SssEventNum", itow(static_cast<oExtendedEvent*>(oe)->getSssEventNum()), 4, 0, L"Number within series");
+		}
+	else {
+		gdi.addInput("SssAltName", static_cast<oExtendedEvent*>(oe)->getSssAltName(), 8, 0, L"Short event label (e.g. ML10)");
+		}
+	time_t last = static_cast<oExtendedEvent*>(oe)->getLastSssUploadTime();
+	if (last > 0)
+		{
+		gdi.dropLine();
+		gdi.popX();
+		char buf[30];
+		ctime_s(buf, 30, &last);
+		buf[24] = '\0';
+		gdi.dropLine(2);
+		gdi.addString("", italicText, string("Last upload ") + string(buf));
+		}
   gdi.dropLine(4);
   gdi.popX();
   gdi.addButton("SssUpload", "Upload Results", CompetitionCB);
+	gdi.addButton("SssUploadAuto", "Auto Upload", CompetitionCB);
   gdi.addButton("Cancel", "Till huvudsidan", CompetitionCB);
   gdi.refresh();
 }
@@ -730,7 +748,11 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
     else if (bi.id=="DoSSSUpload") 
       loadSssUploadPage(gdi);
     else if (bi.id=="SssUpload") 
-      static_cast<oExtendedEvent*>(oe)->uploadSss(gdi);
+      static_cast<oExtendedEvent*>(oe)->uploadSss(gdi, false);
+		else if (bi.id == "SssUploadAuto")
+			static_cast<oExtendedEvent*>(oe)->uploadSss(gdi, true);
+		else if (bi.id == "SssUploadAutoStop")
+			static_cast<oExtendedEvent*>(oe)->setAutoUploadSss(false);
     else if (bi.id=="SaveClient") {
       oe->setClientName(gdi.getText("ClientName"));
       if (gdi.getText("ClientName").length()>0)
@@ -2705,23 +2727,21 @@ bool TabCompetition::loadPage(gdioutput &gdi)
       gdi.addButton(gdi.getCX(), gdi.getCY(), bw, "ConnectMySQL", "Databasanslutning",
                     CompetitionCB, "", false, false);
     }
-  if (static_cast<oExtendedEvent*>(oe)->getIsSydneySummerSeries())
 
+		gdi.addButton(gdi.getCX(), gdi.getCY(), bw, "DoSSSUpload", "Upload Results", 
+									CompetitionCB, "", false, false);
+		rc.bottom = gdi.getCY() + gdi.scaleLength(30);
+		rc.right = rc.left + bw + gdi.scaleLength(60);
 
-    gdi.addButton(gdi.getCX(), gdi.getCY(), bw, "DoSSSUpload", "Upload SSS Results", 
-                  CompetitionCB, "", false, false);
-    rc.bottom = gdi.getCY() + gdi.scaleLength(30);
-    rc.right = rc.left + bw + gdi.scaleLength(60);
+		gdi.addRectangle(rc, colorLightBlue);
 
-    gdi.addRectangle(rc, colorLightBlue);
+		gdi.popX();
 
-    gdi.popX();
+		gdi.dropLine(3);
+		copyrightLine(gdi);
 
-    gdi.dropLine(3);
-    copyrightLine(gdi);
-
-    gdi.setOnClearCb(CompetitionCB);
-  }
+		gdi.setOnClearCb(CompetitionCB);
+		}
   gdi.refresh();
   return true;
 }

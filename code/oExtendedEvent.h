@@ -11,15 +11,23 @@ public:
 
 	bool SSSQuickStart(gdioutput &gdi);
 	void exportCourseOrderedIOFSplits(IOFVersion version, const wchar_t *file, bool oldStylePatrolExport, const set<int> &classes, int leg);
-	void uploadSss(gdioutput &gdi);
+	void uploadSss(gdioutput &gdi, bool automate);
+	void uploadSssUnattended();
+	int incUploadCounter();
+	void prepData4SssUpload(wstring& data);
 	virtual void writeExtraXml(xmlparser &xml);
 	virtual void readExtraXml(const xmlparser &xml);
 	int getSssEventNum() {return SssEventNum;};
+	wstring getSssAltName() { return SssAltName; }
   wstring getSssSeriesPrefix() {return SssSeriesPrefix;};
 	int getIsSydneySummerSeries() {return IsSydneySummerSeries;};
 	bool exportOrCSV(const wchar_t  *file, bool byClass);
 	bool isRentedCard(int card);
 	void loadRentedCardNumbers();
+	bool getAutoUploadSss();
+	time_t getLastSssUploadTime() { return LastAutoUploadSssTime; }
+	bool setAutoUploadSss(bool automatic);
+	void checkForPeriodicEvents();
 
 private:
 	wstring loadCsvToString(wstring file);
@@ -27,6 +35,10 @@ private:
 	bool IsSydneySummerSeries;
 	int SssEventNum;
   wstring SssSeriesPrefix;
+	wstring SssAltName;
 	std::vector<int> RentedCards;
 	bool LoadedCards;
+	bool AutoUploadSss;
+	time_t LastAutoUploadSssTime;
+	time_t AutoUploadSssInterval;
 };

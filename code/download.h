@@ -67,17 +67,21 @@ public:
 
   void postFile(const wstring &url, const wstring &file, const wstring &fileOut,
                 const vector< pair<wstring, wstring> > &headers, ProgressWindow &pw);
-  void postData(const wstring &url, const wstring &data, ProgressWindow &pw);
+  bool postData(const wstring &url, const wstring &data, bool ui = true);
   int processMessages();
   bool successful();
   bool isWorking();
   void setBytesToDownload(DWORD btd);
+
   void endDownload();
   void downloadFile(const wstring &url, const wstring &file, const vector< pair<wstring, wstring> > &headers);
   void initInternet();
   void shutDown();
   bool createDownloadThread();
+	bool createUploadThread();
   void downLoadNoThread() {initThread();}
+
+	void setUploadData(wstring url, wstring data);
 
   Download();
   virtual ~Download();
@@ -88,6 +92,10 @@ protected:
   friend void SUThread(void *ptr);
 
   std::vector<string*> usedBuffers;
+
+	wstring postDataw;
+	wstring postUrlw;
+	bool doUpload;
 
 };
 

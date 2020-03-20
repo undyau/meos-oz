@@ -1,3 +1,8 @@
+  6 November 2019 3.6.1089.6
+- Turn SSS result upload facility into general upload facility
+  to use, click on the button Upload Results. 
+- Add simple automated results uploads via Upload Results.
+
   6 November 2019 3.6.1089.5
 - Start times published to Eventor were corrupted if using
   UTC start times and start time offset from midnight is 
