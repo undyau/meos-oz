@@ -8,6 +8,7 @@
 #include "Download.h"
 #include "progress.h"
 #include "csvparser.h"
+#include <time.h>
 
 
 oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
@@ -16,6 +17,9 @@ oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
   SssEventNum = 0;
   SssSeriesPrefix = L"sss";
 	LoadedCards = false;
+	AutoUploadSssInterval = (time_t) getPropertyInt("AutoUploadSssInterval", 120);
+	LastAutoUploadSssTime = 0;
+	AutoUploadSss = false;
 }
 
 oExtendedEvent::~oExtendedEvent(void)
@@ -173,7 +177,7 @@ void oExtendedEvent::uploadSssUnattended()
 	dwl.setUploadData(url, data);
 
 	dwl.createUploadThread(); 
-	GetSystemTime(&LastAutoUploadTime);  // Pretend it worked even if I never check
+	LastAutoUploadSssTime = time(0);  // Pretend it worked even if I never check
 }
 
 void oExtendedEvent::uploadSss(gdioutput &gdi, bool automate)
@@ -188,8 +192,14 @@ void oExtendedEvent::uploadSss(gdioutput &gdi, bool automate)
 			}
 		SssEventNum = gdi.getTextNo("SssEventNum", false);
 		}
-	else
+	else {
 		SssAltName = gdi.getText("SssAltName", false);
+		if (SssAltName.empty()) {
+			gdi.alert(L"Invalid event label:" + gdi.getText("SssAltName"));
+			return;
+			}
+		}
+		
 
 	wstring data;
 	prepData4SssUpload(data);
@@ -207,13 +217,13 @@ void oExtendedEvent::uploadSss(gdioutput &gdi, bool automate)
 	setProperty("SssServer",url);
 	if (automate) {
 		gdi.alert(L"Completed upload of results to " + url + L", will repeat");
-		setAutoUpload(true);
-		GetSystemTime(&LastAutoUploadTime);
+		setAutoUploadSss(true);
+		LastAutoUploadSssTime = time(0);
 	}
 	else {
 		gdi.alert(L"Completed upload of results to " + url);
-		setAutoUpload(false);
-		GetSystemTime(&LastAutoUploadTime);
+		setAutoUploadSss(false);
+		LastAutoUploadSssTime = time(0);
 	}
 }
 
@@ -493,21 +503,23 @@ bool oExtendedEvent::isRentedCard(int card)
 	return false;
 }
 
-bool oExtendedEvent::getAutoUpload()
+bool oExtendedEvent::getAutoUploadSss()
 {
-	return AutoUpload;
+	return AutoUploadSss;
 }
 
-bool oExtendedEvent::setAutoUpload(bool automatic)
+bool oExtendedEvent::setAutoUploadSss(bool automatic)
 {
-	AutoUpload = automatic;
-	return AutoUpload;
+	AutoUploadSss = automatic;
+	return AutoUploadSss;
 }
 
 void oExtendedEvent::checkForPeriodicEvents()
 {
 	static DWORD lastUpdate = 0;
-	if (getAutoUpload()) {
-	if now - LastAutoUploadTime > something then do an upload in a non-UI thread
+	if (getAutoUploadSss()) {
+		time_t currentTime = time(0);
+		if (currentTime - LastAutoUploadSssTime > AutoUploadSssInterval)
+			uploadSssUnattended();
 	}
 }

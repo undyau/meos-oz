@@ -61,6 +61,7 @@
 #include <cassert>
 #include <cmath>
 #include <io.h>
+#include <time.h>
 
 void Setup(bool overwrite, bool overWriteall);
 void exportSetup();
@@ -229,6 +230,17 @@ void TabCompetition::loadSssUploadPage(gdioutput &gdi)
 		}
 	else {
 		gdi.addInput("SssAltName", static_cast<oExtendedEvent*>(oe)->getSssAltName(), 8, 0, L"Short event label (e.g. ML10)");
+		}
+	time_t last = static_cast<oExtendedEvent*>(oe)->getLastSssUploadTime();
+	if (last > 0)
+		{
+		gdi.dropLine();
+		gdi.popX();
+		char buf[30];
+		ctime_s(buf, 30, &last);
+		buf[24] = '\0';
+		gdi.dropLine(2);
+		gdi.addString("", italicText, string("Last upload ") + string(buf));
 		}
   gdi.dropLine(4);
   gdi.popX();
@@ -740,7 +752,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
 		else if (bi.id == "SssUploadAuto")
 			static_cast<oExtendedEvent*>(oe)->uploadSss(gdi, true);
 		else if (bi.id == "SssUploadAutoStop")
-			static_cast<oExtendedEvent*>(oe)->setAutoUpload(false);
+			static_cast<oExtendedEvent*>(oe)->setAutoUploadSss(false);
     else if (bi.id=="SaveClient") {
       oe->setClientName(gdi.getText("ClientName"));
       if (gdi.getText("ClientName").length()>0)

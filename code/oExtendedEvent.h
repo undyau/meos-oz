@@ -24,8 +24,9 @@ public:
 	bool exportOrCSV(const wchar_t  *file, bool byClass);
 	bool isRentedCard(int card);
 	void loadRentedCardNumbers();
-	bool getAutoUpload();
-	bool setAutoUpload(bool automatic);
+	bool getAutoUploadSss();
+	time_t getLastSssUploadTime() { return LastAutoUploadSssTime; }
+	bool setAutoUploadSss(bool automatic);
 	void checkForPeriodicEvents();
 
 private:
@@ -37,6 +38,7 @@ private:
 	wstring SssAltName;
 	std::vector<int> RentedCards;
 	bool LoadedCards;
-	bool AutoUpload;
-	SYSTEMTIME LastAutoUploadTime;
+	bool AutoUploadSss;
+	time_t LastAutoUploadSssTime;
+	time_t AutoUploadSssInterval;
 };

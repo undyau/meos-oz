@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{5A8ACFDC-9E0A-4B59-9D8F-4013251EB156}
 AppName=MEOS-OZ
-AppVersion=3.6.1089.5
+AppVersion=3.6.1089.6
 AppPublisher=undy
 AppPublisherURL=https://github.com/undyau/meos-oz
 AppSupportURL=https://github.com/undyau/meos-oz
@@ -16,7 +16,7 @@ DefaultDirName={pf}\MEOS-OZ
 DefaultGroupName=MEOS-OZ
 LicenseFile=license.txt
 OutputDir=.
-OutputBaseFilename=setup
+OutputBaseFilename=meos-setup
 Compression=lzma
 SolidCompression=yes
 
