@@ -1157,7 +1157,7 @@ int TabSI::siCB(gdioutput &gdi, int type, void *data)
         for (int c : hc)
           csv.outputRow(itos(c));
         csv.closeOutput();
-				oe->setProperty("HireCardFile", fn);
+        oe->setProperty("HireCardFile", fn);
       }
     }
     else if (bi.id == "RHCPrint") {
