@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -291,7 +291,7 @@ int TabAuto::processButton(gdioutput &gdi, const ButtonInfo &bu)
     gdi.setInputStatus("ExportScript", stat);
     gdi.setInputStatus("BrowseFile", stat);
     gdi.setInputStatus("BrowseScript", stat);
-    if (gdi.hasField("HTMLRefresh")) {
+    if (gdi.hasWidget("HTMLRefresh")) {
       gdi.setInputStatus("HTMLRefresh", stat);
       gdi.setInputStatus("StructuredExport", stat);
     }
@@ -366,7 +366,7 @@ int TabAuto::processButton(gdioutput &gdi, const ButtonInfo &bu)
             else
               par.setLegNumberCoded(0);
 
-            oe->generateListInfo(par, gdi.getLineHeight(), prm->listInfo);
+            oe->generateListInfo(par, prm->listInfo);
           }
         }
         prm->po.onlyChanged = gdi.isChecked("OnlyChanged");

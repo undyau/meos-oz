@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -42,18 +42,69 @@ static char THIS_FILE[]=__FILE__;
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-char RunnerStatusOrderMap[100];
 
 oBase::oBase(oEvent *poe) {
   Removed = false;
   oe = poe;
   Id = 0;
   changed = false;
-  reChanged = false;
   counter = 0;
   Modified.update();
   correctionNeeded = true;
   localObject = false;
+}
+
+oBase::oBase(const oBase &in) {
+  Removed = in.Removed;
+  oe = in.oe;
+  Id = in.Id;
+  changed = false;
+  counter = in.counter;
+  Modified.update();
+  correctionNeeded = in.correctionNeeded;
+  localObject = in.localObject;
+  implicitlyAdded = in.implicitlyAdded;
+  addedToEvent = in.addedToEvent;
+  sqlUpdated = in.sqlUpdated;
+  localObject = in.localObject;
+  transientChanged = in.transientChanged;
+}
+
+oBase::oBase(oBase &&in) {
+  Removed = in.Removed;
+  oe = in.oe;
+  Id = in.Id;
+  changed = false;
+  counter = in.counter;
+  Modified.update();
+  correctionNeeded = in.correctionNeeded;
+  localObject = in.localObject;
+  implicitlyAdded = in.implicitlyAdded;
+  addedToEvent = in.addedToEvent;
+  sqlUpdated = in.sqlUpdated;
+  localObject = in.localObject;
+  transientChanged = in.transientChanged;
+  if (in.myReference) {
+    myReference.swap(in.myReference);
+    myReference->ref = this;
+  }
+}
+
+const oBase &oBase::operator=(const oBase &in) {
+  Removed = in.Removed;
+  oe = in.oe;
+  Id = in.Id;
+  changed = false;
+  counter = in.counter;
+  Modified.update();
+  correctionNeeded = in.correctionNeeded;
+  localObject = in.localObject;
+  implicitlyAdded = in.implicitlyAdded;
+  addedToEvent = in.addedToEvent;
+  sqlUpdated = in.sqlUpdated;
+  localObject = in.localObject;
+  transientChanged = in.transientChanged;
+  return *this;
 }
 
 oBase::~oBase(){
@@ -66,12 +117,14 @@ void oBase::remove() {
     myReference->ref = nullptr;
 }
 
+
 bool oBase::synchronize(bool writeOnly)
 {
-  if (oe && changed) {
+  if (oe && (changed || transientChanged)) {
     changedObject();
     oe->dataRevision++;
   }
+  transientChanged = false;
   if (oe && oe->HasDBConnection && (changed || !writeOnly)) {
     correctionNeeded = false;
     if (localObject)
@@ -84,7 +137,7 @@ bool oBase::synchronize(bool writeOnly)
         changed = false;
     }
   }
-	static_cast<oExtendedEvent*>(oe)->checkForPeriodicEvents();
+  static_cast<oExtendedEvent*>(oe)->checkForPeriodicEvents();
   return true;
 }
 
@@ -184,7 +237,20 @@ oDataConstInterface oBase::getDCI(void) const
   return dc.getConstInterface(data, getDISize(), this);
 }
 
-void oBase::updateChanged() {
+void oBase::updateChanged(ChangeType ct) {
   Modified.update();
-  changed=true;
+  if (ct == ChangeType::Update)
+    changed = true;
+  else
+    transientChanged = true;
+}
+
+void oBase::makeQuietChangePermanent() {
+  if (transientChanged)
+    changed = true;
+}
+
+void oBase::update(SqlUpdated &info) const {
+  info.updated = max(sqlUpdated, info.updated);
+  info.counter = max(counter, info.counter);
 }

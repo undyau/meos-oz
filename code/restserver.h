@@ -1,8 +1,8 @@
-#pragma once
+Ôªø#pragma once
 
 /************************************************************************
 MeOS - Orienteering Software
-Copyright (C) 2009-2019 Melin Software HB
+Copyright (C) 2009-2020 Melin Software HB
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Melin Software HB - software@melin.nu - www.melin.nu
-Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -31,6 +31,10 @@ Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
 #include <deque>
 #include <condition_variable>
 #include <tuple>
+#include <random>
+
+class InfoCompetition;
+class xmlbuffer;
 
 namespace restbed {
   class Service;
@@ -111,6 +115,29 @@ private:
 
   string root;
   multimap<string, string> rootMap;
+
+  struct InfoServerContainer {
+    //static int currentInstanceId;
+    int getNextInstanceId();
+
+    const int instanceIncrementor;
+    int thisInstanceId = -1;
+    int nextInstanceId;
+    shared_ptr<InfoCompetition> cmpModel;
+    shared_ptr<xmlbuffer> lastData;
+    set<int> classes;
+    set<int> controls;
+
+    InfoServerContainer(int s, int e) : nextInstanceId(s), instanceIncrementor(e) {}
+  };
+
+  shared_ptr<default_random_engine> randGen;
+  list<InfoServerContainer> isContainers;
+  int getNewInstanceId();
+  xmlbuffer *getMOPXML(oEvent &oe, int id, int &nextId);
+
+  void difference(oEvent &oe, int id, string &answer);
+
 public:
 
   ~RestServer();

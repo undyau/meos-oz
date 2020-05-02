@@ -22,8 +22,6 @@ public:
   wstring getSssSeriesPrefix() {return SssSeriesPrefix;};
 	int getIsSydneySummerSeries() {return IsSydneySummerSeries;};
 	bool exportOrCSV(const wchar_t  *file, bool byClass);
-	bool isRentedCard(int card);
-	void loadRentedCardNumbers();
 	bool getAutoUploadSss();
 	time_t getLastSssUploadTime() { return LastAutoUploadSssTime; }
 	bool setAutoUploadSss(bool automatic);

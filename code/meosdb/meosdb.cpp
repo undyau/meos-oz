@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -70,6 +70,10 @@ int getListMask(oEvent &oe) {
   return msql.getModifiedMask(oe);
 }
 
+void resetSynchTimes() {
+  msql.clearReadTimes();
+}
+
 bool MEOSDB_API msSynchronizeList(oEvent *oe, oListId lid)
 {
   nSynchList++;
@@ -134,9 +138,9 @@ int MEOSDB_API msSynchronizeUpdate(oBase *obj)
 
     return msql.SyncUpdate((oEvent *) obj);
   }
-	else if(typeid(*obj)==typeid(oExtendedEvent)){
-		return msql.SyncUpdate((oEvent *) obj);
-	}
+  else if(typeid(*obj)==typeid(oExtendedEvent)){
+    return msql.SyncUpdate((oEvent *) obj);return msql.SyncUpdate((oEvent *) obj);
+  }
   else if (typeid(*obj)==typeid(oTeam)){
     return msql.syncUpdate((oTeam *) obj, false);
   }
@@ -148,10 +152,10 @@ int MEOSDB_API msSynchronizeRead(oBase *obj)
   nSynchEnt++;
   if (nSynchEnt % 100 == 99)
     OutputDebugString(L"Synchronized 100 entities\n");
-	if(typeid(*obj)==typeid(oExtendedEvent)){
-		return msql.syncRead(false, (oEvent *) obj);
-	}
-	return msql.syncRead(false, obj);
+  if(typeid(*obj)==typeid(oExtendedEvent)){
+    return msql.syncRead(false, (oEvent *) obj);
+  }
+  return msql.syncRead(false, obj);
 
 }
 

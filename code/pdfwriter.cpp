@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -142,6 +142,12 @@ void pdfwriter::selectFont(HPDF_Page page, const PDFFontSet &fs, int format, flo
   }
 }
 
+const float fontFromGdiScale(double gdiScale) {
+  double f = max(1.0, min(gdiScale, 3.0))-1.0;
+  double s = 1.05 + 0.75*f;
+  return float(s);
+}
+
 void pdfwriter::generatePDF(const gdioutput &gdi,
                             const wstring &file,
                             const wstring &pageTitleW,
@@ -206,7 +212,9 @@ void pdfwriter::generatePDF(const gdioutput &gdi,
   float w = HPDF_Page_GetWidth(page);
   float h = HPDF_Page_GetHeight(page);
   float scale = (w / maxX) * 0.95f;
-  float fontScale = 1.5f;
+  
+  double gdiScale = gdi.getScale();
+  const float fontScale = fontFromGdiScale(gdiScale);
 
   vector<RenderedPage> pages;
   PageInfo pageInfo;
@@ -243,33 +251,33 @@ void pdfwriter::generatePDF(const gdioutput &gdi,
       if (fonts.count(info[k].ti.font) == 0) {
         FontInfo fi;
         gdi.getFontInfo(info[k].ti, fi);
-        float fontScale;
+        float fontScaleLoc;
         wstring tmpFile;
         fonts[info[k].ti.font] = fs; //Default fallback
         PDFFontSet &f = fonts[info[k].ti.font];
 
-        HPDF_Font font = getPDFFont(fi.normal, float(gdi.getScale()), tmpFile, fontScale);
+        HPDF_Font font = getPDFFont(fi.normal, float(gdi.getScale()), tmpFile, fontScaleLoc);
         if (!tmpFile.empty())
           tmpFiles.push_back(tmpFile);
         if (font) {
           f.font = font;
-          f.fontScale = fontScale;
+          f.fontScale = fontScaleLoc;
         }
 
-        font = getPDFFont(fi.italic, float(gdi.getScale()), tmpFile, fontScale);
+        font = getPDFFont(fi.italic, float(gdi.getScale()), tmpFile, fontScaleLoc);
         if (!tmpFile.empty())
           tmpFiles.push_back(tmpFile);
         if (font) {
           f.fontItalic = font;
-          f.fontScaleItalic = fontScale;
+          f.fontScaleItalic = fontScaleLoc;
         }
 
-        font = getPDFFont(fi.bold, (float)gdi.getScale(), tmpFile, fontScale);
+        font = getPDFFont(fi.bold, (float)gdi.getScale(), tmpFile, fontScaleLoc);
         if (!tmpFile.empty())
           tmpFiles.push_back(tmpFile);
         if (font) {
           f.fontBold = font;
-          f.fontScaleBold = fontScale;
+          f.fontScaleBold = fontScaleLoc;
         }
       }
 
@@ -282,16 +290,18 @@ void pdfwriter::generatePDF(const gdioutput &gdi,
       string nt = gdi.toUTF8(info[k].ti.text);
         
       if (info[k].ti.format & textRight) {
-        float w = float(info[k].ti.xlimit) * scale*fontScale;
+        float w = float(info[k].ti.xlimit) * scale;
         float sw = HPDF_Page_TextWidth(page, nt.c_str());
-        float space = info[k].ti.xlimit > 0 ? 2 * HPDF_Page_GetCharSpace(page) : 0;
+        //float space = info[k].ti.xlimit > 0 ? 2 * HPDF_Page_GetCharSpace(page) : 0;
+        float space = info[k].ti.xlimit > 0 ? HPDF_Page_TextWidth(page, "-") : 0;
+
         HPDF_Page_TextOut (page, info[k].xp + w - sw - space, h - info[k].yp,
                             nt.c_str());
       }
       else if (info[k].ti.format & textCenter) {
-        float w = float(info[k].ti.xlimit) * scale*fontScale;
+        float w = float(info[k].ti.xlimit) * scale;
         float sw = HPDF_Page_TextWidth(page, nt.c_str());
-        HPDF_Page_TextOut (page, info[k].xp + w - sw/2, h - info[k].yp,
+        HPDF_Page_TextOut (page, info[k].xp + (w - sw) *0.5, h - info[k].yp,
                             nt.c_str());
       }
       else {

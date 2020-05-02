@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -30,33 +30,27 @@
 //V35: abcdef
 //V36: abcdef
 int getMeosBuild() {
-  string revision("$Rev: 915 $");
+  string revision("$Rev: 1004 $");
   return 174 + atoi(revision.substr(5, string::npos).c_str());
 }
 
-//ABCDEFGHIJKILMNOPQRSTUVXYZabcdefghijklmnopqrstuvxyz
-//V2: abcdefgh
-//V3: abcdefghijklmnopqrstuvxyz
-//V31: abcde
-//V32: abcdefgh
-//V33: abcdefghij
-//V34: abcdfge
+//V37: a
 wstring getMeosDate() {
-  wstring date(L"$Date: 2019-07-30 07:05:51 +0200 (ti, 30 jul 2019) $");
+  wstring date(L"$Date: 2020-02-25 21:05:03 +0100 (ti, 25 feb 2020) $");
   return date.substr(7,10);
 }
 
 wstring getBuildType() {
-  return L"Update 2"; // No parantheses (...)
+  return L"RC1"; // No parantheses (...)
 }
 
 wstring getMajorVersion() {
-  return L"3.6";
+  return L"3.7";
 }
 
 int getMinorVersion() {   // Used by MEOS-OZ only
-	return 6;
-	}
+  return 0;
+  }
 
 wstring getMeosFullVersion() {
   wchar_t bf[256];
@@ -107,7 +101,6 @@ void getSupporters(vector<wstring> &supp, vector<wstring> &developSupp)
   supp.emplace_back(L"Hans Carlstedt, Sävedalens AIK");
   supp.emplace_back(L"IFK Mora OK");
   supp.emplace_back(L"Attunda OK");
-  supp.emplace_back(L"OK Tyr, Karlstad");
   supp.emplace_back(L"Siguldas Takas, Latvia");
   supp.emplace_back(L"Eric Teutsch, Ottawa Orienteering Club, Canada");
   supp.emplace_back(L"Silkeborg OK, Denmark");
@@ -139,6 +132,23 @@ void getSupporters(vector<wstring> &supp, vector<wstring> &developSupp)
   supp.emplace_back(L"JWOC 2019");
   developSupp.emplace_back(L"OK Nackhe");
   supp.emplace_back(L"OK Rodhen");
+  supp.emplace_back(L"HEYRIES");
+  developSupp.emplace_back(L"SongTao Wang / Henan Zhixing Exploration Sports Culture Co., Ltd.");
+  developSupp.emplace_back(L"Australian and Oceania Orienteering Championships 2019");
+  supp.emplace_back(L"Järfälla OK");
+  supp.emplace_back(L"TJ Slávia Farmaceut Bratislava");
+  supp.emplace_back(L"OK Tyr, Karlstad");
+  supp.emplace_back(L"Magnus Thornell, Surahammars SOK");
+  supp.emplace_back(L"Mariager Fjord OK");
+  supp.emplace_back(L"Nässjö OK");
+  supp.emplace_back(L"Ringsjö OK");
+  supp.emplace_back(L"Big Foot Orienteers");
+  supp.emplace_back(L"Bay Area Orienteering Club");
+  supp.emplace_back(L"Finspångs SOK");
+  supp.emplace_back(L"OK Gorm, Denmark");
+  supp.emplace_back(L"Nyköpings OK");
+  supp.emplace_back(L"Thomas Engberg, VK Uvarna");
+  supp.emplace_back(L"LG Axmalm, Sävedalens AIK");
 
   reverse(supp.begin(), supp.end());
 }

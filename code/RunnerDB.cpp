@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -48,13 +48,38 @@ RunnerDB::RunnerDB(oEvent *oe_): oe(oe_)
   loadedFromServer = false;
   dataDate = 20100201;
   dataTime = 222222;
-  runnerTable = 0;
-  clubTable = 0;
+}
+
+RunnerDB::RunnerDB(const RunnerDB &in) : oe(in.oe) {
+  loadedFromServer = false;
+  dataDate = in.dataDate;
+  dataTime = in.dataTime;
+
+  rdb = in.rdb;
+  rwdb = in.rwdb;
+  for (size_t k = 0; k < rwdb.size(); k++) 
+    rwdb[k].init(this, k);
+
+  rhash = in.rhash;
+
+  cdb = in.cdb;
+  oRDB = in.oRDB;
+  chash = in.chash;
+  freeCIx = in.freeCIx;
 }
 
 RunnerDB::~RunnerDB(void)
 {
   releaseTables();
+}
+
+bool RunnerDB::operator!=(const RunnerDB &in) const {
+return dataDate != in.dataDate ||
+       dataTime != in.dataTime ||
+       freeCIx != in.freeCIx ||
+       rdb.size() != in.rdb.size() ||
+       cdb.size() != in.cdb.size() || 
+       (!rdb.empty() && !(rdb.back() == in.rdb.back()));
 }
 
 RunnerDBEntry::RunnerDBEntry()
@@ -268,8 +293,8 @@ RunnerWDBEntry *RunnerDB::addRunner(const wchar_t *name,
                                     int club, int card)
 {
   assert(rdb.size() == rwdb.size());
-  rdb.push_back(RunnerDBEntry());
-  rwdb.push_back(RunnerWDBEntry());
+  rdb.emplace_back();
+  rwdb.emplace_back();
   rwdb.back().init(this, rdb.size()-1);
 
   RunnerWDBEntry &e=rwdb.back();
@@ -290,7 +315,7 @@ RunnerWDBEntry *RunnerDB::addRunner(const wchar_t *name,
     if (!idhash.empty())
       idhash[extId] = rdb.size()-1;
     if (!nhash.empty())
-      nhash.insert(pair<wstring, int>(canonizeName(e.name), rdb.size()-1));
+      nhash.emplace(canonizeName(e.name), rdb.size()-1);
   }
   return &e;
 }
@@ -301,8 +326,8 @@ RunnerWDBEntry *RunnerDB::addRunner(const char *nameUTF,
                                     int club, int card)
 {
   assert(rdb.size() == rwdb.size());
-  rdb.push_back(RunnerDBEntry());
-  rwdb.push_back(RunnerWDBEntry());
+  rdb.emplace_back();
+  rwdb.emplace_back();
   rwdb.back().init(this, rdb.size()-1);
 
   RunnerWDBEntry &e=rwdb.back();
@@ -325,7 +350,7 @@ RunnerWDBEntry *RunnerDB::addRunner(const char *nameUTF,
     if (!nhash.empty()) {
       wstring wn;
       e.getName(wn);
-      nhash.insert(pair<wstring, int>(canonizeName(wn.c_str()), rdb.size()-1));
+      nhash.emplace(canonizeName(wn.c_str()), rdb.size()-1);
     }
   }
   return &e;
@@ -406,7 +431,7 @@ void RunnerDB::importClub(oClub &club, bool matchName)
   else {
     // Completely new club
     chash [club.getId()] = cdb.size();
-    cdb.push_back(oDBClubEntry(club, cdb.size(), this));
+    cdb.emplace_back(club, cdb.size(), this);
   }
 }
 
@@ -1139,15 +1164,39 @@ void RunnerDB::fillClubs(vector< pair<wstring, size_t> > &out) const {
   out.reserve(cdb.size());
   for (size_t k = 0; k<cdb.size(); k++) {
     if (!cdb[k].isRemoved()) {
-      out.push_back(make_pair(cdb[k].getName(), cdb[k].getId()));
+      out.emplace_back(cdb[k].getName(), cdb[k].getId());
     }
   }
   sort(out.begin(), out.end());
 }
 
 oDBRunnerEntry::oDBRunnerEntry(oEvent *oe) : oBase(oe) {
-  db = 0;
+  db = nullptr;
   index = -1;
+}
+
+oDBRunnerEntry::oDBRunnerEntry(oDBRunnerEntry &&in) : oBase(std::move(in)) {
+  db = in.db;
+  index = in.index;
+}
+
+oDBRunnerEntry::oDBRunnerEntry(const oDBRunnerEntry &in) : oBase(in) {
+  db = in.db;
+  index = in.index;
+}
+
+const oDBRunnerEntry &oDBRunnerEntry::operator=(const oDBRunnerEntry &in) {
+  oBase::operator=(in);
+  db = in.db;
+  index = in.index;
+  return *this;
+}
+
+const oDBRunnerEntry &oDBRunnerEntry::operator=(oDBRunnerEntry &&in) {
+  oBase::operator=(std::move(in));
+  db = in.db;
+  index = in.index;
+  return *this;
 }
 
 oDBRunnerEntry::~oDBRunnerEntry() {}
@@ -1194,19 +1243,13 @@ void RunnerDB::refreshTables() {
 }
 
 void RunnerDB::releaseTables() {
-  if (runnerTable)
-    runnerTable->releaseOwnership();
-  runnerTable = 0;
-
-  if (clubTable)
-    clubTable->releaseOwnership();
-  clubTable = 0;
+  runnerTable.reset();
+  clubTable.reset();
 }
 
-Table *RunnerDB::getRunnerTB()//Table mode
-{
-  if (runnerTable == 0) {
-    Table *table=new Table(oe, 20, L"Löpardatabasen", "runnerdb");
+const shared_ptr<Table> &RunnerDB::getRunnerTB() {
+  if (!runnerTable) {
+    auto table = make_shared<Table>(oe, 20, L"Löpardatabasen", "runnerdb");
 
     table->addColumn("Index", 70, true, true);
     table->addColumn("Id", 70, true, true);
@@ -1216,11 +1259,10 @@ Table *RunnerDB::getRunnerTB()//Table mode
     table->addColumn("Nationalitet", 70, false, true);
     table->addColumn("Kön", 50, false, true);
     table->addColumn("Födelseår", 70, true, true);
-    table->addColumn("Anmäl", 70, false, true);
+    table->addColumn("Anmäl", 120, false, true);
 
     table->setTableProp(Table::CAN_INSERT|Table::CAN_DELETE|Table::CAN_PASTE);
     table->setClearOnHide(false);
-    table->addOwnership();
     runnerTable = table;
   }
   int nr = 0;
@@ -1231,6 +1273,25 @@ Table *RunnerDB::getRunnerTB()//Table mode
 
   if (runnerTable->getNumDataRows() != nr)
     runnerTable->update();
+  else {
+    /*vector<pRunner> runners;
+    setupIdHash();
+    oe->getRunners(0, 0, runners, false);
+    for (pRunner r : runners) {
+      int64_t extId = r->getExtIdentifier();
+      if (extId != 0) {
+        int value;
+        if (idhash.lookup(extId, value)) {
+          try {
+            runnerTable->reloadRow(value + 1);
+          }
+          catch (const std::exception &) {
+            // Ignore any problems with the table.
+          }
+        }
+      }
+    }*/
+  }
   return runnerTable;
 }
 
@@ -1266,15 +1327,15 @@ void RunnerDB::refreshRunnerTableData(Table &table) {
       if (row) {
         row->setObject(oRDB[k]);
         
-        oClass *val = 0;
+        int runnerId;
         bool found = false;
 
         if (rdb[k].extId != 0)
-          found = runnerInEvent.lookup(rdb[k].extId, val);
+          found = runnerInEvent.lookup(rdb[k].extId, runnerId);
 
-
-        if (found && row->getCellType(cellEntryIndex) == cellAction) {
-          row->updateCell(cellEntryIndex, cellEdit, val->getName());
+        if (found) {
+          pRunner r = oe->getRunner(runnerId, 0);
+          row->updateCell(cellEntryIndex, cellEdit, r ? r->getClass(true) : L"");
         }
         else if (!found && row->getCellType(cellEntryIndex) == cellEdit) {
           row->updateCell(cellEntryIndex, cellAction, L"@+");
@@ -1284,18 +1345,17 @@ void RunnerDB::refreshRunnerTableData(Table &table) {
   }
 }
 
-Table *RunnerDB::getClubTB()//Table mode
-{
+const shared_ptr<Table> &RunnerDB::getClubTB() {
   bool canEdit = !oe->isClient();
 
-  if (clubTable == 0) {
-    Table *table = new Table(oe, 20, L"Klubbdatabasen", "clubdb");
+  if (!clubTable) {
+    auto table = make_shared<Table>(oe, 20, L"Klubbdatabasen", "clubdb");
 
     table->addColumn("Id", 70, true, true);
     table->addColumn("Ändrad", 70, false);
 
     table->addColumn("Namn", 200, false);
-    oClub::buildTableCol(oe, table);
+    oClub::buildTableCol(oe, table.get());
 
     if (canEdit)
       table->setTableProp(Table::CAN_DELETE|Table::CAN_INSERT|Table::CAN_PASTE);
@@ -1303,7 +1363,6 @@ Table *RunnerDB::getClubTB()//Table mode
       table->setTableProp(0);
 
     table->setClearOnHide(false);
-    table->addOwnership();
     clubTable = table;
   }
 
@@ -1317,7 +1376,6 @@ Table *RunnerDB::getClubTB()//Table mode
     clubTable->update();
   return clubTable;
 }
-
 
 void oDBRunnerEntry::addTableRow(Table &table) const {
   bool canEdit = !oe->isClient();
@@ -1353,11 +1411,11 @@ void oDBRunnerEntry::addTableRow(Table &table) const {
   table.set(row++, it, TID_SEX, sex, canEdit, cellEdit);
   table.set(row++, it, TID_YEAR, itow(rn.birthYear), canEdit, cellEdit);
 
-  oClass *val = 0;
+  int runnerId;
   bool found = false;
 
   if (rn.extId != 0)
-    found = db->runnerInEvent.lookup(rn.extId, val);
+    found = db->runnerInEvent.lookup(rn.extId, runnerId);
 
   if (canEdit)
     table.setTableProp(Table::CAN_DELETE|Table::CAN_INSERT|Table::CAN_PASTE);
@@ -1367,8 +1425,10 @@ void oDBRunnerEntry::addTableRow(Table &table) const {
   RunnerDB::cellEntryIndex = row;
   if (!found)
     table.set(row++, it, TID_ENTER, L"@+", false, cellAction);
-  else
-    table.set(row++, it, TID_ENTER, val ? val->getName() : L"", false, cellEdit);
+  else {
+    pRunner r = oe->getRunner(runnerId, 0);
+    table.set(row++, it, TID_ENTER, r ? r->getClass(true) : L"", false, cellEdit);
+  }
 }
 
 const RunnerDBEntry &oDBRunnerEntry::getRunner() const {
@@ -1377,8 +1437,8 @@ const RunnerDBEntry &oDBRunnerEntry::getRunner() const {
   return db->rdb[index];
 }
 
-bool oDBRunnerEntry::inputData(int id, const wstring &input,
-                           int inputId, wstring &output, bool noUpdate)
+pair<int, bool>  oDBRunnerEntry::inputData(int id, const wstring &input,
+                                           int inputId, wstring &output, bool noUpdate)
 {
   if (!db)
     throw meosException("Not initialized");
@@ -1392,7 +1452,7 @@ bool oDBRunnerEntry::inputData(int id, const wstring &input,
       db->nhash.clear();
       db->runnerHash.clear();
       db->runnerHashByClub.clear();
-      return true;
+      break;
     case TID_CARD:
       db->rhash.remove(rd.cardNo);
       rd.cardNo = _wtoi(input.c_str());
@@ -1401,7 +1461,7 @@ bool oDBRunnerEntry::inputData(int id, const wstring &input,
         output = itow(rd.cardNo);
       else
         output = L"";
-      return true;
+      break;
     case TID_NATIONAL:
       if (input.empty()) {
         rd.national[0] = 0;
@@ -1429,7 +1489,7 @@ bool oDBRunnerEntry::inputData(int id, const wstring &input,
       output = input;
       break;
   }
-  return false;
+  return make_pair(0, false);
 }
 
 void oDBRunnerEntry::fillInput(int id, vector< pair<wstring, size_t> > &out, size_t &selected)
@@ -1437,7 +1497,7 @@ void oDBRunnerEntry::fillInput(int id, vector< pair<wstring, size_t> > &out, siz
   RunnerDBEntry &r = db->rdb[index];
   if (id==TID_CLUB) {
     db->fillClubs(out);
-    out.push_back(make_pair(L"-", 0));
+    out.emplace_back(L"-", 0);
     selected = r.clubNo;
   }
 }
@@ -1470,11 +1530,11 @@ bool oDBRunnerEntry::canRemove() const {
 }
 
 oDBRunnerEntry *RunnerDB::addRunner() {
-  rdb.push_back(RunnerDBEntry());
-  rwdb.push_back(RunnerWDBEntry());
+  rdb.emplace_back();
+  rwdb.emplace_back();
   rwdb.back().init(this, rdb.size() -1);
 
-  oRDB.push_back(oDBRunnerEntry(oe));
+  oRDB.emplace_back(oe);
   oRDB.back().init(this, rdb.size() - 1);
 
   return &oRDB.back();
@@ -1485,7 +1545,7 @@ oClub *RunnerDB::addClub() {
   while (chash.count(freeCIx))
     freeCIx++;
 
-  cdb.push_back(oDBClubEntry(oe, freeCIx, cdb.size(), this));
+  cdb.emplace_back(oe, freeCIx, cdb.size(), this);
   chash.insert(freeCIx, cdb.size()-1);
   cnhash.clear();
 

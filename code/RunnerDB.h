@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -107,6 +107,10 @@ struct RunnerDBEntry {
 
   bool isUTF() const { return (reserved & 2) == 2; }
   void setUTF() { reserved |= 2; }
+
+  bool operator==(const RunnerDBEntry &d) const {
+    return memcmp(this, &d, sizeof(RunnerDBEntry)) == 0;
+  }
 };
 
 class RunnerDB;
@@ -161,14 +165,14 @@ class RunnerDB {
 private:
   oEvent *oe;
 
-  Table *runnerTable;
-  Table *clubTable;
+  shared_ptr<Table> runnerTable;
+  shared_ptr<Table> clubTable;
 
   static int cellEntryIndex;
 
   bool check(const RunnerDBEntry &rde) const;
 
-  intkeymap<oClass *, __int64> runnerInEvent;
+  intkeymap<int, __int64> runnerInEvent;
 
   /** Init name hash lazy */
   void setupNameHash() const;
@@ -286,8 +290,8 @@ public:
   void refreshClubTableData(Table &table);
   void refreshTables();
 
-  Table *getRunnerTB();
-  Table *getClubTB();
+  const shared_ptr<Table> &getRunnerTB();
+  const shared_ptr<Table> &getClubTB();
 
   void hasEnteredCompetition(__int64 extId);
 
@@ -345,6 +349,9 @@ public:
 
   void getAllNames(vector<wstring> &givenName, vector<wstring> &familyName);
   RunnerDB(oEvent *);
+  RunnerDB(const RunnerDB &in);
+  bool operator!=(const RunnerDB &other) const;
+
   ~RunnerDB(void);
   friend class oDBRunnerEntry;
   friend class oDBClubEntry;
@@ -368,11 +375,17 @@ public:
   const RunnerDBEntry &getRunner() const;
 
   void addTableRow(Table &table) const;
-  bool inputData(int id, const wstring &input,
-                 int inputId, wstring &output, bool noUpdate);
-  void fillInput(int id, vector< pair<wstring, size_t> > &out, size_t &selected);
+  pair<int, bool> inputData(int id, const wstring &input,
+                            int inputId, wstring &output, bool noUpdate) override;
+  void fillInput(int id, vector< pair<wstring, size_t> > &out, size_t &selected) override;
 
   oDBRunnerEntry(oEvent *oe);
+  oDBRunnerEntry(oDBRunnerEntry &&in);
+  oDBRunnerEntry(const oDBRunnerEntry &in);
+
+  const oDBRunnerEntry &operator=(oDBRunnerEntry &&in);
+  const oDBRunnerEntry &operator=(const oDBRunnerEntry &in);
+
   virtual ~oDBRunnerEntry();
 
   void remove();

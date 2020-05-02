@@ -1,7 +1,7 @@
 #pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -47,13 +47,13 @@ private:
   T &rehash(int size, KEY key, const T &value);
   T &get(const KEY key);
 
-  const intkeymap &operator=(const intkeymap &co);
   void *lookup(KEY key) const;
 public:
   virtual ~intkeymap();
   intkeymap(int size);
   intkeymap();
   intkeymap(const intkeymap &co);
+  const intkeymap &operator=(const intkeymap &co);
 
   bool empty() const;
   int size() const;

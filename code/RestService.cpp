@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -96,7 +96,7 @@ void RestService::settings(gdioutput &gdi, oEvent &oe, bool created) {
   bool disablePermisson = true;
   gdi.popX();
 
-  gdi.addCheckbox("MapRoot", "Mappa rootadresssen (http:///localhost:port/) till funktion:", nullptr, !rootMap.empty()).setHandler(this);
+  gdi.addCheckbox("MapRoot", "Mappa rootadressen (http:///localhost:port/) till funktion:", nullptr, !rootMap.empty()).setHandler(this);
   gdi.addInput("RootMap", gdi.recodeToWide(rootMap));
   gdi.setInputStatus("RootMap", !rootMap.empty());
 

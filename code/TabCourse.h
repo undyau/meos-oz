@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -38,6 +38,8 @@ class TabCourse :
   wstring point_limit;
   wstring point_reduction;
 
+  bool tableMode = false;
+
   void fillCourseControls(gdioutput &gdi, const wstring &ctrl);
   void fillOtherCourses(gdioutput &gdi, oCourse &crs, bool withLoops);
 
@@ -47,7 +49,7 @@ class TabCourse :
 
   oEvent::DrawMethod getDefaultMethod() const;
 
-  wstring encodeCourse(const wstring &in, bool firstStart, bool lastFinish);
+  wstring encodeCourse(const wstring &in, bool rogaining, bool firstStart, bool lastFinish);
   void refreshCourse(const wstring &text, gdioutput &gdi);
   
   const wstring &formatControl(int id, wstring &bf) const;

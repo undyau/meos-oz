@@ -122,13 +122,13 @@ void oEvent::calculateCourseRogainingResults()
       continue;
 
     if (invalidClass) {
-      it->tTotalPlace = 0;
+      it->tTotalPlace.update(*oe, 0);
       it->tPlace.update(*this, 0);
     }
     else if(it->status==StatusOK) {
 			cPlace++;
 
-      int cmpRes = 3600 * 24 * 7 * it->tRogainingPoints - it->getRunningTime();
+      int cmpRes = 3600 * 24 * 7 * it->tRogainingPoints - it->getRunningTime(false);
 
       if(cmpRes != cTime)
 				vPlace = cPlace;
@@ -383,7 +383,7 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
 		row[10]=ws2s(it->getFinishTimeS());
 		if(row[10]=="-") row[10]="";
 
-		row[11]= formatOeCsvTime(it->getRunningTime());
+		row[11]= formatOeCsvTime(it->getRunningTime(false));
 		if(row[11]=="-") row[11]="";
 
 		row[12]=my_conv_is(MyConvertStatusToOE(it->getStatus()));
@@ -396,9 +396,9 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
 		row[17]=IsSydneySummerSeries && !byClass ? "1" : my_conv_is(it->getClassId(false));
 		row[18]=ws2s(it->getClass(false));
 		row[19]=ws2s(it->getClass(false));
-		row[20]=my_conv_is(it->getRogainingPoints(false));
-		row[21]=my_conv_is(it->getRogainingReduction()+it->getRogainingPoints(false));
-		row[22]=my_conv_is(it->getRogainingReduction());
+		row[20]=my_conv_is(it->getRogainingPointsGross(false));
+		row[21]=my_conv_is(it->getRogainingReduction(false)+it->getRogainingPoints(false, false));
+		row[22]=my_conv_is(it->getRogainingReduction(false));
 		row[23]=ws2s(it->getClass(false));
 
 		row[35]=my_conv_is(di.getInt("CardFee"));
@@ -454,54 +454,6 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
 	return true;
 }
 
-void oExtendedEvent::loadRentedCardNumbers()
-{
-		RentedCards.clear();
-		vector<string> strings;
-		string input = getPropertyString("RentedCards","");
-		istringstream f(input);
-		string s;    
-		while (getline(f, s, ',')) 
-				strings.push_back(s);
-		
-		for (unsigned int i = 0; i < strings.size(); i++)
-		{
-			istringstream f(strings.at(i));
-			vector<string> parts; // should be 1 or 2 parts 
-			string part;
-			while (getline(f, part, '-')) 
-				parts.push_back(part);
-
-			if (parts.size() == 1)
-			{
-				int card = atoi(trim(parts.at(0)).c_str());
-				RentedCards.push_back(card);
-			}
-
-			if (parts.size() == 2)
-			{
-				int start = atoi(trim(parts.at(0)).c_str());
-				int end = atoi(trim(parts.at(1)).c_str());
-				if (start < end)
-				{
-					for (int card = start; card <= end; card++)
-						RentedCards.push_back(card);
-				}
-			}
-		}
-}
-
-
-bool oExtendedEvent::isRentedCard(int card)
-{
-	if (!LoadedCards)
-			loadRentedCardNumbers();
-	LoadedCards = true;
-	for (unsigned int i = 0; i < RentedCards.size(); i++)
-		if (RentedCards.at(i) == card)
-			return true;
-	return false;
-}
 
 bool oExtendedEvent::getAutoUploadSss()
 {

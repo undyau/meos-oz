@@ -13,7 +13,6 @@ private:
   oExtendedEvent& m_Event;
   bool GetEventTemplateFromWeb(wstring& a_File);
 	bool GetEventTemplateFromInstall(wstring& a_File);
-	bool GetStartListFromWeb(wstring& a_File);
 	void AddMeosOzCustomList(wstring a_ReportDef);
 	void CustomiseClasses(); // Set age limits, gender for each class
   bool LoadCoursesFromFile(wstring file);

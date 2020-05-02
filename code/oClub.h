@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -78,10 +78,10 @@ protected:
 
   virtual int getTableId() const;
 
-  bool inputData(int id, const wstring &input, int inputId,
-                        wstring &output, bool noUpdate);
+  pair<int, bool>  inputData(int id, const wstring &input, int inputId,
+                             wstring &output, bool noUpdate) override;
 
-  void fillInput(int id, vector< pair<wstring, size_t> > &elements, size_t &selected);
+  void fillInput(int id, vector< pair<wstring, size_t> > &elements, size_t &selected) override;
 
   void exportIOFClub(xmlparser &xml, bool compact) const;
 
@@ -141,13 +141,16 @@ protected:
 
 public:
 
+  static const shared_ptr<Table> &getTable(oEvent *oe);
+
   /** Assign invoice numbers to all clubs. */
   static void assignInvoiceNumber(oEvent &oe, bool reset);
 
   static int getFirstInvoiceNumber(oEvent &oe);
+  static wstring getInvoiceDate(oEvent &oe);
+  static void setInvoiceDate(oEvent &oe, const wstring &id);
 
   static void definedPayModes(oEvent &oe, map<int, wstring> &definedPayModes);
-
 
   /** Remove all clubs from a competion (and all belong to club relations)*/
   static void clearClubs(oEvent &oe);

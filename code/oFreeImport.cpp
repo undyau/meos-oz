@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -1784,7 +1784,7 @@ void oFreeImport::addEntries(pEvent oe, const vector<oEntryBlock> &entries)
         //sprintf_s(tname, "%s %d", entries[k].eClub.c_str(), ++teamno[id]);
         pTeam t=oe->addTeam(team, club ? club->getId() : 0, pc->getId());
         if (t) {
-          t->setStartNo(t->getId(), false);
+          t->setStartNo(t->getId(), oBase::ChangeType::Update);
 
           for (int j=0;j<max(nr, entries[k].getNumPersons());j++) {
             pRunner r=oe->addRunner(entries[k].getName(j), entries[k].getClub(j),
@@ -1794,7 +1794,8 @@ void oFreeImport::addEntries(pEvent oe, const vector<oEntryBlock> &entries)
             t->setRunner(j, r, true);
           }
 
-          t->apply(true, 0, false);
+          t->apply(oBase::ChangeType::Update, nullptr);
+          t->synchronize();
         }
       }
     }

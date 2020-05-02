@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@ void SpeakerMonitor::setClassFilter(const set<int> &filter, const set<int> &cfil
   classFilter = filter;
   controlIdFilter = cfilter;
   oListInfo li;
-  maxClassNameWidth = li.getMaxCharWidth(&oe, classFilter, lClassName, L"", normalText, false);
+  maxClassNameWidth = oe.gdiBase().scaleLength(li.getMaxCharWidth(&oe, classFilter, lClassName, L"", normalText, false));
 }
 
 void SpeakerMonitor::setLimits(int place, int num) {
@@ -227,7 +227,7 @@ void SpeakerMonitor::renderResult(gdioutput &gdi,
     GDICOLOR color = colorLightRed;
 
     if (res.control == oPunch::PunchFinish) {
-      if (r && r->statusOK())
+      if (r && r->statusOK(true))
         color = colorLightGreen;
       else
         color = colorLightRed;
@@ -291,7 +291,7 @@ void SpeakerMonitor::calculateResults() {
   // TODO Result modules
 
   for (size_t k = 0; k < results.size(); k++) {
-    results[k].runTime = results[k].r->getTotalRunningTime(results[k].time, totalResults);
+    results[k].runTime = results[k].r->getTotalRunningTime(results[k].time, true, totalResults);
     if (results[k].status == StatusOK && totalResults)
       results[k].status = results[k].r->getTotalStatus();
     
@@ -317,7 +317,7 @@ void SpeakerMonitor::calculateResults() {
   for (size_t k = 0; k < results.size(); k++) {
     if (results[k].partialCount > 0)
       continue; // Skip in result calculation
-    int totTime = results[k].r->getTotalRunningTime(results[k].time, totalResults);
+    int totTime = results[k].r->getTotalRunningTime(results[k].time, true, totalResults);
     assert(totTime == results[k].runTime);
     int leg = results[k].leg();
     
@@ -440,7 +440,7 @@ void SpeakerMonitor::getMessage(const oEvent::ResultEvent &res,
           while (leg > 0) {
             pRunner pr = res.r->getTeam()->getRunner(--leg);
             // TODO: Pursuit
-            if (pr && pr->prelStatusOK() && pr->getFinishTime() == res.r->getStartTime()) {
+            if (pr && pr->prelStatusOK(false, false) && pr->getFinishTime() == res.r->getStartTime()) {
               vector<ResultInfo> &rResultsP = runnerToTimeKey[pr->getId()];
               if (!rResultsP.empty()) {
                 preRes = &rResultsP.back();

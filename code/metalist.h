@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -143,10 +143,12 @@ public:
 };
 
 struct DynamicResultRef {
-  DynamicResultRef(const DynamicResult *resIn, MetaList *ctrIn) : res(resIn), ctr(ctrIn) {}
-  DynamicResultRef() : res(0), ctr(0) {}
-  const DynamicResult *res;
+  DynamicResultRef(const shared_ptr<DynamicResult> &resIn, MetaList *ctrIn) : res(resIn), ctr(ctrIn) {}
+  DynamicResultRef() : ctr(0) {}
+  shared_ptr<DynamicResult> res;
   MetaList *ctr;
+
+  wstring getAnnotation() const;
 };
 
 class MetaList {
@@ -277,8 +279,6 @@ public:
     return *this;
   }
 
-  void getExistingTypes(vector< pair<string, size_t> > &types) const;
-
   const wstring &getListName() const {return listName;}
   oListInfo::EBaseType getListType() const;
 
@@ -307,8 +307,7 @@ public:
   void save(xmlparser &xml, const oEvent *oe) const;
   void load(const xmlobject &xDef);
 
-  void interpret(oEvent *oe, const gdioutput &gdi, const oListParam &par,
-                 int lineHeight, oListInfo &li) const;
+  void interpret(oEvent *oe, const gdioutput &gdi, const oListParam &par, oListInfo &li) const;
 
   MetaList &setListName(const wstring &title) {listName = title; return *this;}
 
@@ -353,8 +352,10 @@ private:
   mutable map<EStdListType, int> globalIndex;
   mutable map<string, EStdListType> tagIndex;
   mutable map<string, EStdListType> uniqueIndex;
-
   map<int, oListParam> listParam;
+
+  map<string, GeneralResultCtr> freeResultModules;
+
   oEvent *owner;
 public:
 
@@ -399,6 +400,9 @@ public:
   bool isInternal(int index) const {return data[index].first == InternalList;}
   bool isExternal(int index) const {return data[index].first == ExternalList;}
 
+  void updateGeneralResult(string tag, const shared_ptr<DynamicResult> &res);
+  void getGeneralResults(vector<DynamicResultRef> &resMod);
+
   void save(MetaListType type, xmlparser &xml, const oEvent *oe) const;
   /** Returns true if all lists where loaded, false if some list was in a unnsupported version and ignoreOld was set.
      Throws if some list was incorrect. */
@@ -419,8 +423,7 @@ public:
 
   void synchronizeTo(MetaListContainer &dst) const;
 
-  bool interpret(oEvent *oe, const gdioutput &gdi, const oListParam &par,
-                 int lineHeight, oListInfo &li) const;
+  bool interpret(oEvent *oe, const gdioutput &gdi, const oListParam &par, oListInfo &li) const;
 
   void enumerateLists(vector< pair<wstring, pair<string, wstring> > > &out) const;
 };

@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -79,8 +79,9 @@ class TabClass :
   set<oEvent::DrawMethod> getSupportedDrawMethods(bool multiDay) const;
 
   void drawDialog(gdioutput &gdi, oEvent::DrawMethod method, const oClass &cls);
-
   void pursuitDialog(gdioutput &gdi);
+  void addVacantPosition(gdioutput &gdi);
+  oEvent::VacantPosition TabClass::readVacantPosition(gdioutput &gdi) const;
 
   bool warnDrawStartTime(gdioutput &gdi, int time, bool absTime);
   bool warnDrawStartTime(gdioutput &gdi, const wstring &firstStart);
@@ -117,7 +118,7 @@ class TabClass :
   void showClassSelection(gdioutput &gdi, int &bx, int &by, GUICALLBACK classesCB) const;
 
   // Set simultaneous start in a class
-  void simultaneous(int classId, const wstring &time);
+  void simultaneous(int classId, const wstring &time, int nVacant);
 
   void updateFairForking(gdioutput &gdi, pClass pc) const;
   void selectCourses(gdioutput &gdi, int legNo);
@@ -156,6 +157,12 @@ class TabClass :
                           int maxNumControl, const wstring& minInterval, const wstring& vacances, const set<int> &clsId);
 
   void loadReadyToDistribute(gdioutput &gdi, int &bx, int &by);
+
+  wstring getDefaultVacant();
+  void setDefaultVacant(const wstring &val);
+
+  vector<string> currentResultModuleTags;
+  void fillResultModules(gdioutput &gdi, pClass pc);
 public:
   
   void clearCompetitionData();

@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -170,18 +170,18 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
       pTeam team=event.addTeam(sp[OSclub] + L" " +  sp[OSdesc], ClubId,  ClassId);
       team->setEntrySource(externalSourceId);
 
-      team->setStartNo(wtoi(sp[OSstno]), false);
+      team->setStartNo(wtoi(sp[OSstno]), oBase::ChangeType::Update);
 
       if (sp[12].length()>0)
-        team->setStatus( ConvertOEStatus( wtoi(sp[OSstatus]) ), true, false);
+        team->setStatus( ConvertOEStatus( wtoi(sp[OSstatus]) ), true, oBase::ChangeType::Update);
 
-      team->setStartTime(event.convertAbsoluteTime(sp[OSstart]), true, false);
+      team->setStartTime(event.convertAbsoluteTime(sp[OSstart]), true, oBase::ChangeType::Update);
 
       if (sp[OStime].length()>0)
         team->setFinishTime( event.convertAbsoluteTime(sp[OSstart])+event.convertAbsoluteTime(sp[OStime])-event.getZeroTimeNum() );
 
       if (team->getStatus()==StatusOK && team->getFinishTime()==0)
-        team->setStatus(StatusUnknown, true, false);
+        team->setStatus(StatusUnknown, true, oBase::ChangeType::Update);
 
       unsigned rindex=Offset;
 
@@ -209,14 +209,14 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
           DI.setInt("CardFee", event.getDCI().getInt("CardFee"));
 
         //r->setCardNo(atoi(sp[rindex+OSRcard]), false);
-        r->setStartTime(event.convertAbsoluteTime(sp[rindex+OSRstart]), true, false);
+        r->setStartTime(event.convertAbsoluteTime(sp[rindex+OSRstart]), true, oBase::ChangeType::Update);
         r->setFinishTime( event.convertAbsoluteTime(sp[rindex+OSRfinish]) );
 
         if (sp[rindex+OSRstatus].length()>0)
-          r->setStatus( ConvertOEStatus( wtoi(sp[rindex+OSRstatus]) ), true, false, false);
+          r->setStatus( ConvertOEStatus( wtoi(sp[rindex+OSRstatus]) ), true, oBase::ChangeType::Update, false);
 
-        if (r->getStatus()==StatusOK && r->getRunningTime()==0)
-          r->setStatus(StatusUnknown, true, false, false);
+        if (r->getStatus()==StatusOK && r->getRunningTime(false)==0)
+          r->setStatus(StatusUnknown, true, oBase::ChangeType::Update, false);
 
         r->addClassDefaultFee(false);
 
@@ -230,7 +230,7 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
       if (pc && runner>(int)pc->getNumStages())
         pc->setNumStages(runner);
 
-      team->apply(true, 0, false);
+      team->evaluate(oBase::ChangeType::Update);
     }
   }
   fin.close();
@@ -240,35 +240,35 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
 
 bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
 {
-		enum {ORsurname=0, ORfirstname=1, ORclub=2, ORcard=3,  
-			ORrent=4, ORstart=5, ORclass=6, ORcourse=7, ORid=8};
+    enum {ORsurname=0, ORfirstname=1, ORclub=2, ORcard=3,  
+      ORrent=4, ORstart=5, ORclass=6, ORcourse=7, ORid=8};
 
-	fin.open(file);
+  fin.open(file);
 
-	if(!fin.good())
-		return false;
+  if(!fin.good())
+    return false;
 
-	char bf[1024];
-	fin.getline(bf, 1024);
-	
-	nimport=0;
-	while (!fin.eof()) {	
-		fin.getline(bf, 1024);
-	
-		vector<char *> sp;
+  char bf[1024];
+  fin.getline(bf, 1024);
+  
+  nimport=0;
+  while (!fin.eof()) {  
+    fin.getline(bf, 1024);
+  
+    vector<char *> sp;
 
-		split(bf, sp, ',');
+    split(bf, sp, ',');
 
-		if (sp.size()>8) {
-			nimport++;
+    if (sp.size()>8) {
+      nimport++;
 
-			std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+      std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
 
       pClub pclub = event.getClubCreate(0, converter.from_bytes(sp[ORclub]));
 
-			if (pclub) {
+      if (pclub) {
         pclub->synchronize(true);
-			}       
+      }       
 
       pRunner pr = 0;            
       if (pr == 0) {        
@@ -282,30 +282,30 @@ bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
       wstring name = converter.from_bytes(string(sp[ORfirstname])+" "+string(sp[ORsurname]));
       pr->setName(name, false);
       pr->setClubId(pclub ? pclub->getId():0);
-			pr->setCardNo( atoi(sp[ORcard]), false );
-			
-			pr->setStartTime( event.convertAbsoluteTime(sp[ORstart]), true, false );
-			pr->setStatus(StatusUnknown, true, false);
+      pr->setCardNo( atoi(sp[ORcard]), false );
+      
+      pr->setStartTime( event.convertAbsoluteTime(sp[ORstart]), true, oBase::ChangeType::Update);
+      pr->setStatus(StatusUnknown, true, oBase::ChangeType::Update, false);
 
       if (strlen(sp[ORclass]) > 0) {
-  			pClass pc=event.getClass(converter.from_bytes(sp[ORclass]));
+        pClass pc=event.getClass(converter.from_bytes(sp[ORclass]));
 
         if (pc) { 
           pc->synchronize();        
           pr->setClassId(pc->getId(), false);
-				}
-				else {
-					set<wstring> dmy;
-					pc=event.getClassCreate(-1, converter.from_bytes(sp[ORclass]), dmy);
-				}
-			}
+        }
+        else {
+          set<wstring> dmy;
+          pc=event.getClassCreate(-1, converter.from_bytes(sp[ORclass]), dmy);
+        }
+      }
 
-			pr->setStartNo(nimport, false);
+      pr->setStartNo(nimport, oBase::ChangeType::Update);
 
-			oDataInterface DI=pr->getDI();
+      oDataInterface DI=pr->getDI();
       
       if(pr->getCourse(false) == 0){
-				  pCourse course(0);
+          pCourse course(0);
 
           if (!course) {
             oCourse oc(&event, -1);
@@ -324,11 +324,11 @@ bool csvparser::ImportOr_CSV(oEvent &event, const char *file)
         }
       if (pr)
         pr->synchronize();
-		}
-	}
-	fin.close();
+    }
+  }
+  fin.close();
 
-	return true;
+  return true;
 }
 
 bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
@@ -421,14 +421,14 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       pr->setClubId(pclub ? pclub->getId():0);
       pr->setCardNo( wtoi(sp[OEcard]), false );
 
-      pr->setStartTime(event.convertAbsoluteTime(sp[OEstart]), true, false);
+      pr->setStartTime(event.convertAbsoluteTime(sp[OEstart]), true, oBase::ChangeType::Update);
       pr->setFinishTime(event.convertAbsoluteTime(sp[OEfinish]));
 
       if (sp[OEstatus].length()>0)
-        pr->setStatus( ConvertOEStatus( wtoi(sp[OEstatus]) ), true, false);
+        pr->setStatus( ConvertOEStatus( wtoi(sp[OEstatus]) ), true, oBase::ChangeType::Update);
 
-      if (pr->getStatus()==StatusOK && pr->getRunningTime()==0)
-        pr->setStatus(StatusUnknown, true, false);
+      if (pr->getStatus()==StatusOK && pr->getRunningTime(false)==0)
+        pr->setStatus(StatusUnknown, true, oBase::ChangeType::Update);
 
       //Autocreate class if it does not exist...
       int classId=wtoi(sp[OEclassno]);
@@ -447,9 +447,9 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       
       if (needSno || newEntry) {
         if (stno>0)
-          pr->setStartNo(stno, false);
+          pr->setStartNo(stno, oBase::ChangeType::Update);
         else
-          pr->setStartNo(nimport, false);
+          pr->setStartNo(nimport, oBase::ChangeType::Update);
       }
       oDataInterface DI=pr->getDI();
 
@@ -458,7 +458,7 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       DI.setString("Nationality", sp[OEnat]);
 
       if (sp.size()>OEbib && needBib)
-        pr->setBib(sp[OEbib], 0, false, false);
+        pr->setBib(sp[OEbib], 0, false);
 
       if (sp.size()>=38) {//ECO
         DI.setInt("Fee", wtoi(sp[OEfee]));
@@ -567,7 +567,7 @@ int csvparser::split(char *line, vector<char *> &split_vector, wchar_t sep)
 
     while(line[m])
     {
-			if(!cite && line[m]==sep)
+      if(!cite && line[m]==sep)
         line[m]=0;
       else
       {
@@ -779,7 +779,7 @@ bool csvparser::importRAID(oEvent &event, const wstring &file)
       //Club is autocreated...
       pTeam team=event.addTeam(sp[RAIDteam], ClubId,  ClassId);
 
-      team->setStartNo(wtoi(sp[RAIDid]), false);
+      team->setStartNo(wtoi(sp[RAIDid]), oBase::ChangeType::Update);
       if (sp.size()>8)
         team->getDI().setInt("SortIndex", wtoi(sp[RAIDcanoe]));
       oDataInterface teamDI=team->getDI();
@@ -800,7 +800,7 @@ bool csvparser::importRAID(oEvent &event, const wstring &file)
       pRunner r2=event.addRunner(sp[RAIDrunner2], ClubId, ClassId, 0, 0, false);
       team->setRunner(1, r2, false);
 
-      team->apply(true, 0, false);
+      team->evaluate(oBase::ChangeType::Update);
     }
   }
   fin.close();

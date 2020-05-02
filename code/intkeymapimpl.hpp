@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -81,6 +81,34 @@ template <class T, class KEY> intkeymap<T, KEY>::intkeymap(const intkeymap &co)
     next = new intkeymap<T, KEY>(*co.next);
     next->parent = this;
   }
+}
+
+template <class T, class KEY>
+const intkeymap<T, KEY> &intkeymap<T, KEY>::operator=(const intkeymap<T, KEY> &co) {
+  clear();
+  delete[] keys;
+
+  allocFactor = co.allocFactor;
+  siz = co.siz;
+  keys = new keypair[siz];
+  hash1 = co.hash1;
+  hash2 = co.hash2;
+  used = co.used;
+  level = co.level;
+  dummy = co.dummy;
+  noValue = co.noValue;
+
+  for (unsigned k = 0; k<siz; k++)
+    keys[k] = co.keys[k];
+
+  parent = 0;
+  next = 0;
+
+  if (co.next) {
+    next = new intkeymap<T, KEY>(*co.next);
+    next->parent = this;
+  }
+  return *this;
 }
 
 template <class T, class KEY> intkeymap<T, KEY>::~intkeymap()

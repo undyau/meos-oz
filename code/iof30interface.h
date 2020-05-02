@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -163,11 +163,12 @@ class IOF30Interface {
                       map<int, pair<wstring, int> > &bibPatterns,
                       const map<int, vector<LegInfo> > &teamClassConfig);
 
-  pTeam getCreateTeam(gdioutput &gdi, const xmlobject &xTeam, bool &newTeam);
+  pTeam getCreateTeam(gdioutput &gdi, const xmlobject &xTeam, int expectedClassId, bool &newTeam);
 
   static int getIndexFromLegPos(int leg, int legorder, const vector<LegInfo> &setup);
   
-  void prescanEntry(xmlobject & xo, set<int>& stages);
+  void prescanEntry(xmlobject & xo, set<int>& stages, xmlList &work);
+  void readIdProviders(xmlobject &person, xmlList &ids, std::string &type);
   void setupClassConfig(int classId, const xmlobject &xTeam, map<int, vector<LegInfo> > &teamClassConfig);
 
   void setupRelayClasses(const map<int, vector<LegInfo> > &teamClassConfig);
@@ -298,6 +299,7 @@ public:
 
   void readClassList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
 
+  void prescanCompetitorList(xmlobject &xo);
   void readCompetitorList(gdioutput &gdi, const xmlobject &xo, int &personCount);
 
   void readClubList(gdioutput &gdi, const xmlobject &xo, int &clubCount);

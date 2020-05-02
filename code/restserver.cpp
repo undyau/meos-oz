@@ -1,6 +1,6 @@
 /************************************************************************
 MeOS - Orienteering Software
-Copyright (C) 2009-2019 Melin Software HB
+Copyright (C) 2009-2020 Melin Software HB
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,15 +21,18 @@ Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 ************************************************************************/
 
 #include "stdafx.h"
+
+#include <thread>
+#include <random>
+#include <chrono>
+
 #include "oEvent.h"
 #include "xmlparser.h"
-#include <thread>
 
 #include "restbed/restbed"
 #include "meosexception.h"
 #include "restserver.h"
 #include "infoserver.h"
-#include <chrono>
 
 #include "oListInfo.h"
 #include "TabList.h"
@@ -376,6 +379,16 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
     string what = rq->parameters.find("lookup")->second;
     lookup(ref, what, rq->parameters, rq->answer);
   }
+  else if (rq->parameters.count("difference")) {
+    string what = rq->parameters.find("difference")->second;
+    int id = -2;
+    if (what == "zero")
+      id = -1;
+    else
+      id = atoi(what.c_str());
+
+    difference(ref, id, rq->answer);
+  }
   else if (rq->parameters.count("page") > 0) {
     string what = rq->parameters.find("page")->second;
     auto &writer = HTMLWriter::getWriter(HTMLWriter::TemplateType::Page, what);
@@ -424,7 +437,7 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
 
       if (!res->second.second) {
         res->second.second = make_shared<oListInfo>();
-        ref.generateListInfo(res->second.first, gdiPrint.getLineHeight(), *res->second.second);
+        ref.generateListInfo(res->second.first, *res->second.second);
       }
       ref.generateList(gdiPrint, true, *res->second.second, false);
       wstring exportFile = getTempFile();
@@ -624,6 +637,7 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
   }
   else if (what == "control") {
     vector<pControl> ctrl;
+    oe.synchronizeList(oListId::oLControlId);
     oe.getControls(ctrl, true);
     vector< pair<string, wstring> > prop(1);
     prop[0].first = "id";
@@ -649,6 +663,8 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
       if (!selection.empty())
         sampleClass = oe.getClass(*selection.begin());
     }
+    oe.autoSynchronizeLists(true);
+    oe.reEvaluateAll(selection, false);
 
     if (sampleClass == 0) {
       vector<pClass> tt;
@@ -1095,11 +1111,11 @@ void RestServer::lookup(oEvent &oe, const string &what, const multimap<string, s
       xml.write("Club", { make_pair("id", itow(r->getClubId())) }, r->getClub());
       xml.write("Class", { make_pair("id", itow(r->getClassId(true))) }, r->getClass(true));
       xml.write("Card", r->getCardNo());
-      xml.write("Status", {make_pair("code", itow(r->getStatus()))}, r->getStatusS(true));
+      xml.write("Status", {make_pair("code", itow(r->getStatusComputed()))}, r->getStatusS(true, true));
       xml.write("Start", r->getStartTimeS());
-      if (r->getFinishTime() > 0) {
+      if (r->getFinishTime() > 0 && r->getStatusComputed() != StatusNoTiming) {
         xml.write("Finish", r->getFinishTimeS());
-        xml.write("RunningTime", r->getRunningTimeS());
+        xml.write("RunningTime", r->getRunningTimeS(true));
         xml.write("Place", r->getPlaceS());
         xml.write("TimeAfter", formatTime(r->getTimeAfter()));
       }
@@ -1109,7 +1125,9 @@ void RestServer::lookup(oEvent &oe, const string &what, const multimap<string, s
         if (cls)
           xml.write("Leg", cls->getLegNumber(r->getLegNumber()));
       }
-      if ((r->getFinishTime() > 0 || r->getCard() != nullptr) && r->getCourse(false)) {
+      if ((r->getFinishTime() > 0 || r->getCard() != nullptr) && 
+          r->getCourse(false) &&
+          r->getStatusComputed() != StatusNoTiming) {
         auto &sd = r->getSplitTimes(false);
         vector<int> after;
         r->getLegTimeAfter(after);
@@ -1274,6 +1292,7 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
     permissionDenied = true;
   
   if (!permissionDenied) {
+    oe.synchronizeList({ oListId::oLClassId, oListId::oLRunnerId });
     wstring name, club;
     long long extId = 0;
     int clubId = 0;
@@ -1338,7 +1357,11 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
     if (epType == EntryPermissionType::InDbExistingClub && clubId == 0) {
       error = L"Anmälan måste hanteras manuellt";
     }
-    
+  
+    bool noTiming = false;
+    if (param.count("notiming"))
+      noTiming = true;
+
     int cardNo = 0;
     if (param.count("card"))
       cardNo = atoi(param.find("card")->second.c_str());
@@ -1363,13 +1386,27 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
       }
       
       if (r) {
+        int cf = 0;
+        if (cardNo > 0 && oe.isHiredCard(cardNo)) {
+          cf = oe.getBaseCardFee();
+          r->getDI().setInt("CardFee", cf);
+        }
         r->setFlag(oRunner::FlagAddedViaAPI, true);
         r->addClassDefaultFee(true);
+        if (noTiming)
+          r->setStatus(StatusNoTiming, true, oBase::ChangeType::Update, false);
+
         r->synchronize();
         r->markClassChanged(-1);
         xml.write("Status", "OK");
-        xml.write("Fee", r->getDCI().getInt("Fee"));
+        vector < pair<string, wstring> > rentCard;
+        if (cf != 0) {
+          rentCard.emplace_back("hiredCard", L"true");
+        }
+        xml.write("Fee", rentCard, itow(r->getDCI().getInt("Fee") + max(cf, 0)));
         xml.write("Info", r->getClass(true) + L", " + r->getCompleteIdentification(false));
+        if (r->getStatus() == StatusNoTiming)
+          xml.write("NoTiming", "true");
       }
     }
   }
@@ -1399,4 +1436,132 @@ vector<pair<wstring, size_t>> RestServer::getPermissionsClass() {
   res.emplace_back(lang.tl("Alla"), size_t(EntryPermissionClass::Any));
   res.emplace_back(lang.tl("Med direktanmälan"), size_t(EntryPermissionClass::DirectEntry));
   return res;
+}
+
+
+//constexpr int largePrime = 5000011;
+//constexpr int smallPrime = 101;
+
+constexpr int largePrime = 5000011;
+constexpr int smallPrime = 101;
+constexpr int idOffset = 100;
+
+int RestServer::InfoServerContainer::getNextInstanceId() {
+  
+  int newInstanceId = (thisInstanceId - idOffset + instanceIncrementor) % (largePrime * smallPrime);
+  return newInstanceId + idOffset;
+}
+
+int RestServer::getNewInstanceId() {
+  int limit = 10;
+  if (isContainers.size() > 10) {
+    isContainers.pop_back();
+  }
+
+  set<int> usedBaseId;
+  for (auto &c : isContainers) {
+    int baseId = (c.nextInstanceId - idOffset) % smallPrime;
+    usedBaseId.insert(baseId);
+    OutputDebugString((L"used: " + itow(baseId) + L"\n").c_str());
+  }
+  if (!randGen) {
+    random_device r;
+    randGen = make_shared<default_random_engine>(r());
+  }
+  int first = (*randGen)() % smallPrime;
+  int off = 1 + (*randGen)() % (smallPrime-1);
+  for (int i = 0; i < smallPrime; i++) {
+    int s = (first + i * off) % smallPrime;
+    if (!usedBaseId.count(s)) {
+      int id = s + smallPrime * ((*randGen)() % 32767) + idOffset;
+      int f = smallPrime * ((113 + (*randGen)() % 32767) % (largePrime - 1) + 1);
+      OutputDebugString((L"add: " + itow(s) + L", " + itow(f) + L"\n").c_str());
+      
+      isContainers.emplace_front(id, f);
+      return id;
+    }
+  }
+
+  throw meosException("No server instance found");
+}
+
+xmlbuffer * RestServer::getMOPXML(oEvent &oe, int id, int &nextId) {
+  for (auto it = isContainers.begin(); it != isContainers.end(); ++it) {
+    auto &c = *it;
+    if (c.thisInstanceId == id) {
+      nextId = c.nextInstanceId;
+      if (it != isContainers.begin())
+        isContainers.splice(isContainers.begin(), isContainers, it);
+
+      return c.lastData.get();
+    }
+    else if (c.nextInstanceId == id) {
+      if (it != isContainers.begin())
+        isContainers.splice(isContainers.begin(), isContainers, it);
+
+      oe.autoSynchronizeLists(true);
+      if (!c.cmpModel) {
+        c.cmpModel = make_shared<InfoCompetition>(id);
+        if (c.classes.empty()) {
+          vector<pClass> classes;
+          oe.getClasses(classes, false);
+          for (pClass pc : classes) {
+            if (!pc->isQualificationFinalBaseClass())
+              c.classes.insert(pc->getId());
+          }
+        }
+        if (c.controls.empty()) {
+          vector<pControl> ctrl;
+          vector<int> ids;
+          oe.getControls(ctrl, true);
+          for (size_t k = 0; k < ctrl.size(); k++) {
+            if (ctrl[k]->isValidRadio()) {
+              ctrl[k]->getCourseControls(ids);
+              c.controls.insert(ids.begin(), ids.end());
+            }
+          }
+        }
+      }
+      c.cmpModel->synchronize(oe, false, c.classes, c.controls, true);
+      c.lastData = make_shared<xmlbuffer>();
+      c.cmpModel->getDiffXML(*c.lastData);
+      c.cmpModel->commitComplete();
+
+      if (c.lastData->size() == 0) {
+        nextId = c.nextInstanceId;
+        return c.lastData.get(); 
+      }
+
+      c.thisInstanceId = id;
+      nextId = c.nextInstanceId = c.getNextInstanceId();
+      return c.lastData.get();
+    }
+  }
+  return nullptr;
+}
+
+void RestServer::difference(oEvent &oe, int id, string &answer) {
+  string type;
+  if (id == -1) {
+    id = getNewInstanceId();
+  }
+  int nextId;
+  xmlbuffer *bf = getMOPXML(oe, id, nextId);
+  if (bf) {
+    xmlparser mem;
+    mem.openMemoryOutput(false);
+    if (bf->isComplete())
+      type = "MOPComplete";
+    else
+      type = "MOPDiff";
+
+    mem.startTag(type.c_str(), { L"xmlns", L"http://www.melin.nu/mop",
+                                 L"nextdifference", itow(nextId)});
+    bf->commitCopy(mem);
+    mem.endTag();
+    mem.getMemoryOutput(answer);
+  }
+  else {
+    answer = "Error (MeOS): Unknown difference state. Use litteral 'zero' (?difference=zero) to get complete competition";
+  }
 }

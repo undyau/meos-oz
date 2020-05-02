@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -100,10 +100,11 @@ EventInfo::EventInfo() : callBack(0), keyEvent(KC_NONE) {}
 /** Return true if rendering text should be skipped for
     this format. */
 bool gdioutput::skipTextRender(int format) {
-  format &= 0xFF;
+  format &= 0xFF | hiddenText;
   return format == pageNewPage ||
          format == pagePageInfo ||
-         format == pageNewChapter;
+         format == pageNewChapter ||
+         (format & hiddenText) == hiddenText;
 }
 
 #ifndef MEOSDB
@@ -179,8 +180,7 @@ void gdioutput::constructor(double _scale)
 
 void gdioutput::setFont(int size, const wstring &font)
 {
-  //setEncoding(enc);
-  double s = 1 + double(size)*0.25;// 1 + size * sqrt(double(size))*0.2;
+  double s = 1 + double(size)*0.25;
   initCommon(s, font);
 }
 
@@ -377,11 +377,8 @@ gdioutput::~gdioutput()
   if (toolbar)
     delete toolbar;
   toolbar = 0;
-  //delete table;
-  while(!Tables.empty()){
-    Tables.front().table->releaseOwnership();
-    Tables.pop_front();
-  }
+  
+  Tables.clear();
 
   if (tabs) {
     delete tabs;
@@ -508,7 +505,7 @@ void gdioutput::drawBackground(HDC hDC, RECT &rc)
     SelectObject(hDC, GetStockObject(ANSI_FIXED_FONT));
     DeleteObject(hInfo);
   }
-
+/*
   DWORD c=GetSysColor(COLOR_3DFACE);
   double red = double(GetRValue(c)) *0.9;
   double green = double(GetGValue(c)) * 0.85;
@@ -524,7 +521,15 @@ void gdioutput::drawBackground(HDC hDC, RECT &rc)
   double blue1=min(255., blue*1.3);
   double green1=min(255., green*1.3);
   double red1=min(255., red*1.3);
+  */
 
+  double red = 242.0;
+  double green = 247.0;
+  double blue = 254.0;
+
+  double blue1 = 250.0;
+  double green1 = 232.0;
+  double red1 = 223.0;
 
   TRIVERTEX vert[2];
   if (hideBG) {
@@ -662,8 +667,10 @@ void gdioutput::draw(HDC hDC, RECT &rc, RECT &drawArea)
 }
 
 void gdioutput::renderRectangle(HDC hDC, RECT *clipRegion, const RectangleInfo &ri) {
-  if (ri.drawBorder)
-    SelectObject(hDC, GetStockObject(BLACK_PEN));
+  if (ri.drawBorder) {
+    SelectObject(hDC, GetStockObject(DC_PEN));
+    SetDCPenColor(hDC, RGB(40,40,60));
+  }
   else
     SelectObject(hDC, GetStockObject(NULL_PEN));
   
@@ -1214,7 +1221,8 @@ void gdioutput::enableCheckBoxLink(TextInfo &ti, bool enable) {
   else {
     needRefresh = ti.callBack != 0;
     ti.callBack = 0;
-    ti.setColor(colorDarkGrey);
+    DWORD c = GetSysColor(COLOR_GRAYTEXT);
+    ti.setColor(GDICOLOR(c));
   }
   if (needRefresh)
     InvalidateRect(hWndTarget, &ti.textRect, true);
@@ -1350,6 +1358,15 @@ HFONT gdioutput::getGUIFont() const
     return getCurrentFont().getGUIFont();
 }
 
+pair<int, int> gdioutput::getInputDimension(int length) const {
+  HDC hDC = GetDC(hWndTarget);
+  SelectObject(hDC, getGUIFont());
+  SIZE size;
+  GetTextExtentPoint32(hDC, L"M", 1, &size);
+  ReleaseDC(hWndTarget, hDC);
+  return make_pair(length*size.cx + scaleLength(8), size.cy + scaleLength(6));
+}
+
 InputInfo &gdioutput::addInput(int x, int y, const string &id, const wstring &text,
                                int length, GUICALLBACK cb,
                                const wstring &explanation, const wstring &help) {
@@ -1359,30 +1376,25 @@ InputInfo &gdioutput::addInput(int x, int y, const string &id, const wstring &te
   }
 
   InputInfo ii;
-  SIZE size;
-
-  HDC hDC=GetDC(hWndTarget);
-  SelectObject(hDC, getGUIFont());
-  GetTextExtentPoint32(hDC, L"M", 1, &size);
-  ReleaseDC(hWndTarget, hDC);
-
+  
+  auto dim = getInputDimension(length);
   int ox=OffsetX;
   int oy=OffsetY;
 
   ii.hWnd=CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", text.c_str(),
     WS_TABSTOP|WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS | ES_AUTOHSCROLL | WS_BORDER,
-    x-ox, y-oy, length*size.cx+scaleLength(8), size.cy+scaleLength(6),
+    x-ox, y-oy, dim.first, dim.second,
     hWndTarget, NULL, (HINSTANCE)GetWindowLong(hWndTarget, GWL_HINSTANCE), NULL);
-
-  updatePos(x, y, length*size.cx+scaleLength(12), size.cy+scaleLength(10));
+  int mrg = scaleLength(4);
+  updatePos(x, y, dim.first+mrg, dim.second+mrg);
 
   SendMessage(ii.hWnd, WM_SETFONT,
               (WPARAM) getGUIFont(), 0);
 
   ii.xp=x;
   ii.yp=y;
-  ii.width = length*size.cx+scaleLength(8);
-  ii.height = size.cy+scaleLength(6);
+  ii.width = dim.first;
+  ii.height = dim.second;
   ii.text = text;
   ii.original = text;
   ii.focusText = text;
@@ -2981,12 +2993,12 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
   lockUpDown = false;
   hasAnyTimer = false;
   enableTables();
-  #ifndef MEOSDB
-    if (toolbar && !keepToolbar)
-      toolbar->hide();
-  #endif
+#ifndef MEOSDB
+  if (toolbar && !keepToolbar)
+    toolbar->hide();
+#endif
 
-  while(!timers.empty()) {
+  while (!timers.empty()) {
     KillTimer(hWndTarget, (UINT_PTR)&timers.back());
     timers.back().setWnd = 0;
     timers.back().parent = 0;
@@ -2995,11 +3007,11 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
 
   restorePoints.clear();
   shownStrings.clear();
-  onClear=0;
+  onClear = 0;
   FocusList.clear();
   currentFocus = 0;
   TL.clear();
-  itTL=TL.end();
+  itTL = TL.end();
   listDescription.clear();
 
   if (hWndTarget && autoRefresh)
@@ -3011,14 +3023,14 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
 
   for (ToolList::iterator it = toolTips.begin(); it != toolTips.end(); ++it) {
     if (hWndToolTip) {
-      SendMessage(hWndToolTip, TTM_DELTOOL, 0, (LPARAM) &it->ti);
+      SendMessage(hWndToolTip, TTM_DELTOOL, 0, (LPARAM)&it->ti);
     }
   }
   toolTips.clear();
 
   {
     list<ButtonInfo>::iterator it;
-    for(it=BI.begin(); it != BI.end(); ++it) {
+    for (it = BI.begin(); it != BI.end(); ++it) {
       it->callBack = 0;
       it->setHandler(0);
       DestroyWindow(it->hWnd);
@@ -3028,7 +3040,7 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
   }
   {
     list<InputInfo>::iterator it;
-    for(it=II.begin(); it != II.end(); ++it) {
+    for (it = II.begin(); it != II.end(); ++it) {
       it->callBack = 0;
       it->setHandler(0);
       DestroyWindow(it->hWnd);
@@ -3039,7 +3051,7 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
 
   {
     list<ListBoxInfo>::iterator it;
-    for(it=LBI.begin(); it != LBI.end(); ++it) {
+    for (it = LBI.begin(); it != LBI.end(); ++it) {
       it->callBack = 0;
       it->setHandler(0);
       DestroyWindow(it->hWnd);
@@ -3050,14 +3062,10 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
     LBI.clear();
   }
 
-  //delete table;
-  //table=0;
-  while(!Tables.empty()){
-    Table *t=Tables.front().table;
-    Tables.front().table=0;
+  while (!Tables.empty()) {
+    auto t = Tables.front().table;
     Tables.pop_front();
     t->hide(*this);
-    t->releaseOwnership();
   }
 
   DataInfo.clear();
@@ -3066,16 +3074,16 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
 
   Rectangles.clear();
 
-  MaxX=40;
-  MaxY=100;
+  MaxX = scaleLength(60);
+  MaxY = scaleLength(100);
 
-  CurrentX=40;
-  CurrentY=START_YP;
+  CurrentX = scaleLength(40);
+  CurrentY = scaleLength(START_YP);
 
-  OffsetX=0;
-  OffsetY=0;
+  OffsetX = 0;
+  OffsetY = 0;
 
-  renderOptimize=true;
+  renderOptimize = true;
 
   backgroundColor1 = -1;
   backgroundColor2 = -1;
@@ -3098,7 +3106,7 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
     wstring msg = ex.wwhat();
     alert(msg);
   }
-  catch(const std::exception &ex) {
+  catch (const std::exception &ex) {
     if (isTestMode)
       throw ex;
     string msg(ex.what());
@@ -3106,7 +3114,7 @@ void gdioutput::clearPage(bool autoRefresh, bool keepToolbar) {
   }
   postClear = 0;
 
-  manualUpdate=!autoRefresh;
+  manualUpdate = !autoRefresh;
 }
 
 void gdioutput::getWindowText(HWND hWnd, wstring &text)
@@ -3209,7 +3217,7 @@ const wstring &gdioutput::getText(const char *id, bool acceptMissing) const
   return _EmptyWString;
 }
 
-bool gdioutput::hasField(const string &id) const
+bool gdioutput::hasWidget(const string &id) const
 {
   for(list<InputInfo>::const_iterator it=II.begin();
                                   it != II.end(); ++it){
@@ -3603,8 +3611,8 @@ void gdioutput::setTabStops(const string &Name, int t1, int t2)
   int n=1;
   LONG bu=GetDialogBaseUnits();
   int baseunitX=LOWORD(bu);
-  array[0]=(t1 * 4) / baseunitX ;
-  array[1]=(t2 * 4) / baseunitX ;
+  array[0]=int(t1 * 4.2) / baseunitX ;
+  array[1]=int(t2 * 4.2) / baseunitX ;
   int lastTabStop = 0;
   if (t2>0) {
     n=2;
@@ -3990,7 +3998,6 @@ void gdioutput::removeString(string id)
   for (it=TL.begin(); it != TL.end(); ++it) {
     if (it->id==id) {
       HDC hDC=GetDC(hWndTarget);
-      //TextOut(
       RECT rc;
       rc.left=it->xp;
       rc.top=it->yp;
@@ -4214,12 +4221,12 @@ void gdioutput::RenderString(TextInfo &ti, HDC hDC)
     ti.textRect.bottom+=ti.yp+dx;
 
     if (ti.format == 10) {
-      DWORD c=GetSysColor(COLOR_INFOBK);
+      DWORD c = colorLightYellow;// GetSysColor(COLOR_INFOBK);
       double red=GetRValue(c);
       double green=GetGValue(c);
       double blue=GetBValue(c);
 
-      double blue1=min(255., blue*0.8);
+      double blue1=min(255., blue*1.05);
       double green1=min(255., green*1.05);
       double red1=min(255., red*1.05);
 
@@ -4274,7 +4281,7 @@ void gdioutput::RenderString(TextInfo &ti, HDC hDC)
     rc.bottom+=ti.yp+dx-OffsetY;
     rc.right=ti.xp+dx+width-OffsetX;
 
-    SetTextColor(hDC, GetSysColor(COLOR_INFOTEXT));
+    SetTextColor(hDC, 0);
     DrawText(hDC, ti.text.c_str(), ti.text.length(), &rc, DT_LEFT|DT_NOPREFIX|DT_WORDBREAK);
   }
 
@@ -4788,7 +4795,7 @@ void gdioutput::CheckInterfaceTimeouts(DWORD T)
   }
 }
 
-bool gdioutput::removeControl(const string &id)
+bool gdioutput::removeWidget(const string &id)
 {
   list<ButtonInfo>::iterator it=BI.begin();
 
@@ -4835,13 +4842,15 @@ bool gdioutput::removeControl(const string &id)
   return false;
 }
 
-bool gdioutput::hideControl(const string &id)
-{
+bool gdioutput::hideWidget(const string &id, bool hide) {
   list<ButtonInfo>::iterator it=BI.begin();
 
   while (it!=BI.end()) {
-    if (it->id==id) {
-      ShowWindow(it->hWnd, SW_HIDE);
+    if (it->id == id) {
+      ShowWindow(it->hWnd, hide ? SW_HIDE : SW_SHOW);
+      if (it->isCheckbox) {
+        hideWidget("T" + id, hide);
+      }
       return true;
     }
     ++it;
@@ -4851,7 +4860,7 @@ bool gdioutput::hideControl(const string &id)
 
   while (lit!=LBI.end()) {
     if (lit->id==id) {
-      ShowWindow(lit->hWnd, SW_HIDE);
+      ShowWindow(lit->hWnd, hide ? SW_HIDE : SW_SHOW);
       return true;
     }
     ++lit;
@@ -4861,14 +4870,24 @@ bool gdioutput::hideControl(const string &id)
 
   while (iit!=II.end()) {
     if (iit->id==id) {
-      ShowWindow(iit->hWnd, SW_HIDE);
+      ShowWindow(iit->hWnd, hide ? SW_HIDE : SW_SHOW);
       return true;
     }
     ++iit;
   }
+
+  for (auto &ti : TL) {
+    if (ti.id == id) {
+      if (hide)
+        ti.format |= hiddenText;
+      else
+        ti.format &= ~hiddenText;
+
+      return true;
+    }
+  }
   return false;
 }
-
 
 void gdioutput::setRestorePoint()
 {
@@ -4975,11 +4994,9 @@ void gdioutput::restoreInternal(const RestoreInfo &ri)
   }
 
   while(Tables.size() > unsigned(ri.nTables)){
-    Table *t=Tables.back().table;
-    Tables.back().table=0;
+    auto t=Tables.back().table;
     Tables.pop_back();
     t->hide(*this);
-    t->releaseOwnership();
   }
 
   int dataRemove=DataInfo.size()-ri.nData;
@@ -5657,7 +5674,7 @@ Table &gdioutput::getTable() const {
   if (Tables.empty())
     throw std::exception("No table defined");
 
-  return *const_cast<Table *>(Tables.back().table);
+  return *const_cast<Table *>(Tables.back().table.get());
 }
 
 static int gdiTableCB(gdioutput *gdi, int type, void *data)
@@ -5775,16 +5792,10 @@ void gdioutput::enableTables()
   useTables=true;
 #ifndef MEOSDB
   if (!Tables.empty()) {
-    Table *t = Tables.front().table;
+    auto &t = Tables.front().table;
     if (toolbar == 0)
       toolbar = new Toolbar(*this);
-/*    RECT rc;
-    rc.top = 10;
-    rc.bottom = 100;
-    rc.left = 100;
-    rc.right = 200;
-    addToolTip("Hej hopp!", 0, &rc);
-*/
+
     toolbar->setData(t);
 
     string tname = string("table") + itos(t->canDelete()) + itos(t->canInsert()) + itos(t->canPaste());
@@ -5810,19 +5821,18 @@ void gdioutput::enableTables()
 #endif
 }
 
-void gdioutput::processToolbarMessage(const string &id, void *data) {
+void gdioutput::processToolbarMessage(const string &id, Table *tbl) {
   if (hasCommandLock())
     return;
   wstring msg;
   string cmd;
   if (getRecorder().recording()) { 
-    Table *tbl = (Table *)data;
     cmd = "tableCmd(\"" + id + "\"); //" + narrow(tbl->getTableName());
   }
   try {
     ButtonInfo bi;
     bi.id = id;
-    tableCB(bi, (Table *)data);
+    tableCB(bi, tbl);
     getRecorder().record(cmd);
   }
   catch (meosException &ex) {
@@ -5880,7 +5890,7 @@ void gdioutput::disableTables()
     if (bit->id.substr(0, 3)=="tbl" && bit->getExtra()!=0) {
       string id = bit->id;
       ++bit;
-      removeControl(id);
+      removeWidget(id);
     }
     else
       ++bit;
@@ -5888,7 +5898,7 @@ void gdioutput::disableTables()
 
 }
 
-void gdioutput::addTable(Table *t, int x, int y)
+void gdioutput::addTable(const shared_ptr<Table> &t, int x, int y)
 {
   TableInfo ti;
   ti.table = t;
@@ -5900,7 +5910,6 @@ void gdioutput::addTable(Table *t, int x, int y)
     t->autoSelectColumns();
   t->autoAdjust(*this);
 
-  ti.table->addOwnership();
   Tables.push_back(ti);
 
   //updatePos(x, y, dx + TableXMargin, dy + TableYMargin);

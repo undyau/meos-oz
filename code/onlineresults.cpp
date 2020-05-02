@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -56,10 +56,10 @@ static int OnlineCB(gdioutput *gdi, int type, void *data) {
     case GUI_LISTBOX:{
       ListBoxInfo lbi = *static_cast<ListBoxInfo *>(data);
       if (lbi.id == "Format") {
-        if (gdi->hasField("IncludeTotal")) {
+        if (gdi->hasWidget("IncludeTotal")) {
           gdi->setInputStatus("IncludeTotal", lbi.data == 1);
         }
-        if (gdi->hasField("IncludeCourse")) {
+        if (gdi->hasWidget("IncludeCourse")) {
           gdi->setInputStatus("IncludeCourse", lbi.data == 1);
         }
       }
@@ -140,7 +140,7 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, bool created) {
 
   gdi.addCheckbox("Zip", "Packa stora filer (zip)", 0, zipFile);
   if (oe.hasPrevStage()) {
-    gdi.addCheckbox("IncludeTotal", "Inkludera resultat frÂn tidigare etapper", 0, includeTotal);
+    gdi.addCheckbox("IncludeTotal", "Inkludera resultat fr√•n tidigare etapper", 0, includeTotal);
     InfoCompetition &ic = getInfoServer();
     gdi.check("IncludeTotal", ic.includeTotalResults());
     gdi.setInputStatus("IncludeTotal", int(dataType) < 10);
@@ -155,8 +155,8 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, bool created) {
   gdi.addInput("URL", url, 40, 0, L"", L"Till exempel X#http://www.results.org/online.php");
   gdi.dropLine(2.5);
   gdi.popX();
-  gdi.addInput("CmpID", itow(cmpId), 10, 0, L"T‰vlingens ID-nummer:");
-  gdi.addInput("Password", passwd, 15, 0, L"Lˆsenord:").setPassword(true);
+  gdi.addInput("CmpID", itow(cmpId), 10, 0, L"T√§vlingens ID-nummer:");
+  gdi.addInput("Password", passwd, 15, 0, L"L√∂senord:").setPassword(true);
 
   enableURL(gdi, sendToURL);
 
@@ -164,12 +164,12 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, bool created) {
   gdi.dropLine(5);
   gdi.fillRight();
 
-  gdi.addCheckbox("ToFile", "Spara pÂ disk", OnlineCB, sendToFile).setExtra(getId());
+  gdi.addCheckbox("ToFile", "Spara p√• disk", OnlineCB, sendToFile).setExtra(getId());
 
   gdi.addString("", 0, "Mapp:");
   gdi.pushX();
   gdi.addInput("FolderName", file, 30);
-  gdi.addButton("BrowseFolder", "Bl‰ddra...", OnlineCB).setExtra(getId());
+  gdi.addButton("BrowseFolder", "Bl√§ddra...", OnlineCB).setExtra(getId());
   gdi.dropLine(2.5);
   gdi.popX();
 
@@ -177,9 +177,9 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, bool created) {
   gdi.dropLine(2.8);
   gdi.popX();
 
-  gdi.addInput("ExportScript", exportScript, 32, 0, L"Skript att kˆra efter export:");
+  gdi.addInput("ExportScript", exportScript, 32, 0, L"Skript att k√∂ra efter export:");
   gdi.dropLine(0.8);
-  gdi.addButton("BrowseScript", "Bl‰ddra...", AutomaticCB);
+  gdi.addButton("BrowseScript", "Bl√§ddra...", AutomaticCB);
 
   gdi.setCY(gdi.getHeight());
   gdi.setCX(basex);
@@ -264,8 +264,8 @@ void OnlineResults::save(oEvent &oe, gdioutput &gdi) {
   prefix = gdi.getText("Prefix");
   exportScript = gdi.getText("ExportScript");
   zipFile = gdi.isChecked("Zip");
-  includeTotal = gdi.hasField("IncludeTotal") && gdi.isChecked("IncludeTotal");
-  includeCourse = gdi.hasField("IncludeCourse") && gdi.isChecked("IncludeCourse");
+  includeTotal = gdi.hasWidget("IncludeTotal") && gdi.isChecked("IncludeTotal");
+  includeCourse = gdi.hasWidget("IncludeCourse") && gdi.isChecked("IncludeCourse");
 
   ListBoxInfo lbi;
   gdi.getSelectedItem("Format", lbi);
@@ -277,7 +277,7 @@ void OnlineResults::save(oEvent &oe, gdioutput &gdi) {
   gdi.getSelection("Classes", classes);
   if (sendToFile) {
     if (folder.empty()) {
-      throw meosException("Mappnamnet fÂr inte vara tomt.");
+      throw meosException("Mappnamnet f√•r inte vara tomt.");
     }
 
     if (*folder.rbegin() == '/' || *folder.rbegin() == '\\')
@@ -291,7 +291,7 @@ void OnlineResults::save(oEvent &oe, gdioutput &gdi) {
 
   if (sendToURL) {
     if (xurl.empty()) {
-      throw meosException("URL mÂste anges.");
+      throw meosException("URL m√•ste anges.");
     }
     url = xurl;
   }
@@ -304,7 +304,7 @@ void OnlineResults::save(oEvent &oe, gdioutput &gdi) {
     ctrl[k]->getCourseControls(ids);
     for (size_t i = 0; i < ids.size(); i++) {
       string id =  "C"+itos(ids[i]);
-      if (gdi.hasField(id)) {
+      if (gdi.hasWidget(id)) {
         bool st = gdi.isChecked(id);
         if (st != ctrl[k]->isValidRadio()) {
           ctrl[k]->setRadio(st);
@@ -354,7 +354,7 @@ void OnlineResults::status(gdioutput &gdi)
   gdi.dropLine(2);
   gdi.addButton("Stop", "Stoppa automaten", AutomaticCB).setExtra(getId());
   gdi.fillDown();
-  gdi.addButton("OnlineResults", "Inst‰llningar...", AutomaticCB).setExtra(getId());
+  gdi.addButton("OnlineResults", "Inst√§llningar...", AutomaticCB).setExtra(getId());
   gdi.popX();
 }
 
@@ -495,11 +495,11 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
           if (res)
             res.getObjectString("status", tmp);
           if (tmp == "BADCMP")
-            throw meosException("Onlineservern svarade: Felaktigt t‰vlings-id");
+            throw meosException("Onlineservern svarade: Felaktigt t√§vlings-id");
           if (tmp == "BADPWD")
-            throw meosException("Onlineservern svarade: Felaktigt lˆsenord");
+            throw meosException("Onlineservern svarade: Felaktigt l√∂senord");
           if (tmp == "NOZIP")
-            throw meosException("Onlineservern svarade: ZIP stˆds ej");
+            throw meosException("Onlineservern svarade: ZIP st√∂ds ej");
           if (tmp == "ERROR")
             throw meosException("Onlineservern svarade: Serverfel");
 

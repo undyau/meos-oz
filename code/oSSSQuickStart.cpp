@@ -4,6 +4,7 @@
 #include "gdioutput.h"
 #include "csvparser.h"
 #include "meos_util.h"
+#include "generalresult.h"
 #include "metalist.h"
 #include <ctime>
 #include "MeOSFeatures.h"
@@ -85,7 +86,7 @@ else
 SYSTEMTIME st;
 GetSystemTime(&st);
 
-m_Event.setDate(convertSystemDate(st));
+m_Event.setDate(convertSystemDate(st), false);
 CustomiseClasses();
 
 AddMeosOzCustomList(wstring(L"SSS Receipt Results.xml"));

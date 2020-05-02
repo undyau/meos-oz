@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2019 Melin Software HB
+    Copyright (C) 2009-2020 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -64,7 +64,9 @@ public:
 
   size_t size() const {return blocks.size();}
   bool commit(xmlparser &xml, int count);
+  void commitCopy(xmlparser &xml);
 
+  bool isComplete() const { return complete; }
   void startXML(xmlparser &xml, const wstring &dest);
 };
 
@@ -140,6 +142,7 @@ class InfoMeosStatus : public InfoBase {
 class InfoOrganization : public InfoBase {
   protected:
     wstring name;
+    wstring nationality;
   public:
     InfoOrganization(int id);
     virtual ~InfoOrganization() {}
@@ -169,6 +172,7 @@ class InfoBaseCompetitor : public InfoBase {
     int startTime;
     int runningTime;
     wstring bib;
+    wstring nationality;
     void serialize(xmlbuffer &xml, bool diffOnly, int course) const;
     bool synchronizeBase(oAbstractRunner &bc);
   public:
@@ -182,9 +186,12 @@ class InfoCompetitor : public InfoBaseCompetitor {
     int inputTime;
     int totalStatus;
     int course;
+    int cardNo = 0;
+    bool isRunning = false;
     bool synchronize(const InfoCompetition &cmp, oRunner &c);
     bool changeTotalSt;
     bool changeRadio;
+    mutable bool changeCard = false;
   public:
     bool synchronize(bool useTotalResults, bool useCourse, oRunner &c);
     void serialize(xmlbuffer &xml, bool diffOnly) const;
