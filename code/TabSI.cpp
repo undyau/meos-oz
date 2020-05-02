@@ -1128,7 +1128,7 @@ int TabSI::siCB(gdioutput &gdi, int type, void *data)
             }
           }
         }
-				oe->setProperty("HireCardFile", fn);
+        oe->setProperty("HireCardFile", fn);
         gdi.scrollToBottom();
         gdi.refresh();
         vector<pRunner> runners;
