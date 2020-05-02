@@ -26,6 +26,26 @@ oExtendedEvent::~oExtendedEvent(void)
 {
 }
 
+void oExtendedEvent::loadHireCards()
+{
+	// Load rental cards
+	wstring fn = oe->getPropertyString("HireCardFile", wstring());
+	if (!fn.empty()) {
+		csvparser csv;
+		list<vector<wstring>> data;
+		csv.parse(fn, data);
+		set<int> rentCards;
+		for (auto &c : data) {
+			for (wstring wc : c) {
+				int cn = _wtoi(wc.c_str());
+				if (cn > 0) {
+					oe->setHiredCard(cn, true);
+					}
+				}
+			}
+		}
+}
+
 bool oExtendedEvent::SSSQuickStart(gdioutput &gdi)
 {
   oSSSQuickStart qs(*this);

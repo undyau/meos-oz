@@ -26,6 +26,7 @@ public:
 	time_t getLastSssUploadTime() { return LastAutoUploadSssTime; }
 	bool setAutoUploadSss(bool automatic);
 	void checkForPeriodicEvents();
+	void loadHireCards();
 
 private:
 	wstring loadCsvToString(wstring file);
