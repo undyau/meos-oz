@@ -25,7 +25,7 @@
 #include <cassert>
 
 #include "iof30interface.h"
-#include "oEvent.h"
+#include "oExtendedEvent.h"
 #include "gdioutput.h"
 #include "gdifonts.h"
 #include "xmlparser.h"
@@ -1686,6 +1686,10 @@ pRunner IOF30Interface::readPersonEntry(gdioutput &gdi, xmlobject &xo, pTeam tea
 
   if (xPers)
     r = readPerson(gdi, xPers);
+  
+  // Avoid over-writing somebody already in MeOS, may have edited their details
+  if (static_cast<oExtendedEvent*>(&oe)->getPreserveExistingRunnersAsIs() && r != 0 && r->getCardNo() > 0)
+    return r;
 
   if (cardNo > 0 && r == 0 && team) {
     // We got no person, but a card number. Add the runner anonymously.

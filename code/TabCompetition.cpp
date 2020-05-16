@@ -1140,9 +1140,13 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       ClassConfigInfo cnf;
       oe->getClassConfigurationInfo(cnf);
       if (cnf.hasResults()) {
-        if (!gdi.ask(L"Tävlingen har redan resultat. Vill du verkligen hämta anmälningar?"))
+        if (!gdi.ask(lang.tl(L"Tävlingen har redan resultat. Vill du verkligen hämta anmälningar?")))
           return 0;
       }
+
+      if (oe->getNumRunners() > 0 && !static_cast<oExtendedEvent*>(oe)->getPreserveExistingRunnersAsIs())
+          static_cast<oExtendedEvent*>(oe)->preserveExistingRunnersAsIs(gdi.ask(lang.tl(L"Bevara befintliga detaljer om konkurrenter som redan finns i MeOS?")));
+
       gdi.enableEditControls(false);
       gdi.enableInput("Cancel");
       gdi.dropLine(2);

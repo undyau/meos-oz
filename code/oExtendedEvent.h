@@ -27,6 +27,8 @@ public:
   bool setAutoUploadSss(bool automatic);
   void checkForPeriodicEvents();
   void loadHireCards();
+  bool preserveExistingRunnersAsIs(bool preserve);
+  bool getPreserveExistingRunnersAsIs() { return PreserveExistingRunnersAsIs; }
 
 private:
   wstring loadCsvToString(wstring file);
@@ -38,6 +40,7 @@ private:
   std::vector<int> RentedCards;
   bool LoadedCards;
   bool AutoUploadSss;
+  bool PreserveExistingRunnersAsIs;
   time_t LastAutoUploadSssTime;
   time_t AutoUploadSssInterval;
 };

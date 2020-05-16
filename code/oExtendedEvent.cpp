@@ -20,6 +20,7 @@ oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
   AutoUploadSssInterval = (time_t) getPropertyInt("AutoUploadSssInterval", 120);
   LastAutoUploadSssTime = 0;
   AutoUploadSss = false;
+  PreserveExistingRunnersAsIs = false;
 }
 
 oExtendedEvent::~oExtendedEvent(void)
@@ -45,6 +46,10 @@ void oExtendedEvent::loadHireCards()
       }
     }
 }
+
+bool oExtendedEvent::preserveExistingRunnersAsIs(bool preserve) {
+  return PreserveExistingRunnersAsIs = preserve;
+  }
 
 bool oExtendedEvent::SSSQuickStart(gdioutput &gdi)
 {
