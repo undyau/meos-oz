@@ -135,7 +135,7 @@ void oEvent::calculateCourseRogainingResults()
       cTime = numeric_limits<int>::min();
       cDuplicateLeg = it->tDuplicateLeg;
       isRogaining = it->Class ? it->Class->isRogaining() : false;
-      invalidClass = it->Class ? it->Class->getClassStatus() != oClass::Normal : false;
+      invalidClass = it->Class ? it->Class->getClassStatus() != oClass::ClassStatus::Normal : false;
     }
 
     if (cCourseId == 0 && it->Class->getCourseId() > 0)
@@ -147,8 +147,8 @@ void oEvent::calculateCourseRogainingResults()
       continue;
 
     if (invalidClass) {
-      it->tTotalPlace.update(*oe, 0);
-      it->tPlace.update(*this, 0);
+      it->tTotalPlace.update(*oe, 0, false);
+      it->tPlace.update(*this, 0, false);
     }
     else if(it->status==StatusOK) {
       cPlace++;
@@ -161,12 +161,12 @@ void oEvent::calculateCourseRogainingResults()
       cTime = cmpRes;
 
       if (useResults)
-        it->tPlace.update(*this, vPlace);
+        it->tPlace.update(*this, vPlace, false);
       else
-        it->tPlace.update(*this, 0);
+        it->tPlace.update(*this, 0, false);
     }
     else
-      it->tPlace.update(*this, 99000 + it->status);
+      it->tPlace.update(*this, 99000 + it->status, false);
   }
 }
 

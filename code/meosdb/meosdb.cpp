@@ -49,8 +49,6 @@ using namespace std;
 #include "../Localizer.h"
 #include "../oExtendedEvent.h"
 
-#include <typeinfo.h>
-
 #ifdef BUILD_DB_DLL
   HINSTANCE hInst=0;
   Localizer lang;

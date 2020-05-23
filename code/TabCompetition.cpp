@@ -609,9 +609,9 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       gdi.clearPage(true);
       oe->generateCompetitionReport(gdi);
 
-      gdi.addButton(gdi.getWidth()+20, 15, gdi.scaleLength(120), "Cancel",
+      gdi.addButton(gdi.getWidth()+20, 15, gdi.scaleLength(baseButtonWidth), "Cancel",
                     "Återgå", CompetitionCB,  "", true, false);
-      gdi.addButton(gdi.getWidth()+20, 18+gdi.getButtonHeight(), gdi.scaleLength(120), "Print",
+      gdi.addButton(gdi.getWidth()+20, 18+gdi.getButtonHeight(), gdi.scaleLength(baseButtonWidth), "Print",
                     "Skriv ut...", CompetitionCB,  "Skriv ut rapporten", true, false);
       gdi.refresh();
 
@@ -662,7 +662,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
     }
     else if (bi.id=="Browse") {
       vector< pair<wstring, wstring> > ext;
-      ext.push_back(make_pair(lang.tl(L"Databaskälla"), L"*.xml;*.csv"));
+      ext.push_back(make_pair(L"Databaskälla", L"*.xml;*.csv"));
       
       wstring f = gdi.browseForOpen(ext, L"xml");
       string id;
@@ -1669,7 +1669,9 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       loadPage(gdi);
     }
     else if (bi.id == "WelcomeOK") {
-      gdi.scaleSize(1.0/gdi.getScale());
+      gdi.setFont(oe->getPropertyInt("TextSize", 0),
+                  oe->getPropertyString("TextFont", L"Arial"));
+
       oe->setProperty("FirstTime", 0);
       loadPage(gdi);
     }
@@ -2469,6 +2471,7 @@ void TabCompetition::loadAboutPage(gdioutput &gdi) const
 				  "\n\nOriginal French Translation by Jerome Monclard"
 				  "\n\nAdaption to French conditions and extended translation by Pierre Gaufillet"
 				  "\n\nCzech Translation by Marek Kustka"
+          "\n\nSpanish Translation by Manuel Pedre"
 				  "\n\nHelp with English documentation: Torbjörn Wikström");
 
   gdi.dropLine();
@@ -2696,7 +2699,7 @@ bool TabCompetition::loadPage(gdioutput &gdi)
     rc.top = gdi.getCY() - gdi.scaleLength(30);
     rc.left = gdi.getCX() - gdi.scaleLength(30);
 
-    int bw = gdi.scaleLength(150);
+    int bw = gdi.scaleLength(baseButtonWidth+40);
     gdi.addString("", 1, "Importera tävlingsdata");
     gdi.addButton(gdi.getCX(), gdi.getCY(), bw, "Entries", "Anmälningar",
                   CompetitionCB, "",  false, false);
@@ -3302,7 +3305,7 @@ void TabCompetition::loadRunnerDB(gdioutput &gdi, int tableToShow, bool updateTa
 
 void TabCompetition::welcomeToMeOS(gdioutput &gdi) {
   gdi.clearPage(false, false);
-  gdi.scaleSize(1.8/gdi.getScale());
+  gdi.scaleSize(1.4*gdi.getScale());
   gdi.dropLine(5);
   gdi.setCX(gdi.getCX() + 5*gdi.getLineHeight());
 
