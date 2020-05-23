@@ -1,18 +1,18 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.2">
+<MeOSListDefinition version="3.7">
 <ListName>SSS Results</ListName>
 <ListOrigin>Summer Series #20 - Pymble (2015-06-13)</ListOrigin>
-<UID>A-8151303428791508141B2494685629</UID>
+<UID>A8530500622433918774B1593924291</UID>
 <SortOrder>CoursePoints</SortOrder>
 <ListType>Runner</ListType>
 <SubListType>None</SubListType>
 <Filter name="FilterResult"/>
-<HeadFont scale="100"></HeadFont>
-<SubHeadFont scale="100"></SubHeadFont>
-<ListFont scale="100"></ListFont>
-<SubListFont scale="100"></SubListFont>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
 <Head>
 <Line>
 <Block Type="CmpName">
@@ -40,6 +40,11 @@
 </Block>
 <Block Type="String">
 <Text>Score</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CourseName">
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>

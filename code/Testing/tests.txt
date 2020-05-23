@@ -7,13 +7,14 @@
 7.  Create event with score and line events mixed and check results.
 8.  Sydney Summer Series - loads custom results reports
 9.  SI number in output XML
-10. Test with server mode
-11. Test hire stick auto detect in server mode
+10. Test autoupload to SSS server
+11. Test that loading late entries can either reset existing data or not (by user choice).
 12. Test no crash if creating an auto report service on a list that is empty.
 13. Print splits on splits printer for regular line event - check for size.
 14. Check that runners remaining logic works.
 15. Check that zero time is set correctly when event is loaded from Eventor
 16. Check that Eventor is not setting mass start times for classes
 17. Export event to Eventor with XML 3 where the day of month is 1-9 (defect in MEOS 3.5)
-18. Test autoupload to SSS server
+18. Test with server mode
+19. Test hire stick auto detect in server mode
 

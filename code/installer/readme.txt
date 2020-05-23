@@ -1,3 +1,10 @@
+  23 May 2020 3.7.1188.0
+- Merge with MeOS 3.7.1188_RC2
+- Allow late entries to be imported from Eventor without 
+  overwriting details for competitors already loaded from Eventor.
+- Use MeOS hire stick logic, remove MEOS-OZ custom code.
+- Make hire sticks persist.
+
   6 November 2019 3.6.1089.6
 - Turn SSS result upload facility into general upload facility
   to use, click on the button Upload Results. 
@@ -7,7 +14,7 @@
 - Start times published to Eventor were corrupted if using
   UTC start times and start time offset from midnight is 
 	smaller than difference from UTC. 
-	Upstream issue: https://github.com/melinsoftware/meos/issues/28
+	Upstream issue: https://github.com/melinsoftware/MeOS/issues/28
 
   5 November 2019 3.6.1089.4
 - Fix url for Australian Eventor API
@@ -17,10 +24,10 @@
 - Improve detection of required Microsoft run-time libraries
 
   15 September 2019
-	Merge with MEOS 3.6.1089
+	Merge with MeOS 3.6.1089
 
   14 October 2018 3.5.916.0
-	Merge with MEOS 3.5.916
+	Merge with MeOS 3.5.916
 
   23 March 2018 3.4.717.7
 - XML results export for IOF XML 2.0.3 had broken split times
@@ -39,7 +46,7 @@
   events were loaded from Eventor.
 
   15 November 2017
-- MEOS crashed when an unknown runner downloaded (bug introduced 3.4.717.2)
+- MeOS crashed when an unknown runner downloaded (bug introduced 3.4.717.2)
 
   6 November 2017
 - Allow specification of a "series" for SSS style events rather than forcing "sss"
@@ -50,21 +57,21 @@
   download from runner db.   
   
   23 October 2017
-- Merge with standard MEOS 3.4.717
+- Merge with standard MeOS 3.4.717
 - Add support for export of Score points in IOF XML 3
 - Add support for instant SSS set-up when event has been imported from Eventor 
 
   8 February 2017
-- Merge with standard MEOS 3.4.690 (3.4 RC1)
-  For changes see 3.4 RC1 notes in http://www.melin.nu/meos/en/whatsnew25.php
+- Merge with standard MeOS 3.4.690 (3.4 RC1)
+  For changes see 3.4 RC1 notes in http://www.melin.nu/MeOS/en/whatsnew25.php
 - This fixes problem introduced in 3.4.666 with tiny font on splits print.
 - This fixes problem introduced where Competitors in Forest found nobody.
   
   18 December 2016 3.4.666.1
-- Merge with standard MEOS 3.4.666
-  For changes see 3.4 Beta 1 notes in http://www.melin.nu/meos/en/whatsnew25.php
-- Remove MEOS-OZ random cross-class draw (MEOS now has this)
-- Remove MEOS-OZ Competitors in Forest logic
+- Merge with standard MeOS 3.4.666
+  For changes see 3.4 Beta 1 notes in http://www.melin.nu/MeOS/en/whatsnew25.php
+- Remove MeOS-OZ random cross-class draw (MeOS now has this)
+- Remove MeOS-OZ Competitors in Forest logic
   
   24 November 2016 3.3.526.7
 - Stop creating duplicate custom reports for SSS.
@@ -89,8 +96,8 @@
 - Intelligent processing of known rented cards when using quick entry 
  
  9 February 2016 3.3.526
-- Merge with standard MEOS 3.3.526.1
-  For changes see 3.3 Beta 1 notes in http://www.melin.nu/meos/en/whatsnew25.php
+- Merge with standard MeOS 3.3.526.1
+  For changes see 3.3 Beta 1 notes in http://www.melin.nu/MeOS/en/whatsnew25.php
 - Make SSS custom reports visible (again)
 - Default start draw is manual after Eventor import 
 
@@ -99,13 +106,13 @@
 - Add custom reports to SSS competition file
 
 30 May 2015 3.2.451.1
-- Merge with standard MEOS 3.2.481 (MeOS 3.2)
-  For changes see http://www.melin.nu/meos/en/whatsnew25.php
+- Merge with standard MeOS 3.2.481 (MeOS 3.2)
+  For changes see http://www.melin.nu/MeOS/en/whatsnew25.php
 
 25 February 2015 3.1.406.1
-- Merge with standard MEOS 3.1.401 (MeOS 3.1 Update 3)
-  For changes see http://www.melin.nu/meos/en/whatsnew25.php
-- Correct bug that prevented MEOS-OZ working in server mode.
+- Merge with standard MeOS 3.1.401 (MeOS 3.1 Update 3)
+  For changes see http://www.melin.nu/MeOS/en/whatsnew25.php
+- Correct bug that prevented MeOS-OZ working in server mode.
 
 10 December 2014 3.1.383.5
 - Allow user to save details of rental sticks so that rental
@@ -126,19 +133,19 @@ someone who hasn't run.
   competitors/course for simple (1 course per class) events.
 
 5 May 2014 3.1.383.1
-- Merge with standard MEOS 3.1.383.1  (the 3.1 release)
-  For changes see http://www.melin.nu/meos/en/whatsnew25.php
+- Merge with standard MeOS 3.1.383.1  (the 3.1 release)
+  For changes see http://www.melin.nu/MeOS/en/whatsnew25.php
   
 22 March 2014 3.1.361.1
-- Merge with standard MEOS 3.1.361.
-  For changes see http://www.melin.nu/meos/en/whatsnew25.php
+- Merge with standard MeOS 3.1.361.
+  For changes see http://www.melin.nu/MeOS/en/whatsnew25.php
 
 22 February 2014 3.1.316.2 
 - Display Rogaining (score) points when download occurs, along 
   with existing result information.
 
 9 February 2014 3.1.316.1 
-- Merge with new release of MEOS (3.1.316 - 3.1 Beta)
+- Merge with new release of MeOS (3.1.316 - 3.1 Beta)
 
 8 December 2013 (fork of 3.0.311)
 - When importing IOF 3 XML entries attempt match on existing entries by name first.
@@ -181,7 +188,7 @@ someone who hasn't run.
 
 May 2013 (fork of 3.0.311)
 - New simple drawing mechanism, accessed via Classes|Draw Several Classes
-  MEOS-Random Fill - then Draw Automatically.
+  MeOS-Random Fill - then Draw Automatically.
   This will do a random draw over the range of start times, only using
   times where nobody else is running on same course.
 
@@ -200,10 +207,10 @@ Australian Customisations:
 - Shorten long club names provided by Eventor to XX.Y format
 
 
-Bug Fixes (to be sent to MEOS owners):
+Bug Fixes (to be sent to MeOS owners):
 - oRunner::getLegPlace() doesn't work.
 
-Bug Fixes (sent to MEOS owner):
+Bug Fixes (sent to MeOS owner):
 - oRunner::doAdjustTimes() - splits shown incorrectly 
   when more than one control with a minimum-time.
 - New time-zone adjustment logic failed if the supplied

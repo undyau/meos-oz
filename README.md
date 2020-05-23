@@ -11,7 +11,6 @@ MeOS - A Much Easier Orienteering System
 - Default Eventor is Australian Eventor
 - Support to print sticky label results
 - Fastest legs bold-printed on splits
-- Automated support for known ranges of rental SI cards
 - Class position on splits
 - Enhanced score event support in splits and results
 - Support for weird Sydney age classes in quick entry mode
@@ -20,3 +19,7 @@ MeOS - A Much Easier Orienteering System
 - Interface for upload to Sydney Summer Series results interface
 - Course displayed on start list
 - Support for import of Or format entries list
+- Last hire sticks file is automatically loaded at start-up
+- Late entries from Eventor entries imported touching previous import data
+
+### Note: Support for rental/hire SI sticks changed to the regular MeOS method in 3.7.1188
