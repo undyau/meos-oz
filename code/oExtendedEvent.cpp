@@ -51,6 +51,38 @@ bool oExtendedEvent::preserveExistingRunnersAsIs(bool preserve) {
   return PreserveExistingRunnersAsIs = preserve;
   }
 
+void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & file)
+{
+// Only handles the simplest case - single event, single competitor per entry
+  int ent = 0, fail = 0;
+
+  xmlparser xml;
+  xml.read(file);
+
+  xmlobject xo = xml.getObject("EntryList");
+
+  if (xo) {
+    gdi.addString("", 0, "Importerar anmälningar (IOF, xml)");
+    gdi.refreshFast();
+
+    xmlList pEntries;
+
+    xo.getObjects("PersonEntry", pEntries);
+    for (size_t k = 0; k < pEntries.size(); k++) {
+      // Process the name, club, class, SI number
+  //    if (readSeasonEntry(gdi, pEntries[k]))
+  //      ent++;
+  //    else
+  //      fail++;
+      }
+    }
+    gdi.addString("", 0, "Klart. Antal importerade: X#" + itos(ent));
+    if (fail>0)
+      gdi.addString("", 0, "Antal som inte importerades: X#" + itos(fail)).setColor(colorRed);
+    gdi.dropLine();
+    gdi.refreshFast();
+}
+
 bool oExtendedEvent::SSSQuickStart(gdioutput &gdi)
 {
   oSSSQuickStart qs(*this);

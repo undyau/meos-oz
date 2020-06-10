@@ -29,6 +29,7 @@ public:
   void loadHireCards();
   bool preserveExistingRunnersAsIs(bool preserve);
   bool getPreserveExistingRunnersAsIs() { return PreserveExistingRunnersAsIs; }
+  void importXML_SeasonTickets(gdioutput &gdi, const wstring &file);
 
 private:
   wstring loadCsvToString(wstring file);
