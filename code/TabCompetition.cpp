@@ -1509,6 +1509,11 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       wstring tEntry = getTempFile();
       wstring tRunnerDB = L"";
       wstring error;
+      gdi.dropLine(2);
+      gdi.popX();
+      gdi.addString("", 0, "Event, Class, Club data will be retrieved but not imported");
+      gdi.dropLine(1);
+      gdi.popX();
       try {
         getEventorCmpData(gdi, ci->Id, tEvent, tClubs, tClass, tEntry, tRunnerDB);
         }
@@ -1540,10 +1545,16 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       removeTempFile(tClass);
       gdi.fillDown();
       gdi.dropLine();
-      // TODO: Some progress message here or earlier ?
-      // Need to do something with the competitor file we downloaded, and only that file
       static_cast<oExtendedEvent*>(oe)->importXML_SeasonTickets(gdi, tEntry.c_str());
       removeTempFile(tEntry);
+      if (gdi.hasWidget("Cancel"))
+        gdi.disableInput("Cancel"); // Disable "cancel" above
+      if (gdi.hasWidget("EventorImportSeason"))
+        gdi.disableInput("EventorImportSeason"); // Disable "next" above
+
+      gdi.fillRight();
+      gdi.addButton("StartIndividual", "Visa startlistan", ListsCB);
+      gdi.addButton("Cancel", "Återgå", CompetitionCB);
       return 0;
     }
     else if (bi.id == "EventorImport") {
@@ -2740,7 +2751,8 @@ bool TabCompetition::loadPage(gdioutput &gdi)
     gdi.fillRight();
     gdi.dropLine();
 
-    if (oe->getExtIdentifier() > 0 && useEventor()) {
+ //   if (oe->getExtIdentifier() > 0 && useEventor()) {
+    if (useEventor()) {
       gdi.addButton("SynchEventor", "Eventorkoppling", CompetitionCB, "Utbyt tävlingsdata med Eventor");
     }
 

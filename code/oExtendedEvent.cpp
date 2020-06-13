@@ -100,6 +100,21 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
     birthDate = L"1998-01-01";  // Force to be a senior at least
   birthYear = std::stoi(birthDate.c_str());
 
+  // Don't over-write existing
+  pRunner existing = getRunnerByName(name);
+  if (existing && (existing->getCardNo() == cardNo || cardNo == 0))
+    {
+    gdi.addString("", 0, L"Entry for " + name + L" already seems to exist - entry ignored");
+    return false;
+    }
+
+  existing = getRunnerByCardNo(cardNo, 0, oEvent::CardLookupProperty::Any);
+  if (existing && existing->getName() == name)
+    {
+    gdi.addString("", 0, L"Entry for " + name + L" already seems to exist - entry ignored");
+    return false;
+    }
+
   return !!addRunner(name, club, cl->getId(), cardNo, birthYear, true);
 }
 

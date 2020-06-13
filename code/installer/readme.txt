@@ -1,3 +1,6 @@
+  13 June 2020 3.7.1188.1
+- Add support for importing a season ticket list from Eventor.
+
   23 May 2020 3.7.1188.0
 - Merge with MeOS 3.7.1188_RC2
 - Allow late entries to be imported from Eventor without 
