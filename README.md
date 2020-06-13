@@ -20,6 +20,7 @@ MeOS - A Much Easier Orienteering System
 - Course displayed on start list
 - Support for import of Or format entries list
 - Last hire sticks file is automatically loaded at start-up
-- Late entries from Eventor entries imported touching previous import data
+- Late entries from Eventor entries imported without touching existing data
+- Import another Eventor event's entries as a "season ticket list"
 
 ### Note: Support for rental/hire SI sticks changed to the regular MeOS method in 3.7.1188
