@@ -28,7 +28,9 @@ public:
   void checkForPeriodicEvents();
   void loadHireCards();
   bool preserveExistingRunnersAsIs(bool preserve);
+  bool addXmlRunner(gdioutput & gdi, xmlobject & xo);
   bool getPreserveExistingRunnersAsIs() { return PreserveExistingRunnersAsIs; }
+  void importXML_SeasonTickets(gdioutput &gdi, const wstring &file);
 
 private:
   wstring loadCsvToString(wstring file);

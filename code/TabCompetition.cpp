@@ -1119,6 +1119,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
 
       gdi.fillRight();
       gdi.addButton("EventorEntries", "Hämta efteranmälningar", CompetitionCB);
+      gdi.addButton("EventorSeason", "Hämta säsongbiljetter", CompetitionCB);
       gdi.addButton("EventorUpdateDB", "Uppdatera löpardatabasen", CompetitionCB);
       gdi.addButton("EventorStartlist", "Publicera startlista", CompetitionCB, "Publicera startlistan på Eventor");
 
@@ -1154,6 +1155,55 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       gdi.setData("UpdateDB", DWORD(0));
       bi.id = "EventorImport";
       competitionCB(gdi, type, &bi);
+    }
+    // New option to load an event from Eventor as a list of "Season Ticket" holders
+    else if (bi.id == "EventorSeason") {
+      // Choose an event from the list available - this is just a copy of the existing logic to get an event
+      if (checkEventor(gdi, bi))
+        return 0;
+
+      SYSTEMTIME st;
+      GetLocalTime(&st);
+      st.wYear--; // Include last years competitions
+      getEventorCompetitions(gdi, convertSystemDate(st), events);
+      gdi.clearPage(true);
+
+      gdi.addString("", boldLarge, "Hämta data från Eventor");
+
+      gdi.dropLine();
+      gdi.addButton("EventorAPI", "Anslutningsinställningar...", CompetitionCB);
+      gdi.dropLine();
+      gdi.fillRight();
+      gdi.pushX();
+      gdi.addSelection("EventorSel", 300, 200);
+
+      // Remove this event from the list of candidates to be the season ticket event
+      vector< CompetitionInfo >::iterator it = events.begin();
+      while (it != events.end()) {
+        if ((long long)it->Id == oe->getExtIdentifier()) {
+          events.erase(it);
+          break;
+        }
+        else ++it;
+      }
+
+      sort(events.begin(), events.end());
+      st.wYear++; // Restore current time
+      wstring now = convertSystemDate(st);
+
+      int selected = 0; // Select next event by default
+      for (int k = events.size() - 1; k >= 0; k--) {
+        wstring n = events[k].Name + L" (" + events[k].Date + L")";
+        gdi.addItem("EventorSel", n, k);
+        if (now < events[k].Date || selected == 0)
+          selected = k;
+        }
+      gdi.selectItemByData("EventorSel", selected);
+
+      gdi.dropLine(3);
+      gdi.popX();
+      gdi.addButton("Cancel", "Avbryt", CompetitionCB);
+      gdi.addButton("EventorImportSeason", "Nästa >>", CompetitionCB);
     }
     else if (bi.id == "EventorStartlist") {
       gdi.clearPage(true);
@@ -1445,6 +1495,67 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       gdi.addButton("EventorImport", "Hämta data från Eventor", CompetitionCB).setDefault();
       gdi.fillDown();
       gdi.popX();
+    }
+    else if (bi.id == "EventorImportSeason") {
+      ListBoxInfo lbi;
+      gdi.getSelectedItem("EventorSel", lbi);
+      const CompetitionInfo *ci = 0;
+      if (lbi.data < events.size())
+        ci = &events[lbi.data];
+
+      wstring tEvent = getTempFile();
+      wstring tClubs = getTempFile();
+      wstring tClass = getTempFile();
+      wstring tEntry = getTempFile();
+      wstring tRunnerDB = L"";
+      wstring error;
+      gdi.dropLine(2);
+      gdi.popX();
+      gdi.addString("", 0, "Event, Class, Club data will be retrieved but not imported");
+      gdi.dropLine(1);
+      gdi.popX();
+      try {
+        getEventorCmpData(gdi, ci->Id, tEvent, tClubs, tClass, tEntry, tRunnerDB);
+        }
+      catch (const meosException &ex) {
+        error = ex.wwhat();
+        }
+      catch (std::exception &ex) {
+        error = gdi.widen(ex.what());
+        if (error.empty())
+          error = L"Okänt fel";
+        }
+
+      if (!error.empty()) {
+        gdi.popX();
+        gdi.dropLine();
+        gdi.fillDown();
+        gdi.addString("", 0, wstring(L"Fel: X#") + error).setColor(colorRed);
+        gdi.addButton("Cancel", "Återgå", CompetitionCB);
+        gdi.refresh();
+        removeTempFile(tEvent);
+        removeTempFile(tClubs);
+        removeTempFile(tClass);
+        removeTempFile(tEntry);
+        return 0;
+        }
+
+      removeTempFile(tEvent);
+      removeTempFile(tClubs);
+      removeTempFile(tClass);
+      gdi.fillDown();
+      gdi.dropLine();
+      static_cast<oExtendedEvent*>(oe)->importXML_SeasonTickets(gdi, tEntry.c_str());
+      removeTempFile(tEntry);
+      if (gdi.hasWidget("Cancel"))
+        gdi.disableInput("Cancel"); // Disable "cancel" above
+      if (gdi.hasWidget("EventorImportSeason"))
+        gdi.disableInput("EventorImportSeason"); // Disable "next" above
+
+      gdi.fillRight();
+      gdi.addButton("StartIndividual", "Visa startlistan", ListsCB);
+      gdi.addButton("Cancel", "Återgå", CompetitionCB);
+      return 0;
     }
     else if (bi.id == "EventorImport") {
       const int diffZeroTime = 3600;
@@ -2640,7 +2751,8 @@ bool TabCompetition::loadPage(gdioutput &gdi)
     gdi.fillRight();
     gdi.dropLine();
 
-    if (oe->getExtIdentifier() > 0 && useEventor()) {
+ //   if (oe->getExtIdentifier() > 0 && useEventor()) {
+    if (useEventor()) {
       gdi.addButton("SynchEventor", "Eventorkoppling", CompetitionCB, "Utbyt tävlingsdata med Eventor");
     }
 

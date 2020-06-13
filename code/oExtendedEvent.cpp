@@ -9,6 +9,7 @@
 #include "progress.h"
 #include "csvparser.h"
 #include <time.h>
+#include "iof30interface.h"
 
 
 oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
@@ -50,6 +51,103 @@ void oExtendedEvent::loadHireCards()
 bool oExtendedEvent::preserveExistingRunnersAsIs(bool preserve) {
   return PreserveExistingRunnersAsIs = preserve;
   }
+
+bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
+{
+  xmlobject xPers = xo.getObject("Person");
+  if (!xPers)
+    return false;
+
+  wstring name;
+  xmlobject xname = xPers.getObject("Name");
+
+  if (!xname) {
+    gdi.addString("", 0, "Entry missing name");
+    return false;
+    }
+
+  wstring given, family;
+  name = xname.getObjectString("Given", given) + L" " +  xname.getObjectString("Family", family);
+
+  wstring club;
+  xmlobject xclub = xo.getObject("Organisation");
+  if (xclub)
+    xclub.getObjectString("ShortName", club);
+
+  wstring className;
+  xmlobject xclass = xo.getObject("Class");
+  if (!xclass)
+    {
+    gdi.addString("", 0, L"Entry for " + name + L" missing class - entry ignored");
+    return false;
+    }
+  xclass.getObjectString("Name", className);
+  pClass cl = getClass(className);
+  if (!cl)
+    {
+    gdi.addString("", 0, L"Entry for " + name + L" has unknown class " + className + L" - entry ignored");
+    return false;
+    }
+
+  const int cardNo = xo.getObjectInt("ControlCard");
+  if (cardNo == 0)
+    gdi.addString("", 0, L"No control card number for " + name);
+
+  wstring birthDate;
+  int birthYear;
+  xPers.getObjectString("BirthDate", birthDate);
+  if (birthDate.empty())
+    birthDate = L"1998-01-01";  // Force to be a senior at least
+  birthYear = std::stoi(birthDate.c_str());
+
+  // Don't over-write existing
+  pRunner existing = getRunnerByName(name);
+  if (existing && (existing->getCardNo() == cardNo || cardNo == 0))
+    {
+    gdi.addString("", 0, L"Entry for " + name + L" already seems to exist - entry ignored");
+    return false;
+    }
+
+  existing = getRunnerByCardNo(cardNo, 0, oEvent::CardLookupProperty::Any);
+  if (existing && existing->getName() == name)
+    {
+    gdi.addString("", 0, L"Entry for " + name + L" already seems to exist - entry ignored");
+    return false;
+    }
+
+  return !!addRunner(name, club, cl->getId(), cardNo, birthYear, true);
+}
+
+void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & file)
+{
+// Only handles the simplest case - single event, single competitor per entry
+  int ent = 0, fail = 0;
+
+  xmlparser xml;
+  xml.read(file);
+
+  xmlobject xo = xml.getObject("EntryList");
+
+  if (xo) {
+    gdi.addString("", 0, "Importerar anmälningar (IOF, xml)");
+    gdi.refreshFast();
+
+    xmlList pEntries;
+
+    xo.getObjects("PersonEntry", pEntries);
+    for (size_t k = 0; k < pEntries.size(); k++) {
+      if (addXmlRunner(gdi, pEntries[k]))
+        ++ent;
+      else
+        ++fail;
+      }
+    }
+    gdi.addString("", 0, "Klart. Antal importerade: X#" + itos(ent));
+    if (fail>0)
+      gdi.addString("", 0, "Antal som inte importerades: X#" + itos(fail)).setColor(colorRed);
+    gdi.dropLine();
+    gdi.refreshFast();
+}
 
 bool oExtendedEvent::SSSQuickStart(gdioutput &gdi)
 {
