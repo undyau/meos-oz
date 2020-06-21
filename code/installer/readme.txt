@@ -1,3 +1,6 @@
+  21 June 2020 3.7.1188.2
+- Fix over-write of info at end of rogaine splits.
+
   13 June 2020 3.7.1188.1
 - Add support for importing a season ticket list from Eventor.
 

@@ -627,7 +627,6 @@ protected:
   wstring tProblemDescription;
   // Sets up mutable data above
   void setupRunnerStatistics() const;
-  void printRogainingSplits(gdioutput &gdi) const;
 
   // Update hash
   void changeId(int newId);
