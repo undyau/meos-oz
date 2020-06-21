@@ -4647,20 +4647,6 @@ void oRunner::printSplits(gdioutput &gdi) const {
     withAnalysis = false;
   }
 
-  
-  if (getCourse(false) && getCourse(false)->hasRogaining()) {
-    vector<pControl> ctrl;
-    bool rogaining(true);
-    getCourse(false)->getControls(ctrl);
-    for (vector<pControl>::const_iterator it=ctrl.begin(); it!=ctrl.end(); ++it)
-      if (!(*it)->isRogaining(true))
-        rogaining = false;
-    if (rogaining) {  
-      printRogainingSplits( gdi);
-      return;
-    }
-  }
-
   gdiFonts head = boldText;
   gdiFonts normal = fontSmall;
   gdiFonts bnormal = boldSmall;
@@ -4683,7 +4669,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
   gdi.dropLine(0.5);
   gdi.addStringUT(normal, lang.tl("Start: ") + getStartTimeS() + lang.tl(", Mål: ") + getFinishTimeS());
   if (cls && cls->isRogaining()) {
-    gdi.addStringUT(normal, lang.tl("Poäng: ") + 
+    gdi.addStringUT(bnormal, lang.tl("Poäng: ") +
                     itow(getRogainingPoints(true, false)) + 
                     +L" (" + lang.tl("Avdrag: ") + itow(getRogainingReduction(true)) + L")");
   }
@@ -4748,6 +4734,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
   set<int> checkedIndex;
 
   if (Card) {
+    int cumulativePoints(0);
     bool hasRogaining = pc ? pc->hasRogaining() : false;
 
     const int cyHead = cy;
@@ -4770,6 +4757,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
         if (it->tRogainingIndex >= 0) {
           const pControl c = pc->getControl(it->tRogainingIndex);
           string point = c ? itos(c->getRogainingPoints()) + "p." : "";
+          cumulativePoints += c ? c->getRogainingPoints() : 0;
 
           gdi.addStringUT(cy, cx + c1 + 10, fontSmall, point);
           any = true;
@@ -4789,6 +4777,8 @@ void oRunner::printSplits(gdioutput &gdi) const {
             wstring punchTime = formatTime(pt - st);
             gdi.addStringUT(cy, cx + c4, fontSmall | textRight, punchTime);
           }
+
+          gdi.addStringUT(cy, cx + c4 + 40, fontSmall, itos(cumulativePoints));
 
           cy += int(gdi.getLineHeight()*0.9);
           continue;
@@ -5061,192 +5051,6 @@ void oRunner::printSplits(gdioutput &gdi) const {
 
   for (size_t k = 0; k < lines.size(); k++) {
     gdi.addStringUT(lines[k].second, formatExtraLine(pRunner(this), lines[k].first));
-  }
-  if (lines.size()>0)
-    gdi.dropLine(0.5);
-
-  gdi.addString("", fontSmall, "Av MeOS: www.melin.nu/meos");
-}
-
-void oRunner::printRogainingSplits(gdioutput &gdi) const {
-  const int ct1=160;
-
-  gdi.setCX(10);
-  gdi.fillDown();
-  gdi.addStringUT(boldText, oe->getName());
-  gdi.addStringUT(fontSmall, oe->getDate());
-  gdi.dropLine(0.5);
-  
-  gdi.addStringUT(boldSmall, getName() + L" " + getClub());
-  int cy = gdi.getCY();
-  gdi.addStringUT(boldSmall, lang.tl("Poäng: ") + itow(getRogainingPoints(false, false)));    
-  gdi.addStringUT(cy, gdi.getCX() + ct1, boldSmall, lang.tl("Tid: ") + getRunningTimeS(false));
-  if (getCard())
-    gdi.addStringUT(fontSmall, lang.tl("SportIdent: ") + getCard()->getCardNoString());
-  gdi.dropLine(0.5);
-  cy = gdi.getCY();
-  gdi.addStringUT(fontSmall, lang.tl("Bana: ") + getCourseName());
-  gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Klass: ") + getClass(false));
-  cy = gdi.getCY();
-  gdi.addStringUT(fontSmall, lang.tl("Gross: ") + itow(this->getRogainingPointsGross(false)));
-  gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Penalty: ") + itow(getRogainingReduction(false)));
-  cy = gdi.getCY();
-  gdi.addStringUT(fontSmall, lang.tl("Start: ") + getStartTimeS());
-  gdi.addStringUT(cy, gdi.getCX() + ct1, fontSmall, lang.tl("Mål: ") + getFinishTimeS());
-
-  cy = gdi.getCY()+4;
-  int cx = gdi.getCX();
-  const int c1=90;
-  const int c2=130;
-  const int c3=170;
-  const int c4=200;
-  const int c5=240;
-  const int width = 68;
-  char bf[256];
-  int lastIndex = -1;
-  int adjust = 0;
-  int offset = 1;
-  int runningTotal = 0;
-
-  bool moreThanHour = getRunningTime(false)>3600;
-  vector<pControl> ctrl;
-  pCourse pc = getCourse(false);
-  if (pc)
-    pc->getControls(ctrl);
-
-  if (Card) {
-    std::vector<pPunch> p;
-    Card->getPunches(p);
-    /*gdi.addStringUT(cy, cx, fontSmall, lang.tl("Kontroll"));
-    gdi.addStringUT(cy, cx + c3, fontSmall, lang.tl("Poäng"));
-    gdi.addStringUT(cy, cx + c4, fontSmall, lang.tl("Löptid"));*/
-    cy+=int(gdi.getLineHeight()*0.9);
-    for (unsigned int i = 0; i < p.size(); i++) {
-      if (p[i]->tRogainingIndex>=0) { 
-        const pControl c = pc->getControl(p[i]->tRogainingIndex);
-        wstring point = c ? c->getRogainingPointsS() : L"";
-        runningTotal += c ? c->getRogainingPoints() : 0;   
-        
-        if (c->getName().length() > 0) 
-          gdi.addStringUT(cy, cx, fontSmall, c->getName() + L" (" + itow(p[i]->getControlNumber()) + L")");
-        else
-          gdi.addStringUT(cy, cx, fontSmall, itow(p[i]->getControlNumber()));
-        gdi.addStringUT(cy, cx + c1, fontSmall, point);
-
-        int st = Card->getSplitTime(getStartTime(), p[i]);
-        
-        if (st>0) {
-          gdi.addStringUT(cy, cx + c2, fontSmall, formatTime(st));
-          if (c->getRogainingPoints() > 0) {
-            float pps = ((float)c->getRogainingPoints() * 60.0f)/st;
-            sprintf_s(bf, "%01.1f", pps);
-            //gdi.addStringUT(cy, cx+c2, fontSmall, bf);
-          }
-        }
-
-        int pt = p[i]->getAdjustedTime();
-        st = getStartTime();
-        if (st>0 && pt>0 && pt>st) {
-          wstring punchTime = formatTime(pt-st);
-          if (!moreThanHour)
-            gdi.addStringUT(cy, cx+c5, fontSmall, punchTime);
-          else
-            gdi.addStringUT(cy, cx+c5+width, fontSmall|textRight, punchTime);
-        }
-
-        gdi.addStringUT(cy, cx+c4, fontSmall, itos(runningTotal));
-
-        cy+=int(gdi.getLineHeight()*0.9);
-        continue;
-      }
-
-      int cid = p[i]->tMatchControlId;
-      wstring punchTime; 
-      if (p[i]->isFinish()) {
-        gdi.addString("", cy, cx, fontSmall, "Mål");
-        int sp = getSplitTime(splitTimes.size(), false);
-        if (sp>0) {
-          gdi.addStringUT(cy, cx+c2, fontSmall, formatTime(sp));
-          punchTime = formatTime(getRunningTime(false));
-        }
-        gdi.addStringUT(cy, cx+c3, fontSmall, oe->getAbsTime(p[i]->Time + adjust));
-
-        if (!punchTime.empty()) {
-          if (!moreThanHour)
-            gdi.addStringUT(cy, cx+c5, fontSmall, punchTime);
-          else
-            gdi.addStringUT(cy, cx+c5+width, fontSmall|textRight, punchTime);
-        }
-        cy+=gdi.getLineHeight();
-      }
-      else if (p[i]->Type>10) { //Filter away check and start
-        int index = -1;
-        if (cid>0)
-          index = findNextControl(ctrl, lastIndex+1, cid, offset, true);
-        if (index>=0) {
-          if (index > lastIndex + 1) {
-            int xx = cx;
-            wstring str = makeDash(L"-");
-            int posy = cy-int(gdi.getLineHeight()*0.4);
-            const int endx = cx+c5 + (moreThanHour ? width : 50);
-
-            while (xx < endx) {
-              gdi.addStringUT(posy, xx, fontSmall, str);
-              xx += 20;
-            }
-            
-            cy+=int(gdi.getLineHeight()*0.3);
-          }
-          
-          lastIndex = index;
-          sprintf_s(bf, "%d.", index+offset);
-          gdi.addStringUT(cy, cx, fontSmall, bf);
-          sprintf_s(bf, "(%d)", p[i]->Type);
-          gdi.addStringUT(cy, cx+c1, fontSmall, bf);
-          
-          adjust = getTimeAdjust(p[i]->tIndex);
-          int sp = getSplitTime(p[i]->tIndex, false);
-          if (sp>0) {
-            punchTime = getPunchTimeS(p[i]->tIndex, false);
-            gdi.addStringUT(cy, cx+c2, fontSmall, formatTime(sp));
-          }
-        }
-        else {
-          if (!p[i]->isUsed) {
-            gdi.addStringUT(cy, cx, fontSmall, makeDash(L"-"));
-          }
-          sprintf_s(bf, "(%d)", p[i]->Type);
-          gdi.addStringUT(cy, cx+c1, fontSmall, bf);
-        }
-        if (p[i]->Time > 0)
-          gdi.addStringUT(cy, cx+c3, fontSmall, oe->getAbsTime(p[i]->Time + adjust));
-        else {
-          wstring str = makeDash(L"-");
-          gdi.addStringUT(cy, cx+c3, fontSmall, str);
-        }
-
-        if (!punchTime.empty()) {
-          if (!moreThanHour)
-            gdi.addStringUT(cy, cx+c5, fontSmall, punchTime);
-          else
-            gdi.addStringUT(cy, cx+c5+width, fontSmall|textRight, punchTime);
-        }
-        cy+=int(gdi.getLineHeight()*0.9);
-      }
-    }
-
-
-    if (getProblemDescription().size() > 0)
-      gdi.addStringUT(fontSmall, lang.tl(getProblemDescription()));
-  }
-
-  gdi.dropLine();
-
-  vector< pair<wstring, int> > lines;
-  oe->getExtraLines("SPExtra", lines);
-
-  for (size_t k = 0; k < lines.size(); k++) {
-    gdi.addStringUT(lines[k].second, lines[k].first);
   }
   if (lines.size()>0)
     gdi.dropLine(0.5);
