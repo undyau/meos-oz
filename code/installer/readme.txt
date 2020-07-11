@@ -1,3 +1,7 @@
+  11 July 2020 3.7.1188.3
+- Fix inability to upload SSS results.
+- Uploaded results (to itsdamp.com server) were not sorted.
+
   21 June 2020 3.7.1188.2
 - Fix over-write of info at end of rogaine splits.
 
