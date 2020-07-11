@@ -309,11 +309,11 @@ void oExtendedEvent::uploadSss(gdioutput &gdi, bool automate)
   wstring url = gdi.getText("SssServer");
   if (getIsSydneySummerSeries()) {
     SssSeriesPrefix = gdi.getText("SssSeriesPrefix", false);
+    SssEventNum = gdi.getTextNo("SssEventNum", false);
     if (SssEventNum == 0) {
       gdi.alert(L"Invalid event number :" + gdi.getText("SssEventNum"));
       return;
       }
-    SssEventNum = gdi.getTextNo("SssEventNum", false);
     }
   else {
     SssAltName = gdi.getText("SssAltName", false);
@@ -471,13 +471,20 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
   if(!csv.openOutput(file))
     return false;
   
-  if (byClass)
-    calculateResults(set<int>(), oEvent::ResultType::ClassResult);
-  else
-    calculateResults(set<int>(), oEvent::ResultType::CourseResult);
-
-  if (IsSydneySummerSeries)
+  if (IsSydneySummerSeries) {
     calculateCourseRogainingResults();
+    this->sortRunners(SortOrder::CoursePoints);
+    }
+  else {
+    if (byClass) {
+      calculateResults(set<int>(), oEvent::ResultType::ClassResult);
+      this->sortRunners(SortOrder::ClassCourseResult);
+      }
+    else {
+      calculateResults(set<int>(), oEvent::ResultType::CourseResult);
+      this->sortRunners(SortOrder::CourseResult);
+      }
+    }
 
   oRunnerList::iterator it;
 
