@@ -118,15 +118,30 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
   return !!addRunner(name, club, cl->getId(), cardNo, birthYear, true);
 }
 
-void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & file)
+void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & competitorFile, const wstring& classesFile)
 {
+// Read the classes file to determine any short names which can then be applied to the competitor import
+  wstring name, shortName, longName;
+  xmlparser xmlCl;
+  xmlCl.read(classesFile);
+  xmlobject xo = xmlCl.getObject("EntryList");
+  xmlList cClass;
+  xo.getObjects("Class", cClass);
+  for (size_t k = 0; k < cClass.size(); k++) {
+    xmlobject &xclass = cClass[k];
+    xclass.getObjectString("Name", name);
+    xclass.getObjectString("ShortName", shortName);
+    if (name.size() > 0 && shortName.size() > 0 && shortName < name)
+      AddClassNameNormalisation(name, shortName);
+    }
+
 // Only handles the simplest case - single event, single competitor per entry
   int ent = 0, fail = 0;
 
   xmlparser xml;
-  xml.read(file);
+  xml.read(competitorFile);
 
-  xmlobject xo = xml.getObject("EntryList");
+  xo = xml.getObject("EntryList");
 
   if (xo) {
     gdi.addString("", 0, "Importerar anmälningar (IOF, xml)");
@@ -148,6 +163,19 @@ void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & fi
     gdi.dropLine();
     gdi.refreshFast();
 }
+
+wstring oExtendedEvent::NormaliseClassName(wstring name)
+  {
+  if (RenamedClasses.find(name) != RenamedClasses.end())
+    return RenamedClasses[name];
+  else
+    return name;
+  }
+
+void oExtendedEvent::AddClassNameNormalisation(wstring oldName, wstring newName)
+  {
+  RenamedClasses[oldName] = newName;
+  }
 
 bool oExtendedEvent::SSSQuickStart(gdioutput &gdi)
 {
