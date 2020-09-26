@@ -82,6 +82,7 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
     return false;
     }
   xclass.getObjectString("Name", className);
+  className = NormaliseClassName(className);
   pClass cl = getClass(className);
   if (!cl)
     {
@@ -124,9 +125,10 @@ void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & co
   wstring name, shortName, longName;
   xmlparser xmlCl;
   xmlCl.read(classesFile);
-  xmlobject xo = xmlCl.getObject("EntryList");
+  xmlobject xo = xmlCl.getObject("ClassList");
   xmlList cClass;
-  xo.getObjects("Class", cClass);
+  if (xo)
+    xo.getObjects("Class", cClass);
   for (size_t k = 0; k < cClass.size(); k++) {
     xmlobject &xclass = cClass[k];
     xclass.getObjectString("Name", name);

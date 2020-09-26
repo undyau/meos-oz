@@ -1416,7 +1416,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
 
       gdi.dropLine(3);
       gdi.popX();
-      gdi.addCheckbox("EventorDb", "Uppdatera löpardatabasen", CompetitionCB, true);
+      gdi.addCheckbox("EventorDb", "Uppdatera löpardatabasen", CompetitionCB, false);
       gdi.dropLine(3);
       gdi.popX();
       gdi.addButton("Cancel", "Avbryt", CompetitionCB);
