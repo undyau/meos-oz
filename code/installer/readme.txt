@@ -1,3 +1,7 @@
+  26 September 2020 3.7.1188.4
+- Use the class short name when importing from Eventor.
+- Default Eventor import to not import the whole people database.
+
   11 July 2020 3.7.1188.3
 - Fix inability to upload SSS results.
 - Uploaded results (to itsdamp.com server) were not sorted.
