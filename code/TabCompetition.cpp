@@ -1176,6 +1176,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
       gdi.fillRight();
       gdi.pushX();
       gdi.addSelection("EventorSel", 300, 200);
+      gdi.clearList("EventorSel");
 
       // Remove this event from the list of candidates to be the season ticket event
       vector< CompetitionInfo >::iterator it = events.begin();
@@ -1415,7 +1416,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
 
       gdi.dropLine(3);
       gdi.popX();
-      gdi.addCheckbox("EventorDb", "Uppdatera löpardatabasen", CompetitionCB, true);
+      gdi.addCheckbox("EventorDb", "Uppdatera löpardatabasen", CompetitionCB, false);
       gdi.dropLine(3);
       gdi.popX();
       gdi.addButton("Cancel", "Avbryt", CompetitionCB);
@@ -1542,10 +1543,11 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
 
       removeTempFile(tEvent);
       removeTempFile(tClubs);
-      removeTempFile(tClass);
+
       gdi.fillDown();
       gdi.dropLine();
-      static_cast<oExtendedEvent*>(oe)->importXML_SeasonTickets(gdi, tEntry.c_str());
+      static_cast<oExtendedEvent*>(oe)->importXML_SeasonTickets(gdi, tEntry.c_str(), tClass.c_str());
+      removeTempFile(tClass);
       removeTempFile(tEntry);
       if (gdi.hasWidget("Cancel"))
         gdi.disableInput("Cancel"); // Disable "cancel" above

@@ -2354,6 +2354,8 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
     longName = name;
     name = shortName;
   }
+  else  // grab the short name were given earlier and pretend it was the real name
+    name = (static_cast<oExtendedEvent*>(&oe)->NormaliseClassName(name));
 
   pClass pc = 0;
 
@@ -2392,7 +2394,8 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
 
   oDataInterface DI = pc->getDI();
   if (!pc->hasFlag(oClass::TransferFlags::FlagManualName)) {
-    if (!longName.empty()) {
+    bool preferLongNames = (oe.getPropertyInt("PreferLongClassNames", 0) != 0);
+    if (!longName.empty() && preferLongNames) {
       pc->setName(name, false);
       DI.setString("LongName", longName);
     }
@@ -2401,6 +2404,10 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
         pc->setName(name, false);
     }
   }
+
+  if (pc->getName() != longName)  // We changed the name, now save it
+    static_cast<oExtendedEvent*>(&oe)->AddClassNameNormalisation(longName, pc->getName());
+
   xmlList legs;
   xclass.getObjects("Leg", legs);
   if (!legs.empty()) {

@@ -30,7 +30,9 @@ public:
   bool preserveExistingRunnersAsIs(bool preserve);
   bool addXmlRunner(gdioutput & gdi, xmlobject & xo);
   bool getPreserveExistingRunnersAsIs() { return PreserveExistingRunnersAsIs; }
-  void importXML_SeasonTickets(gdioutput &gdi, const wstring &file);
+  void importXML_SeasonTickets(gdioutput &gdi, const wstring &competitorFile, const wstring& classesFile);
+  wstring NormaliseClassName(wstring name);
+  void AddClassNameNormalisation(wstring oldName, wstring newName);
 
 private:
   wstring loadCsvToString(wstring file);
@@ -45,4 +47,5 @@ private:
   bool PreserveExistingRunnersAsIs;
   time_t LastAutoUploadSssTime;
   time_t AutoUploadSssInterval;
+  std::map<wstring, wstring> RenamedClasses; // Use on import so we can rename from long class names to short ones
 };

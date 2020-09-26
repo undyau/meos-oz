@@ -600,6 +600,7 @@ void oEvent::listProperties(bool userProps, vector< pair<string, PropertyType> >
   b.insert("FirstTime");
   b.insert("ExportCSVSplits");
   b.insert("DrawInterlace");
+  b.insert("PreferLongClassNames");
   // Integers
   i.insert("YouthFee");
   i.insert("YouthAge");
