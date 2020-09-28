@@ -1,3 +1,6 @@
+  27 September 2020 3.7.1188.5
+- Reset position counter across courses for score events in live result upload.
+
   26 September 2020 3.7.1188.4
 - Use the class short name when importing from Eventor.
 - Default Eventor import to not import the whole people database.
