@@ -240,37 +240,28 @@ void oEvent::calculateCourseRogainingResults()
   sortRunners(CoursePoints);
   oRunnerList::iterator it;
 
-  int cCourseId=-1;
   int cPlace = 0;
   int vPlace = 0;
   int cTime = numeric_limits<int>::min();;
-  int cDuplicateLeg=0;
   bool useResults = false;
   bool isRogaining = false;
   bool invalidClass = false;
-  int cCourseOfClassId=-1;
+  pCourse cCourse(nullptr);
 
   for (it=Runners.begin(); it != Runners.end(); ++it) {
     if (it->isRemoved())
       continue;
 
-    if ((it->getCourseId()!=cCourseId && (cCourseOfClassId <= 0 || it->getCourseId()!=cCourseOfClassId)) || 
-      it->tDuplicateLeg!=cDuplicateLeg) {
-      cCourseId = it->getCourseId();
+    if (it->getCourse(false) != cCourse) {
+      cCourse = it->getCourse(false);
       useResults = it->Class ? !it->Class->getNoTiming() : false;
       cPlace = 0;
       vPlace = 0;
       cTime = numeric_limits<int>::min();
-      cDuplicateLeg = it->tDuplicateLeg;
       isRogaining = it->Class ? it->Class->isRogaining() : false;
       invalidClass = it->Class ? it->Class->getClassStatus() != oClass::ClassStatus::Normal : false;
     }
-
-    if (cCourseId == 0 && it->Class->getCourseId() > 0)
-      cCourseOfClassId = it->Class->getCourseId();
-    else
-      cCourseOfClassId = -1;
-  
+ 
     if (!isRogaining)
       continue;
 
