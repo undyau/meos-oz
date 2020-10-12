@@ -2282,10 +2282,12 @@ bool oRunner::operator<(const oRunner &c) const {
       int id2 = crs2 ? crs2->getId() : 0;
       return id1 < id2;
     }
-		if(status != c.status)
-			return unsigned(status-1) < unsigned(c.status-1);
+    RunnerStatus stat = getStatusComputed();
+    RunnerStatus cstat = c.getStatusComputed();
+		if(stat != cstat)
+      return RunnerStatusOrderMap[stat] < RunnerStatusOrderMap[cstat];
 		else {
-			if (status==StatusOK) {
+			if (stat == StatusOK) {
         if(tRogainingPoints != c.tRogainingPoints)
 			    return tRogainingPoints > c.tRogainingPoints;
 				int t=getRunningTime(false);

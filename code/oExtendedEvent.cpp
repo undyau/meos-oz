@@ -269,7 +269,7 @@ void oEvent::calculateCourseRogainingResults()
       it->tTotalPlace.update(*oe, 0, false);
       it->tPlace.update(*this, 0, false);
     }
-    else if(it->status==StatusOK) {
+    else if(it->getStatusComputed()==StatusOK) {
       cPlace++;
 
       int cmpRes = 3600 * 24 * 7 * it->tRogainingPoints - it->getRunningTime(false);
@@ -285,7 +285,7 @@ void oEvent::calculateCourseRogainingResults()
         it->tPlace.update(*this, 0, false);
     }
     else
-      it->tPlace.update(*this, 99000 + it->status, false);
+      it->tPlace.update(*this, 99000 + it->getStatusComputed(), false);
   }
 }
 
@@ -547,8 +547,8 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
     row[17]=IsSydneySummerSeries && !byClass ? "1" : my_conv_is(it->getClassId(false));
     row[18]=ws2s(it->getClass(false));
     row[19]=ws2s(it->getClass(false));
-    row[20]=my_conv_is(it->getRogainingPointsGross(false));
-    row[21]=my_conv_is(it->getRogainingReduction(false)+it->getRogainingPoints(false, false));
+    row[20]=my_conv_is(it->getRogainingPoints(false, false));
+    row[21]=my_conv_is(it->getRogainingPointsGross(false));
     row[22]=my_conv_is(it->getRogainingReduction(false));
     row[23]=ws2s(it->getClass(false));
 
