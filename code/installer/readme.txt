@@ -1,3 +1,6 @@
+  17 October 2020 3.7.1188.6
+- Fix bug in rogaine (score) results which stopped them being ordered correctly.
+
   27 September 2020 3.7.1188.5
 - Reset position counter across courses for score events in live result upload.
 
