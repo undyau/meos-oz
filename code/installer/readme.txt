@@ -1,3 +1,7 @@
+  05 December 2020 3.7.1188.7
+- Improve triggering of auto-upload results ("itsdamp").
+- Expose the time delay (AutoUploadSssInterval) between auto-uploads when busy.
+
   17 October 2020 3.7.1188.6
 - Fix bug in rogaine (score) results which stopped them being ordered correctly.
 

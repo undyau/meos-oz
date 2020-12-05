@@ -18,7 +18,7 @@ oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
   SssEventNum = 0;
   SssSeriesPrefix = L"sss";
   LoadedCards = false;
-  AutoUploadSssInterval = (time_t) getPropertyInt("AutoUploadSssInterval", 120);
+  AutoUploadSssInterval = (time_t) getPropertyInt("AutoUploadSssInterval", 60);
   LastAutoUploadSssTime = 0;
   AutoUploadSss = false;
   PreserveExistingRunnersAsIs = false;
@@ -26,6 +26,7 @@ oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
 
 oExtendedEvent::~oExtendedEvent(void)
 {
+  setProperty("AutoUploadSssInterval", 60);
 }
 
 void oExtendedEvent::loadHireCards()

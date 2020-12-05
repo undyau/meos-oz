@@ -137,7 +137,6 @@ bool oBase::synchronize(bool writeOnly)
         changed = false;
     }
   }
-  static_cast<oExtendedEvent*>(oe)->checkForPeriodicEvents();
   return true;
 }
 
