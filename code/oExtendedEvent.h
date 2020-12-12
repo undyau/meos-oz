@@ -41,8 +41,6 @@ private:
   int SssEventNum;
   wstring SssSeriesPrefix;
   wstring SssAltName;
-  std::vector<int> RentedCards;
-  bool LoadedCards;
   bool AutoUploadSss;
   bool PreserveExistingRunnersAsIs;
   time_t LastAutoUploadSssTime;

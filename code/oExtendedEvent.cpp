@@ -17,7 +17,6 @@ oExtendedEvent::oExtendedEvent(gdioutput &gdi) : oEvent(gdi)
   IsSydneySummerSeries = false;
   SssEventNum = 0;
   SssSeriesPrefix = L"sss";
-  LoadedCards = false;
   AutoUploadSssInterval = (time_t) getPropertyInt("AutoUploadSssInterval", 60);
   LastAutoUploadSssTime = 0;
   AutoUploadSss = false;

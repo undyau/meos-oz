@@ -52,6 +52,7 @@
 #include "MeOSFeatures.h"
 #include "generalresult.h"
 #include "oEventDraw.h"
+#include "oExtendedEvent.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -3702,6 +3703,7 @@ void oEvent::newCompetition(const wstring &name)
 
   Name = name;
   oEventData->initData(this, sizeof(oData));
+  static_cast<oExtendedEvent*>(this)->loadHireCards();
 
   getDI().setString("Organizer", getPropertyString("Organizer", L""));
   getDI().setString("Street", getPropertyString("Street", L""));
