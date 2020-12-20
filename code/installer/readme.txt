@@ -1,3 +1,7 @@
+  20 December 2020 3.7.1188.8
+- Set hire-card flag (regression bug).
+- Update help file.
+
   05 December 2020 3.7.1188.7
 - Improve triggering of auto-upload results ("itsdamp").
 - Expose the time delay (AutoUploadSssInterval) between auto-uploads when busy.
