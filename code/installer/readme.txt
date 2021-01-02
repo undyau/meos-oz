@@ -1,6 +1,9 @@
-  20 December 2020 3.7.1188.8
+  02 January 2021 3.7.1188.8
 - Set hire-card flag (regression bug).
 - Update help file.
+- Fix failure to do database sync after uploading local 
+  competition to database (workaround was to disconnect and
+  reconnect).
 
   05 December 2020 3.7.1188.7
 - Improve triggering of auto-upload results ("itsdamp").
