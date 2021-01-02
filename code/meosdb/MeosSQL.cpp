@@ -3590,6 +3590,9 @@ string MeosSQL::selectUpdated(const char *oTable, const SqlUpdated &updated) {
 
   string q = "(" + p1 + " WHERE Counter>" + itos(updated.counter) + ") UNION ALL ("+
                    p1 + " WHERE Modified>'" + updated.updated + "' AND Counter<=" + itos(updated.counter) + ")";
+ 
+  if (updated.updated.empty()) // Probably created locally, then uploaded to DB
+    q = "(" + p1 + ")";
 
   return q;
 }
