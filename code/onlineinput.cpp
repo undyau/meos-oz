@@ -208,6 +208,60 @@ void OnlineInput::status(gdioutput &gdi)
   gdi.popX();
 }
 
+const std::wstring getRocDate() {
+  // Need current date in Sweden to trick ROC into giving us the punches
+  // Otherwise if we use the Australian date, we won't get punches in the morning
+  SYSTEMTIME utc;
+  SYSTEMTIME Swedish_time;
+  SYSTEMTIME* reference_time;
+
+  struct STimeZoneFromRegistry
+  {
+    long  Bias;
+    long  StandardBias;
+    long  DaylightBias;
+    SYSTEMTIME StandardDate;
+    SYSTEMTIME DaylightDate;
+  };
+
+  GetSystemTime(&utc);
+
+  // Populate the Swedish timezone structure with info from registry
+  STimeZoneFromRegistry w_european_tz_data;
+  DWORD size = sizeof(w_european_tz_data);
+  HKEY hk = NULL;
+  TCHAR zone_key[] = _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\W. Europe Standard Time");
+  if ((RegOpenKeyEx(HKEY_LOCAL_MACHINE, zone_key, 0, KEY_QUERY_VALUE, &hk) == ERROR_SUCCESS) &&
+    (RegQueryValueEx(hk, L"TZI", NULL, NULL, (BYTE *)&w_european_tz_data, &size) == ERROR_SUCCESS))
+  {
+    w_european_tz_data.DaylightDate.wYear = utc.wYear;
+    w_european_tz_data.StandardDate.wYear = utc.wYear;
+    __int64 utc_seconds = SystemTimeToInt64Second(utc);
+    __int64 swedish_dst_start = SystemTimeToInt64Second(w_european_tz_data.DaylightDate);
+    __int64 swedish_standard_start = SystemTimeToInt64Second(w_european_tz_data.StandardDate);
+    __int64 swedish_seconds;
+   
+    if ((utc_seconds > swedish_dst_start - 60 * (w_european_tz_data.Bias + w_european_tz_data.DaylightBias)) &&
+      (utc_seconds < swedish_standard_start - 60 * (w_european_tz_data.Bias + w_european_tz_data.StandardBias))) {
+      swedish_seconds = utc_seconds - 60 * (w_european_tz_data.Bias + w_european_tz_data.DaylightBias);
+    }
+    else {
+      swedish_seconds = utc_seconds - 60 * (w_european_tz_data.Bias + w_european_tz_data.StandardBias);
+    }
+
+    Swedish_time = Int64SecondToSystemTime(swedish_seconds);
+    reference_time = &Swedish_time;
+  }
+  else
+    reference_time = &utc;
+
+  WCHAR buffer[12];
+  wsprintf(buffer, L"%d-%02d-%02d", reference_time->wYear, reference_time->wMonth, reference_time->wDay);
+  return wstring(buffer);
+}
+
+
+
 void OnlineInput::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
   oe->autoSynchronizeLists(true);
 
@@ -219,9 +273,9 @@ void OnlineInput::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
     wstring q;
     if (useROCProtocol) {
       if (!useUnitId)
-        q = L"?unitId=" + itow(cmpId) + L"&lastId=" + itow(lastImportedId) + L"&date=" + oe->getDate() + L"&time=" + oe->getZeroTime();
+        q = L"?unitId=" + itow(cmpId) + L"&lastId=" + itow(lastImportedId) + L"&date=" + getRocDate() + L"&time=" + oe->getZeroTime();
       else
-        q = L"?unitId=" + unitId + L"&lastId=" + itow(lastImportedId) + L"&date=" + oe->getDate() + L"&time=" + oe->getZeroTime();
+        q = L"?unitId=" + unitId + L"&lastId=" + itow(lastImportedId) + L"&date=" + getRocDate() + L"&time=" + oe->getZeroTime();
     }
     else {
       pair<wstring, wstring> mk1(L"competition", itow(cmpId));
