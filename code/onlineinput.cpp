@@ -208,6 +208,31 @@ void OnlineInput::status(gdioutput &gdi)
   gdi.popX();
 }
 
+const std::wstring getRocDate() {
+  // Need current date in Sweden to trick ROC into giving us the punches
+  // Otherwise if we use the Australian date, we won't get punches in the morning
+
+  TIME_ZONE_INFORMATION Swedish_tz;
+  SYSTEMTIME utc;
+  SYSTEMTIME Swedish_time;
+  SYSTEMTIME* reference_time;
+
+  GetSystemTime(&utc);
+  wcscpy_s(Swedish_tz.StandardName,L"W. Europe Standard Time");
+  if (GetTimeZoneInformation(&Swedish_tz) != TIME_ZONE_ID_INVALID) {
+    SystemTimeToTzSpecificLocalTime(&Swedish_tz, &utc, &Swedish_time);
+    reference_time = &Swedish_time;
+  }
+  else
+    reference_time = &utc;
+
+  WCHAR buffer[12];
+  wsprintf(buffer, L"%d-%02d-%02d", reference_time->wYear, reference_time->wMonth, reference_time->wDay);
+  return wstring(buffer);
+}
+
+
+
 void OnlineInput::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
   oe->autoSynchronizeLists(true);
 
@@ -219,9 +244,9 @@ void OnlineInput::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
     wstring q;
     if (useROCProtocol) {
       if (!useUnitId)
-        q = L"?unitId=" + itow(cmpId) + L"&lastId=" + itow(lastImportedId) + L"&date=" + oe->getDate() + L"&time=" + oe->getZeroTime();
+        q = L"?unitId=" + itow(cmpId) + L"&lastId=" + itow(lastImportedId) + L"&date=" + getRocDate() + L"&time=" + oe->getZeroTime();
       else
-        q = L"?unitId=" + unitId + L"&lastId=" + itow(lastImportedId) + L"&date=" + oe->getDate() + L"&time=" + oe->getZeroTime();
+        q = L"?unitId=" + unitId + L"&lastId=" + itow(lastImportedId) + L"&date=" + getRocDate() + L"&time=" + oe->getZeroTime();
     }
     else {
       pair<wstring, wstring> mk1(L"competition", itow(cmpId));
