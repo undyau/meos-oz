@@ -1,0 +1,118 @@
+@MEOS EXPORT TEMPLATE
+pagenohead@Pages with columns, no header
+info:pageswithcolumns
+%Show the list one page at the time, with the specified number of columns. Automatically reload data for each round.
+
+% This is a MeOS HTML Template file.
+%  
+%  The file must begin with 
+%
+% @MEOS EXPORT TEMPLATE
+% [tag]@Short description / Name
+% Detailed description / help.
+%
+% The tag must be unique for the installation.
+%
+% The output is constructed like follows @HEAD @OUTERPAGE (@INNERPAGE @SEPARATOR @INNERPAGE ...)  
+%                                              @OUTERPAGE (@INNERPAGE @SEPARATOR @INNERPAGE ...) 
+%                                              ...
+%                                              @END
+%
+% The number of inner pages is determined by the number of columns when exporting from MeOS.
+% The height of each inner page is determined by the number of rows per page set in the export.
+%
+% The following symbols will be replaced by MeOS output:
+% -----------------------------------------------------
+%    @S   |  Dynamic (generated) CSS styles.
+%    @D   |  Description of contents. (For example included class names, leg number, etc.) 
+%    @C   |  Contents: For an inner page, the consents in that page/column, for an outer page its inner pages.
+%    @P   |  Inner or outer page number
+%    @N   |  Total number of outer pages
+%    @I   |  Number of inner pages (columns) per page
+%    @M   |  MeOS version
+%    @T   |  Show interval (milliseconds)
+%
+
+@HEAD
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>@T</title>
+</head>
+
+<body>
+@S
+
+<style type="text/css">
+
+body {margin: 0px;}
+
+.vl {
+  border-left: 2px solid grey;
+  height: 100%;
+  box-shadow: 0px 3px 3px gray;
+}
+
+.bottomright {
+  position: absolute;
+  bottom: 8px;
+  right: 16px;
+  font-size: 10px;
+}
+
+a:link {
+  text-decoration: none;
+}
+
+a:visited {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a:active {
+  text-decoration: underline;
+}
+
+</style>
+
+@OUTERPAGE
+<div id="page@P">@C</div>
+
+@INNERPAGE
+<div id="ipage@P" style="position:absolute;left:@L%;top:0em">@C</div>
+
+@SEPARATOR
+<div class="vl" style="position:absolute;left:@L%;top:0em"></div>
+
+@END
+
+<div class="bottomright">@M</div>
+
+<script>
+
+function swapPage() {
+  var ix = 1;
+  setInterval(frame, @T);
+  var i;
+  for (i = 2; i <= @N; i++) {
+     document.getElementById("page" + i).style.display = "none";
+  }
+  
+  function frame() {    
+    document.getElementById("page" + ix).style.display = "none";
+    ix++;    
+    if (ix > @N) {
+      ix = 1;
+      location.reload();
+    }
+   document.getElementById("page" + ix).style.display = "block";
+  }
+}
+window.onload = swapPage;
+</script>
+</body>
+</html> 

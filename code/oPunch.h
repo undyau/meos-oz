@@ -98,6 +98,9 @@ public:
   string codeString() const;
   void appendCodeString(string &dst) const;
 
+
+  void merge(const oBase &input, const oBase *base) override;
+
   oPunch(oEvent *poe);
   virtual ~oPunch();
 

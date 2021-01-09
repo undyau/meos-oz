@@ -14,7 +14,7 @@
 <Tag>ms-patrol-rogaining</Tag>
 <Description>Rogaining results for a patrol</Description>
 <Origin>Rogaining patrol (2018-01-18)</Origin>
-<Date>2018-01-23 06:50:52</Date>
+<Date>2019-12-03 06:45:17</Date>
 <Rule name="RunnerPoints">
 <Method>OutputNumbers[0] = PointReduction;&#13;&#10;return Points;</Method>
 </Rule>
@@ -22,7 +22,7 @@
 <Method>OutputTimes[0] = PatrolRogainingOvertime;&#13;&#10;OutputNumbers[0] = PatrolRogainingReduction;&#13;&#10;return PatrolRogainingScore;</Method>
 </Rule>
 <Rule name="TeamScore">
-<Method>if (Status==StatusOK)&#13;&#10;  return Time - 1000000 * Points;&#13;&#10;else&#13;&#10;  return 100000+Status;&#13;&#10;</Method>
+<Method>if (Status==StatusOK)&#13;&#10;  return Time - 1000000 * ComputedPoints;&#13;&#10;else&#13;&#10;  return 100000+Status;&#13;&#10;</Method>
 </Rule>
 </MeOSResultCalculationSet>
 <HideLegSelection>1</HideLegSelection>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.6">
+<ListName>Patrol, start list</ListName>
+<Tag>patrolstart</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Team</ListType>
+<SubListType>None</SubListType>
+<HideLegSelection>1</HideLegSelection>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Startlista - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassLength">
+<Text> (X meter)</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="StartTimeForClass">
+<Text>Start: X</Text>
+<Leg>0</Leg>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Bricka</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamBib">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerStartCond">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="PatrolNameNames">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">StartTimeForClass</Align>
+</Block>
+<Block Type="RunnerCard">
+<Leg>0</Leg>
+<Align BlockAlign="true">Bricka</Align>
+</Block>
+<Block Type="TeamRunnerCard">
+<Text> / X</Text>
+<Leg>1</Leg>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

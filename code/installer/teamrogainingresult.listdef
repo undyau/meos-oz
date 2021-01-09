@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.7">
+<ListName>Resultatlista, Rogaining, lag</ListName>
+<Tag>teamrogainingresult</Tag>
+<SortOrder>ClassPoints</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<HideLegSelection>1</HideLegSelection>
+<Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
+<SubFilter name="FilterResult"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="3">arial</ListFont>
+<SubListFont scale="120" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Poäng</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Övertid</Text>
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="String">
+<Text>Avdrag</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamPlace">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+<BlockWidth>20</BlockWidth>
+</Block>
+<Block Type="TeamRogainingPoint">
+<Align BlockAlign="true">Poäng</Align>
+<Font>Bold</Font>
+<TextAdjust>Center</TextAdjust>
+</Block>
+<Block Type="TeamTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="TeamRogainingOvertime">
+<Align BlockAlign="true">Övertid</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="TeamRogainingReduction">
+<Align BlockAlign="true">Avdrag</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="RunnerName">
+<Text>  X</Text>
+<Align BlockAlign="true">TeamName</Align>
+</Block>
+<Block Type="RunnerRogainingPoint">
+<Text>  X</Text>
+<Align BlockAlign="true">TeamRogainingPoint</Align>
+<BlockWidth>5</BlockWidth>
+<TextAdjust>Center</TextAdjust>
+</Block>
+<Block Type="RunnerTime">
+<Text>  X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerRogainingOvertime">
+<Align BlockAlign="true">Övertid</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+<Block Type="RunnerRogainingReduction">
+<Align BlockAlign="true">Avdrag</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

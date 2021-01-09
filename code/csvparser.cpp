@@ -37,6 +37,7 @@
 #include <locale>
 #include <codecvt>
 
+
 #ifdef _DEBUG
 #undef THIS_FILE
 static char THIS_FILE[]=__FILE__;
@@ -685,7 +686,7 @@ bool csvparser::importOCAD_CSV(oEvent &event, const wstring &file, bool addClass
       }
       else {
         // Reset control
-        pc->importControls("", false);
+        pc->importControls("", true, false);
         pc->setLength(int(Length*1000));
       }
 

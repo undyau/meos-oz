@@ -1,3 +1,6 @@
+  09 January 2021 3.7.1221.0
+- Merge with MeOS 3.7SD.1221
+
   04 January 2021 3.7.1188.8
 - Set hire-card flag (regression bug).
 - Update help file.

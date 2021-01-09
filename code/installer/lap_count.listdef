@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.6">
+<ListName>Lap Count</ListName>
+<Tag>lapcount</Tag>
+<SortOrder>CustomSort</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>AllPunches</SubListType>
+<ResultModule>ms-number-loops</ResultModule>
+<MeOSResultCalculationSet>
+<Name>Antal varv</Name>
+<Tag>ms-number-loops</Tag>
+<Description>Number of punches (laps), then time.</Description>
+<Date>2018-10-28 09:12:21</Date>
+<Rule name="RunnerScore">
+<Method>if (Status != StatusOK)&#13;&#10;  return Status + 3600*10;&#13;&#10;&#13;&#10;score = 0;&#13;&#10;for(i = 0; i &lt; CardTimes.size(); i++) {&#13;&#10;  if (i == 0 || (CardTimes[i] - CardTimes[i-1]) &gt; 60)&#13;&#10;    score++;&#13;&#10;}&#13;&#10;OutputNumbers[0] = score + 1;&#13;&#10;&#13;&#10;return Time - score*3600*10;</Method>
+</Rule>
+</MeOSResultCalculationSet>
+<Filter name="FilterAnyResult"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="5">arial</ListFont>
+<SubListFont scale="120" above="0">Arial</SubListFont>
+<Head>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+<BlockWidth>300</BlockWidth>
+</Block>
+<Block Type="String">
+<Text>Poäng</Text>
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<Text>X.  </Text>
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerName">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerClub">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ResultModuleNumber">
+<ResultModule>ms-number-loops</ResultModule>
+<Leg>0</Leg>
+<Align BlockAlign="true">Poäng</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">Tid</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="SubSubCounter">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="PunchName">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="PunchAbsTime">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="PunchTotalTime">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="PunchTimeSinceLast">
+<Text>(X)</Text>
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="LineBreak">
+<ResultModule>ms-number-loops</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

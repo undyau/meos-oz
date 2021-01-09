@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.6">
+<ListName>Knockout total</ListName>
+<Tag>knockout-total</Tag>
+<SortOrder>ClassKnockoutTotalResult</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<HideLegSelection>1</HideLegSelection>
+<Filter name="FilterNoCancel"/>
+<SubFilter name="FilterPrelResult"/>
+<SubFilter name="FilterStarted"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="110" above="3">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+<BlockWidth>20</BlockWidth>
+</Block>
+<Block Type="String">
+<Text>Placering</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerName">
+<Text> X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerClub">
+<Text>   (X)</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="SubSubCounter">
+<Align BlockAlign="false">None</Align>
+<IndentMin>5</IndentMin>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="ClassName">
+<Text> X</Text>
+<Align BlockAlign="true">None</Align>
+<Font>NormalFont</Font>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerPlace">
+<Align BlockAlign="true">Placering</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+<Font>NormalFont</Font>
+</Block>
+<Block Type="RunnerTimeAfter">
+<Align BlockAlign="true">Efter</Align>
+<Font>NormalFont</Font>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

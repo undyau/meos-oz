@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.6">
+<ListName>Patrol results</ListName>
+<Tag>patrolresult</Tag>
+<SortOrder>ClassResult</SortOrder>
+<ListType>Team</ListType>
+<SubListType>None</SubListType>
+<Filter name="FilterResult"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Resultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">CmpName</Align>
+</Block>
+<Block Type="ClassResultFraction">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamPlace">
+<Align BlockAlign="true">CmpName</Align>
+</Block>
+<Block Type="PatrolNameNames">
+<Align BlockAlign="true">ClassName</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="TeamTimeAfter">
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

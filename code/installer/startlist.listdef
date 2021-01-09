@@ -1,16 +1,16 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.2">
-<ListName>Startlista</ListName>
+<MeOSListDefinition version="3.6">
+<ListName>Startlista, individuell</ListName>
 <Tag>indstartlist</Tag>
 <SortOrder>ClassStartTimeClub</SortOrder>
 <ListType>Runner</ListType>
 <SubListType>None</SubListType>
-<HeadFont scale="100"></HeadFont>
-<SubHeadFont scale="100"></SubHeadFont>
-<ListFont scale="100"></ListFont>
-<SubListFont scale="100"></SubListFont>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
 <Head>
 <Line>
 <Block Type="CmpName">
@@ -29,6 +29,10 @@
 <Block Type="ClassName">
 <Align BlockAlign="true">None</Align>
 </Block>
+<Block Type="ClassNumEntries">
+<Text>X anmälda</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
 <Block Type="ClassLength">
 <Text>X meter</Text>
 <Align BlockAlign="true">None</Align>
@@ -40,14 +44,15 @@
 </SubHead>
 <List>
 <Line>
+<Block Type="RunnerBib">
+<Align BlockAlign="true">None</Align>
+<TextAdjust>Right</TextAdjust>
+</Block>
 <Block Type="RunnerStart">
 <Align BlockAlign="true">ClassName</Align>
 </Block>
-<Block Type="RunnerBib">
-<Align BlockAlign="true">None</Align>
-</Block>
 <Block Type="RunnerName">
-<Align BlockAlign="true">None</Align>
+<Align BlockAlign="true">ClassNumEntries</Align>
 </Block>
 <Block Type="ClubName">
 <Align BlockAlign="true">None</Align>
