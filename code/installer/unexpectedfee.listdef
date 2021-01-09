@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.6">
+<ListName>Unexpected Fee</ListName>
+<Tag>unexpectedfee</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<Filter name="EFilterWrongFee"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Anmälningsdatum</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Födelseår</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Avgift</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Förväntad</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerCompleteName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerEntryDate">
+<Align BlockAlign="true">Anmälningsdatum</Align>
+</Block>
+<Block Type="RunnerBirthYear">
+<Align BlockAlign="true">Födelseår</Align>
+</Block>
+<Block Type="RunnerFee">
+<Align BlockAlign="true">Avgift</Align>
+</Block>
+<Block Type="RunnerExpectedFee">
+<Align BlockAlign="true">Förväntad</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

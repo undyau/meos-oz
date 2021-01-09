@@ -2,11 +2,12 @@
 
 
 <MeOSListDefinition version="3.6">
-<ListName>Startlista, individuell</ListName>
-<Tag>indstartlist</Tag>
-<SortOrder>ClassStartTimeClub</SortOrder>
-<ListType>Runner</ListType>
+<ListName>Patrol results</ListName>
+<Tag>patrolresult</Tag>
+<SortOrder>ClassResult</SortOrder>
+<ListType>Team</ListType>
 <SubListType>None</SubListType>
+<Filter name="FilterResult"/>
 <HeadFont scale="100" above="0">arial</HeadFont>
 <SubHeadFont scale="100" above="0">arial</SubHeadFont>
 <ListFont scale="100" above="0">arial</ListFont>
@@ -14,7 +15,7 @@
 <Head>
 <Line>
 <Block Type="CmpName">
-<Text>Startlista - X</Text>
+<Text>Resultat - X</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>
@@ -27,38 +28,37 @@
 <SubHead>
 <Line>
 <Block Type="ClassName">
+<Align BlockAlign="true">CmpName</Align>
+</Block>
+<Block Type="ClassResultFraction">
 <Align BlockAlign="true">None</Align>
 </Block>
-<Block Type="ClassNumEntries">
-<Text>X anmälda</Text>
+<Block Type="String">
+<Text>Tid</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
-<Block Type="ClassLength">
-<Text>X meter</Text>
-<Align BlockAlign="true">None</Align>
-</Block>
-<Block Type="ClassStartName">
+<Block Type="String">
+<Text>Efter</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>
 </SubHead>
 <List>
 <Line>
-<Block Type="RunnerBib">
-<Align BlockAlign="true">None</Align>
-<TextAdjust>Right</TextAdjust>
+<Block Type="TeamPlace">
+<Align BlockAlign="true">CmpName</Align>
 </Block>
-<Block Type="RunnerStart">
+<Block Type="PatrolNameNames">
 <Align BlockAlign="true">ClassName</Align>
 </Block>
-<Block Type="RunnerName">
-<Align BlockAlign="true">ClassNumEntries</Align>
-</Block>
-<Block Type="ClubName">
+<Block Type="TeamName">
 <Align BlockAlign="true">None</Align>
 </Block>
-<Block Type="RunnerCard">
-<Align BlockAlign="true">None</Align>
+<Block Type="TeamTimeStatus">
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="TeamTimeAfter">
+<Align BlockAlign="true">Efter</Align>
 </Block>
 </Line>
 </List>

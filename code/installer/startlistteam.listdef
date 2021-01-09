@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.7">
+<ListName>Startlista, lag</ListName>
+<Tag>teamstartlist</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<HideLegSelection>1</HideLegSelection>
+<SubFilter name="FilterNotVacant"/>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="100" above="5"/>
+<SubListFont scale="140" above="0"/>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="StartTimeForClass">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassLength">
+<Text>X meter</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassStartName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamBib">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="RunnerLegNumberAlpha">
+<Align BlockAlign="true">TeamName</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerCard">
+<Align BlockAlign="true">ClassStartName</Align>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

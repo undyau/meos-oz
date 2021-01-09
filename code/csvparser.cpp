@@ -34,6 +34,9 @@
 #include "importformats.h"
 
 #include "meosexception.h"
+#include <locale>
+#include <codecvt>
+
 
 #ifdef _DEBUG
 #undef THIS_FILE

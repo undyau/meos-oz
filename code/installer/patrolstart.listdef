@@ -2,11 +2,12 @@
 
 
 <MeOSListDefinition version="3.6">
-<ListName>Startlista, individuell</ListName>
-<Tag>indstartlist</Tag>
-<SortOrder>ClassStartTimeClub</SortOrder>
-<ListType>Runner</ListType>
+<ListName>Patrol, start list</ListName>
+<Tag>patrolstart</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Team</ListType>
 <SubListType>None</SubListType>
+<HideLegSelection>1</HideLegSelection>
 <HeadFont scale="100" above="0">arial</HeadFont>
 <SubHeadFont scale="100" above="0">arial</SubHeadFont>
 <ListFont scale="100" above="0">arial</ListFont>
@@ -29,36 +30,45 @@
 <Block Type="ClassName">
 <Align BlockAlign="true">None</Align>
 </Block>
-<Block Type="ClassNumEntries">
-<Text>X anmälda</Text>
-<Align BlockAlign="true">None</Align>
-</Block>
 <Block Type="ClassLength">
-<Text>X meter</Text>
+<Text> (X meter)</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="StartTimeForClass">
+<Text>Start: X</Text>
+<Leg>0</Leg>
 <Align BlockAlign="true">None</Align>
 </Block>
-<Block Type="ClassStartName">
+<Block Type="String">
+<Text>Bricka</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>
 </SubHead>
 <List>
 <Line>
-<Block Type="RunnerBib">
+<Block Type="TeamBib">
 <Align BlockAlign="true">None</Align>
-<TextAdjust>Right</TextAdjust>
 </Block>
-<Block Type="RunnerStart">
-<Align BlockAlign="true">ClassName</Align>
-</Block>
-<Block Type="RunnerName">
-<Align BlockAlign="true">ClassNumEntries</Align>
-</Block>
-<Block Type="ClubName">
+<Block Type="RunnerStartCond">
 <Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="PatrolNameNames">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">StartTimeForClass</Align>
 </Block>
 <Block Type="RunnerCard">
+<Leg>0</Leg>
+<Align BlockAlign="true">Bricka</Align>
+</Block>
+<Block Type="TeamRunnerCard">
+<Text> / X</Text>
+<Leg>1</Leg>
 <Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
 </Block>
 </Line>
 </List>

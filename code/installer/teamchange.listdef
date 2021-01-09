@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.5">
+<ListName>Lagändringblankett</ListName>
+<Tag>teamchanges</Tag>
+<SortOrder>SortNameOnly</SortOrder>
+<ListType>Team</ListType>
+<SubListType>Runner</SubListType>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="150" above="0"/>
+<ListFont scale="100" above="0"/>
+<SubListFont scale="100" above="0"/>
+<Head>
+</Head>
+<SubHead>
+<Line>
+<Block Type="TeamBib">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="String">
+<Text> </Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+</List>
+<SubList>
+<Line>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+<Font>MediumPlus</Font>
+</Block>
+<Block Type="RunnerCard">
+<Align BlockAlign="true">None</Align>
+<Font>MediumPlus</Font>
+</Block>
+</Line>
+<Line>
+<Block Type="String">
+<Text> </Text>
+<Align BlockAlign="true">None</Align>
+<Font>MediumPlus</Font>
+</Block>
+</Line>
+<Line>
+<Block Type="RunnerLegNumberAlpha">
+<Align BlockAlign="true">None</Align>
+<Font>ItalicMediumPlus</Font>
+</Block>
+<Block Type="String">
+<Text>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ </Text>
+<Align BlockAlign="true">None</Align>
+<Font>MediumPlus</Font>
+</Block>
+</Line>
+<Line>
+<Block Type="String">
+<Text> </Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

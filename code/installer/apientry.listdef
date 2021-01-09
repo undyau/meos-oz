@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.6">
+<ListName>EFilterAPIEntry</ListName>
+<Tag>apientry</Tag>
+<SortOrder>SortNameOnly</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<Filter name="EFilterAPIEntry"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="String">
+<Text>EFilterAPIEntry</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerCompleteName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerEntryDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerEntryTime">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerFee">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

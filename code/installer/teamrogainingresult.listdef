@@ -1,30 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.5">
-<ListName>Patrol Team Rogaining</ListName>
-<Tag>patrol_team_rogaining</Tag>
-<UID>A-7941583486858019635B1030030353</UID>
-<SortOrder>CustomSort</SortOrder>
+<MeOSListDefinition version="3.7">
+<ListName>Resultatlista, Rogaining, lag</ListName>
+<Tag>teamrogainingresult</Tag>
+<SortOrder>ClassPoints</SortOrder>
 <ListType>Team</ListType>
 <SubListType>Runner</SubListType>
-<ResultModule>ms-patrol-rogaining</ResultModule>
-<MeOSResultCalculationSet>
-<Name>Patrol Rogaining</Name>
-<Tag>ms-patrol-rogaining</Tag>
-<Description>Rogaining results for a patrol</Description>
-<Origin>Rogaining patrol (2018-01-18)</Origin>
-<Date>2019-12-03 06:45:17</Date>
-<Rule name="RunnerPoints">
-<Method>OutputNumbers[0] = PointReduction;&#13;&#10;return Points;</Method>
-</Rule>
-<Rule name="TeamPoints">
-<Method>OutputTimes[0] = PatrolRogainingOvertime;&#13;&#10;OutputNumbers[0] = PatrolRogainingReduction;&#13;&#10;return PatrolRogainingScore;</Method>
-</Rule>
-<Rule name="TeamScore">
-<Method>if (Status==StatusOK)&#13;&#10;  return Time - 1000000 * ComputedPoints;&#13;&#10;else&#13;&#10;  return 100000+Status;&#13;&#10;</Method>
-</Rule>
-</MeOSResultCalculationSet>
 <HideLegSelection>1</HideLegSelection>
 <Filter name="FilterResult"/>
 <Filter name="FilterNoCancel"/>
@@ -73,7 +55,6 @@
 <List>
 <Line>
 <Block Type="TeamPlace">
-<ResultModule>ms-patrol-rogaining</ResultModule>
 <Align BlockAlign="true">None</Align>
 </Block>
 <Block Type="TeamName">
@@ -88,15 +69,11 @@
 <Block Type="TeamTimeStatus">
 <Align BlockAlign="true">Tid</Align>
 </Block>
-<Block Type="ResultModuleTimeTeam">
-<ResultModule>ms-patrol-rogaining</ResultModule>
-<Leg>0</Leg>
+<Block Type="TeamRogainingOvertime">
 <Align BlockAlign="true">Övertid</Align>
 <TextAdjust>Right</TextAdjust>
 </Block>
-<Block Type="ResultModuleNumberTeam">
-<ResultModule>ms-patrol-rogaining</ResultModule>
-<Leg>0</Leg>
+<Block Type="TeamRogainingReduction">
 <Align BlockAlign="true">Avdrag</Align>
 <TextAdjust>Right</TextAdjust>
 </Block>
@@ -122,9 +99,7 @@
 <Align BlockAlign="true">Övertid</Align>
 <TextAdjust>Right</TextAdjust>
 </Block>
-<Block Type="ResultModuleNumber">
-<ResultModule>ms-patrol-rogaining</ResultModule>
-<Leg>0</Leg>
+<Block Type="RunnerRogainingReduction">
 <Align BlockAlign="true">Avdrag</Align>
 <TextAdjust>Right</TextAdjust>
 </Block>
