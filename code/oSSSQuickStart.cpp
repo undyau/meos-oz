@@ -70,7 +70,7 @@ if (!m_Event.empty())
 else
   {
   gdi.setWaitCursor(true);
-  if(m_Event.open((file, true, false))) 
+  if(m_Event.open(file, true, false)) 
 	  {
 	  m_Event.updateTabs();
 	  gdi.setWindowTitle(m_Event.getTitleName());

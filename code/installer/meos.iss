@@ -34,6 +34,7 @@ Source: "license.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.meos"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.brules"; DestDir: "{app}"; Flags: ignoreversion
+Source: "*.template"; DestDir: "{app}"; Flags: ignoreversion
 Source: "mysqlpp.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "thirdpartylicense.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "baseclass.xml"; DestDir: "{app}"; Flags: ignoreversion
@@ -43,7 +44,6 @@ Source: "*.lxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.listdef"; DestDir: "{app}"; Flags: ignoreversion
 Source: "ind_courseresult.lxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sss201230.xml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "classcourse.lxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Receipt Results.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Results.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "vc_redist.x86.exe"; DestDir: {tmp}; Flags: deleteafterinstall
