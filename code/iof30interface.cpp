@@ -1063,6 +1063,10 @@ void IOF30Interface::readServiceRequestList(gdioutput &gdi, xmlobject &xo, int &
   xo.getObjects("PersonServiceRequest", req);
   entrySourceId = 0;
 
+  auto &sg = oe.getStartGroups(true);
+
+  bool importStartGroups = sg.size() > 0;
+
   for (auto &rx : req) {
     xmlobject xPers = rx.getObject("Person");
     pRunner r = 0;
@@ -1074,9 +1078,13 @@ void IOF30Interface::readServiceRequestList(gdioutput &gdi, xmlobject &xo, int &
       if (xreq) {
         auto xServ = xreq.getObject("Service");
         string type;
-        if (xServ && xServ.getObjectString("type", type)=="StartGroup") {
+        if (xServ && (xServ.getObjectString("type", type)=="StartGroup" || importStartGroups)) {
           int id = xServ.getObjectInt("Id");
-          r->getDI().setInt("Heat", id);
+          if (!importStartGroups)
+            r->getDI().setInt("Heat", id);
+
+          if (sg.count(id))
+            r->setStartGroup(id);
         }
       }
     }
@@ -1388,7 +1396,46 @@ void IOF30Interface::readEvent(gdioutput &gdi, const xmlobject &xo,
       DI.setString("LateEntryFactor", lf);
     }
   }
+
   oe.synchronize();
+  xmlList xService;
+  xo.getObjects("Service", xService);
+  services.clear();
+
+  for (auto &s : xService) {
+    int id = s.getObjectInt("Id");
+    if (id > 0) {      
+      xmlList nameList;
+      s.getObjects("Name", nameList);
+      for (auto s : nameList) {        
+        services.emplace_back(id, s.getw());
+      }
+    }
+  }
+  bool anySG = false;
+  // This is a "hack" to interpret services of the from "XXXX 14:00 - 15:00 XXXX" as a start group.
+  for (auto &srv : services) {
+    vector<wstring> parts;
+    split(srv.name, L" --–—-", parts);
+    vector<int> times;
+    for (auto &p : parts) {
+      for (auto &c : p) {
+        if (c == '.')
+          c = ':';
+      }
+      int t = oe.getRelativeTime(p);
+      if (t > 0)
+        times.push_back(t);
+    }
+    int ts = times.size();
+    if (ts >= 2 && times[ts - 2] < times[ts - 1]) {
+      oe.setStartGroup(srv.id, times[ts - 2], times[ts - 1]);
+      anySG = true;
+    }
+  }
+
+  if (anySG)
+    oe.updateStartGroups();
 }
 
 void IOF30Interface::setupClassConfig(int classId, const xmlobject &xTeam, map<int, vector<LegInfo> > &teamClassConfig) {
@@ -2964,7 +3011,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
     xml.write("StartTime", oe.getAbsDateTimeISO(r.getStartTime(), true, useGMT));
 
   bool hasTiming = (!r.getClassRef(false) || r.getClassRef(true)->getNoTiming() == false) &&
-                    r.getStatusComputed() != RunnerStatus::StatusNoTiming;
+                    r.getStatusComputed() != RunnerStatus::StatusNoTiming && !r.noTiming();
 
   int finishTime, runningTime, place, after;
   RunnerStatus status;
@@ -3953,7 +4000,7 @@ pCourse IOF30Interface::readCourse(const xmlobject &xcrs) {
   if (pc) {
     pc->setName(name);
     pc->setLength(len);
-    pc->importControls("", false);
+    pc->importControls("", true, false);
     for (size_t i = 0; i<ctrlCode.size(); i++) {
       pc->addControl(ctrlCode[i]->getId());
     }

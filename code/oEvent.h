@@ -444,9 +444,23 @@ protected:
 
   mutable vector<GeneralResultCtr> generalResults;
 
+  // Start group id -> first, last start
+  mutable map<int, pair<int, int>> startGroups;
+
+  string encodeStartGroups() const;
+  void decodeStartGroups(const string &enc) const;
+  
   // Temporarily disable recaluclate leader times
   bool disableRecalculate;
 public:
+
+  void setStartGroup(int id, int firstStart, int lastStart);
+  void updateStartGroups(); // Update to source
+  void readStartGroups() const; // Read from source.
+
+  pair<int, int> getStartGroup(int id) const;
+  const map<int, pair<int, int>> &getStartGroups(bool reload) const;
+
 
   enum TransferFlags {
     FlagManualName = 1,
@@ -953,7 +967,7 @@ public:
 
   bool exportOECSV(const wchar_t *file, int LanguageTypeIndex, bool includeSplits, bool byClass = true);
   bool save();
-  void duplicate();
+  void duplicate(const wstring &annotation, bool keepTags = false);
   void newCompetition(const wstring &Name);
   void clearListedCmp();
   bool enumerateCompetitions(const wchar_t *path, const wchar_t *extension);
@@ -1057,11 +1071,15 @@ public:
   pCard allocateCard(pRunner owner);
 
   /** Optimize the start order based on drawInfo. Result in cInfo */
-  void optimizeStartOrder(gdioutput &gdi, DrawInfo &drawInfo, vector<ClassInfo> &cInfo);
+  void optimizeStartOrder(vector<pair<int, wstring>> &outLines, DrawInfo &drawInfo, vector<ClassInfo> &cInfo);
 
   void loadDrawSettings(const set<int> &classes, DrawInfo &drawInfo, vector<ClassInfo> &cInfo) const;
 
   void drawRemaining(DrawMethod method, bool placeAfter);
+  void drawListStartGroups(const vector<ClassDrawSpecification> &spec,
+                           DrawMethod method, int pairSize, DrawType drawType,
+                           bool limitGroupSize = true,
+                           DrawInfo *di = nullptr);
   void drawList(const vector<ClassDrawSpecification> &spec,
                 DrawMethod method, int pairSize, DrawType drawType);
   void drawListClumped(int classID, int firstStart, int interval, int vacances);
@@ -1180,7 +1198,7 @@ public:
   void fillFees(gdioutput &gdi, const string &name, bool onlyDirect, bool withAuto) const;
   wstring getAutoClassName() const;
   pClass addClass(const wstring &pname, int CourseId = 0, int classId = 0);
-  pClass addClass(oClass &c);
+  pClass addClass(const oClass &c);
   /** Get a class if it exists, or create it. 
       exactNames is a set of class names that must be matched exactly. 
       It is extended with the name of the class added. The purpose is to allow very
@@ -1246,7 +1264,7 @@ public:
   const vector< pair<wstring, size_t> > &fillControlTypes(vector< pair<wstring, size_t> > &out);
 
   bool open(int id);
-  bool open(const wstring &file, bool import=false);
+  bool open(const wstring &file, bool import, bool forMerge);
   bool open(const xmlparser &xml);
 
   bool save(const wstring &file);
@@ -1287,6 +1305,8 @@ protected:
   /** type: 0 control, 1 start, 2 finish*/
   bool addXMLControl(const xmlobject &xcontrol, int type);
 
+  void merge(const oBase &src, const oBase *base) final;
+
 public:
   void calculateCourseRogainingResults(); // implemented in oExtendedEvent.cpp
 
@@ -1298,8 +1318,11 @@ public:
 
   void getPredefinedClassTypes(map<wstring, ClassMetaType> &types) const;
 
+  void merge(oEvent &src, oEvent *base, bool allowRemove, int &numAdd, int &numRemove, int &numUpdate);
+  string getLastModified() const;
+
   wstring cloneCompetition(bool cloneRunners, bool cloneTimes,
-                          bool cloneCourses, bool cloneResult, bool addToDate);
+                           bool cloneCourses, bool cloneResult, bool addToDate);
 
   enum ChangedClassMethod {
     ChangeClassVacant,
@@ -1327,6 +1350,10 @@ public:
 
 
   void transferListsAndSave(const oEvent &src);
+
+  wstring getMergeTag(bool forceReset = false);
+  wstring getMergeInfo(const wstring &tag) const;
+  void addMergeInfo(const wstring &tag, const wstring &version);
 
   enum MultiStageType {
     MultiStageNone = 0,

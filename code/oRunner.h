@@ -84,7 +84,7 @@ enum SortOrder {
   CourseResult,
   CourseStartTime,
   SortByEntryTime,
-	CoursePoints,
+  CoursePoints,
   Custom,
   SortEnumLastItem
 };
@@ -202,6 +202,8 @@ public:
   bool preventRestart() const;
   void preventRestart(bool state);
 
+  void merge(const oBase &input, const oBase *base) override;
+
   /** Call this method after doing something to just this
       runner/team that changed the time/status etc, that effects
       the result. May make a global evaluation of the class.
@@ -242,6 +244,9 @@ public:
 
   bool hasFlag(TransferFlags flag) const;
   void setFlag(TransferFlags flag, bool state);
+
+  /** Return true if no timing is requested. */
+  bool noTiming() const { return hasFlag(FlagNoTiming); }
 
   // Get the runners team or the team itself
   virtual cTeam getTeam() const = 0;
@@ -659,8 +664,19 @@ protected:
 
   bool isHiredCard(int card) const;
 
+  int tmpStartGroup = 0;
 public:
   static const shared_ptr<Table> &getTable(oEvent *oe);
+
+  int getStartGroup(bool useTmpStartGroup) const {
+    if (useTmpStartGroup && tmpStartGroup)
+      return tmpStartGroup;
+    return getDCI().getInt("StartGroup");
+  }
+
+  void setStartGroup(int sg) {
+    getDI().setInt("StartGroup", sg);
+  }
 
   // Get the leg defineing parallel results for this runner (in a team)
   int getParResultLeg() const;
@@ -904,7 +920,7 @@ public:
   void setNumShortening(int numShorten);
 
   pCard getCard() const {return Card;}
-  int getCardId(){if (Card) return Card->Id; else return 0;}
+  int getCardId() const {if (Card) return Card->Id; else return 0;}
 
   bool operator<(const oRunner &c) const;
   bool static CompareCardNumber(const oRunner &a, const oRunner &b) { return a.cardNumber < b.cardNumber; }
@@ -947,6 +963,8 @@ public:
   /** Formats extra line for runner []-syntax, or if r is null, checks validity and throws on error.*/
   static wstring formatExtraLine(pRunner r, const wstring &input);
 
+  void merge(const oBase &input, const oBase *base) final;
+  
   virtual ~oRunner();
 
   friend class MeosSQL;
