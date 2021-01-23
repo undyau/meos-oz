@@ -17,4 +17,5 @@
 17. Export event to Eventor with XML 3 where the day of month is 1-9 (defect in MEOS 3.5)
 18. Test with server mode
 19. Test hire stick auto detect in server mode
+20. Test ROC control when Sweden/Australia on different days
 

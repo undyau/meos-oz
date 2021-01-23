@@ -133,7 +133,7 @@ void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & co
     xmlobject &xclass = cClass[k];
     xclass.getObjectString("Name", name);
     xclass.getObjectString("ShortName", shortName);
-    if (name.size() > 0 && shortName.size() > 0 && shortName < name)
+    if (name.size() > 0 && shortName.size() > 0 && shortName.size() < name.size())
       AddClassNameNormalisation(name, shortName);
     }
 
