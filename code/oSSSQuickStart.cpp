@@ -162,7 +162,11 @@ bool oSSSQuickStart::GetEventTemplateFromInstall(wstring& a_File)
 			ownPth[pos] = '\0';
 
 			wstring templateFile(ownPth);
-			templateFile += L"\\sss201230.xml";
+      if (m_Event.getDCI().getString("Organizer") == L"Big Foot Orienteers")
+        templateFile += L"\\sss201230.xml";
+      else
+        templateFile += L"\\sss101130.xml";
+
 			if (!fileExist(templateFile.c_str()))
 				return false;
 			else
@@ -174,7 +178,11 @@ bool oSSSQuickStart::GetEventTemplateFromInstall(wstring& a_File)
 
 bool oSSSQuickStart::GetEventTemplateFromWeb(wstring& a_File)
 {
-  wstring url = L"http://sportident.itsdamp.com/sss201230.xml";
+  wstring url;
+  if (m_Event.getDCI().getString("Organizer") == L"Big Foot Orienteers")
+    url = L"http://sportident.itsdamp.com/sss201230.xml";
+  else
+    url = L"http://sportident.itsdamp.com/sss101130.xml";
 
   Download dwl;
   dwl.initInternet();

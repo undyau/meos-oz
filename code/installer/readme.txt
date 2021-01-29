@@ -1,3 +1,9 @@
+  09 January 2021 3.7.1221.1
+- Set default SSS controls to 101-130. Previously the default
+  set was 201-230, but conmtrols 101-130 were aliased to that 
+  range, but that caused confusion when additional controls were 
+  used for another course.
+
   09 January 2021 3.7.1221.0
 - Merge with MeOS 3.7SD.1221
 
