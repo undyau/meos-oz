@@ -86,8 +86,13 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
   pClass cl = getClass(className);
   if (!cl)
     {
-    gdi.addString("", 0, L"Entry for " + name + L" has unknown class " + className + L" - entry ignored");
-    return false;
+    className = GetShortSssName(className);
+    pClass cl = getClass(className);
+    if (!cl)
+      {
+      gdi.addString("", 0, L"Entry for " + name + L" has unknown class " + className + L" - entry ignored");
+      return false;
+      }
     }
 
   const int cardNo = xo.getObjectInt("ControlCard");
@@ -173,6 +178,28 @@ wstring oExtendedEvent::NormaliseClassName(wstring name)
   else
     return name;
   }
+
+wstring oExtendedEvent::GetShortSssName(wstring & className)
+{
+  // Get initials of each word if its two words long and not "Walking..."
+  vector<wstring> parts;
+  split(className, L" ", parts);
+  if (parts.size() > 0)
+  {
+    if (parts[0].substr(0, 2) == wstring(L"Wa"))
+      return L"Wa" + parts[1].substr(0, 1);
+    else
+    {
+      wstring retVal;
+      for (auto i = 0; i < parts.size(); i++)
+        retVal += parts[i].substr(0, 1);
+      return retVal;
+    }
+  }
+
+  return className;
+
+}
 
 void oExtendedEvent::AddClassNameNormalisation(wstring oldName, wstring newName)
   {
