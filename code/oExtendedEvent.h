@@ -32,6 +32,7 @@ public:
   bool getPreserveExistingRunnersAsIs() { return PreserveExistingRunnersAsIs; }
   void importXML_SeasonTickets(gdioutput &gdi, const wstring &competitorFile, const wstring& classesFile);
   wstring NormaliseClassName(wstring name);
+  wstring GetShortSssName(wstring& className);
   void AddClassNameNormalisation(wstring oldName, wstring newName);
 
 private:
