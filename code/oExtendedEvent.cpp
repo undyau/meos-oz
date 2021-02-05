@@ -87,7 +87,7 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
   if (!cl)
     {
     className = GetShortSssName(className);
-    pClass cl = getClass(className);
+    cl = getClass(className);
     if (!cl)
       {
       gdi.addString("", 0, L"Entry for " + name + L" has unknown class " + className + L" - entry ignored");

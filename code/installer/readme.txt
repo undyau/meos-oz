@@ -1,6 +1,7 @@
-  04 February 2021 3.7.1221.4
+  06 February 2021 3.7.1221.5
 - If season ticket data has unknown class, try converting class to 
   an abbreviation eg "Veteran Men" -> "VM" to see if that matches.
+  (Originally in 3.7.1221.4, but that release was withdrawn)
 
   09 January 2021 3.7.1221.3
 - Set default SSS controls to 101-130. Previously the default
