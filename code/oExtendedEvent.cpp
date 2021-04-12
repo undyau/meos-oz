@@ -609,7 +609,7 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
   if (it->getCard()) 
     {
     int j(0);
-    for (int i = 0; i < it->getCard()->getNumPunches(); i++)
+    for (int i = 0; i < it->getCard()->getNumPunches() && i <= 75; i++)
       {
       oPunch* punch = it->getCard()->getPunchByIndex(i);
       if (punch->getControlNumber() > 0)

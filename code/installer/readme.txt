@@ -1,3 +1,7 @@
+  06 February 2021 3.7.1221.6
+- SI Air users with failing battery may generate many punches.
+  This caused Or format CSV exports to fail, stopping the program.
+
   06 February 2021 3.7.1221.5
 - If season ticket data has unknown class, try converting class to 
   an abbreviation eg "Veteran Men" -> "VM" to see if that matches.
