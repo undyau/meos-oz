@@ -1722,11 +1722,14 @@ pRunner oEvent::addRunner(const wstring &name, int clubId, int classId,
   if (birthYear != 0)
     birthYear = extendYear(birthYear);
 
-  pRunner db_r = oe->dbLookUpByCard(cardNo);
+  if (cardNo>0) {
+    pRunner db_r = oe->dbLookUpByCard(cardNo);
 
-  if (db_r && !db_r->matchName(name))
-    db_r = 0; // "Existing" card, but different runner
-
+    if (db_r && !db_r->matchName(name))
+      db_r = 0; // "Existing" card, but different runner
+  }
+  else 
+    db_r = 0; // card = 0
 
   if (db_r == 0 && getNumberSuffix(name) == 0)
     db_r = oe->dbLookUpByName(name, clubId, classId, birthYear);

@@ -1367,10 +1367,10 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
     if (param.count("card"))
       cardNo = atoi(param.find("card")->second.c_str());
 
-    if (cardNo <= 0) {
+    if (cardNo < 0) {
       error = L"Ogiltigt bricknummer X#" + itow(cardNo);
     }
-    else {
+    else if (cardNo > 0) {
       vector<pRunner> runners;
       oe.getRunnersByCardNo(cardNo, true, oEvent::CardLookupProperty::CardInUse, runners);
       for (auto r : runners) {
