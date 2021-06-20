@@ -1519,7 +1519,7 @@ pRunner oEvent::dbLookUpById(__int64 extId) const
 
 pRunner oEvent::dbLookUpByCard(int cardNo) const
 {
-  if (!useRunnerDb())
+  if (!useRunnerDb() || cardNo<=0)
     return 0;
 
   oEvent *toe = const_cast<oEvent *>(this);
@@ -1722,14 +1722,11 @@ pRunner oEvent::addRunner(const wstring &name, int clubId, int classId,
   if (birthYear != 0)
     birthYear = extendYear(birthYear);
 
-  if (cardNo>0) {
-    pRunner db_r = oe->dbLookUpByCard(cardNo);
+  pRunner db_r = oe->dbLookUpByCard(cardNo);
 
-    if (db_r && !db_r->matchName(name))
-      db_r = 0; // "Existing" card, but different runner
-  }
-  else 
-    db_r = 0; // card = 0
+  if (db_r && !db_r->matchName(name))
+    db_r = 0; // "Existing" card, but different runner
+
 
   if (db_r == 0 && getNumberSuffix(name) == 0)
     db_r = oe->dbLookUpByName(name, clubId, classId, birthYear);
