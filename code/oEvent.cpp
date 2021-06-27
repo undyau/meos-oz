@@ -1519,7 +1519,7 @@ pRunner oEvent::dbLookUpById(__int64 extId) const
 
 pRunner oEvent::dbLookUpByCard(int cardNo) const
 {
-  if (!useRunnerDb())
+  if (!useRunnerDb() || cardNo<=0)
     return 0;
 
   oEvent *toe = const_cast<oEvent *>(this);
