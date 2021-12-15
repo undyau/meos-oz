@@ -752,7 +752,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, int type, void *data)
     else if (bi.id=="SssUpload") 
       static_cast<oExtendedEvent*>(oe)->uploadSss(gdi, false);
     else if (bi.id == "SssUploadAuto")
-      static_cast<oExtendedEvent*>(oe)->uploadSss(gdi, true);
+      static_cast<oExtendedEvent*>(oe)->setAutoUploadSss(true);
     else if (bi.id == "SssUploadAutoStop")
       static_cast<oExtendedEvent*>(oe)->setAutoUploadSss(false);
     else if (bi.id=="SaveClient") {

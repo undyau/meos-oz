@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{5A8ACFDC-9E0A-4B59-9D8F-4013251EB156}
 AppName=MEOS-OZ
-AppVersion=3.7.1221.6
+AppVersion=3.7.1221.7
 AppPublisher=undy
 AppPublisherURL=https://github.com/undyau/meos-oz
 AppSupportURL=https://github.com/undyau/meos-oz
@@ -47,7 +47,7 @@ Source: "sss201230.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sss101130.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Receipt Results.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Results.xml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "vc_redist.x86.exe"; DestDir: {tmp}; Flags: deleteafterinstall
+Source: "Prerequisites\vc_redist.x86.exe"; DestDir: {tmp}; Flags: deleteafterinstall
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
