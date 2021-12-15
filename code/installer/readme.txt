@@ -1,3 +1,6 @@
+  15 December 2021 3.7.122.7
+- Fixed regression where autoupload didn't work (sorry folks).
+
   06 February 2021 3.7.1221.6
 - SI Air users with failing battery may generate many punches.
   This caused Or format CSV exports to fail, stopping the program.
