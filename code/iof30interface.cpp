@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -37,6 +37,22 @@
 wstring &getFirst(wstring &inout, int maxNames);
 wstring getMeosCompectVersion();
 
+vector<int> parseSGTimes(const oEvent &oe, const wstring &name) {
+  vector<wstring> parts;
+  vector<int> times;
+  split(name, L" -‚Äí‚Äì‚Äî‚Äê", parts);
+  for (auto &p : parts) {
+    for (auto &c : p) {
+      if (c == '.')
+        c = ':';
+    }
+    int t = oe.getRelativeTime(p);
+    if (t > 0)
+      times.push_back(t);
+  }
+  return times;
+}
+
 IOF30Interface::IOF30Interface(oEvent *oe, bool forceSplitFee) : oe(*oe), useGMT(false), teamsAsIndividual(false), 
                                 entrySourceId(1), unrollLoops(true), 
                                 includeStageRaceInfo(true) {
@@ -49,7 +65,7 @@ void IOF30Interface::readCourseData(gdioutput &gdi, const xmlobject &xo, bool up
   string ver;
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
   courseCount = 0;
   failed = 0;
   xmlList xl;
@@ -69,7 +85,7 @@ void IOF30Interface::readCourseData(gdioutput &gdi, const xmlobject &xo, bool up
       }
     }
     if (ix == -1)
-      throw meosException("Filen innehÂller flera upps‰ttningar banor, men ingen har samma etappnummer som denna etapp (X).#" + itos(nr));
+      throw meosException("Filen inneh√•ller flera upps√§ttningar banor, men ingen har samma etappnummer som denna etapp (X).#" + itos(nr));
     else
       xRaceCourses = xl[ix];
   }
@@ -90,7 +106,7 @@ void IOF30Interface::readCourseData(gdioutput &gdi, const xmlobject &xo, bool up
     if (pc) {
       courseCount++;
       if (courses.count(pc->getName()))
-        gdi.addString("", 0, L"Varning: Banan 'X' fˆrekommer flera gÂnger#" + pc->getName());
+        gdi.addString("", 0, L"Varning: Banan 'X' f√∂rekommer flera g√•nger#" + pc->getName());
 
       courses[pc->getName()] = pc;
 
@@ -135,6 +151,116 @@ void IOF30Interface::readCourseData(gdioutput &gdi, const xmlobject &xo, bool up
     classAssignmentObsolete(gdi, xAssignment, courses, coursesFamilies);
   }
 
+  auto matchCoursePattern = [](const vector<int> &p1, const vector<int> &p2) {
+    for (int j = 0; j < p1.size(); j++) {
+      if (p1[j] != p2[j] && p1[j] != -1 && p2[j] != -1)
+        return false;
+    }
+    return true;
+  };
+
+  // Try to reconstruct 
+  for (auto &bibLegCourse : classToBibLegCourse) {
+    pClass pc = oe.getClass(bibLegCourse.first);
+    if (!pc || bibLegCourse.second.empty())
+      continue;
+
+    // Get collection of courses
+    set<int> classCourses;
+    for (auto &blc : bibLegCourse.second)
+      classCourses.insert(get<pCourse>(blc)->getId());
+
+    vector<pCourse> presentCrs;
+    pc->getCourses(-1, presentCrs);
+
+    // Check if we have the same set of courses
+    bool sameSet = presentCrs.size() == classCourses.size();
+    for (pCourse crs : presentCrs) {
+      if (!classCourses.count(crs->getId())) {
+        sameSet = false;
+        break;
+      }
+    }
+
+    if (sameSet)
+      continue; // Do not touch forking if same set
+
+    int fallBackCrs = *classCourses.begin();
+    map<int, vector<pair<int, int>>> bibToLegCourseId;
+    for (auto &blc : bibLegCourse.second) {
+      int bib = get<0>(blc);
+      int leg = get<1>(blc);
+      int crsId = get<2>(blc)->getId();
+      bibToLegCourseId[bib].emplace_back(leg, crsId);
+    }
+
+    int width = 0;
+    for (auto &blcid : bibToLegCourseId) {
+      sort(blcid.second.begin(), blcid.second.end());
+      width = max(width, blcid.second.back().first);
+    }
+
+    vector<vector<int>> coursePattern;
+    int offset = bibToLegCourseId.begin()->first;
+    for (auto &blcid : bibToLegCourseId) {
+      int bib = blcid.first;
+      while (coursePattern.size() <= bib - offset)
+        coursePattern.emplace_back(width + 1, -1);
+      for (auto &legCrsId : blcid.second) {
+        coursePattern.back()[legCrsId.first] = legCrsId.second;
+      }
+    }
+
+    int period = 1;
+    while (period < coursePattern.size()) {
+      if (matchCoursePattern(coursePattern[0], coursePattern[period])) {
+        // Check if pattern is OK
+        bool ok = true;
+        for (int off = 0; off < period; off++) {
+          for (int c = off + period; c < coursePattern.size(); c++) {
+            if (!matchCoursePattern(coursePattern[off], coursePattern[c])) {
+              ok = false;
+              break;
+            }
+          }
+          if (!ok)
+            break;
+        }
+
+        if (ok) // Found OK pattern
+          break;
+      }
+      period++;
+    }
+    
+    // Add any missing courses for incomplete patterns. Need not result in a fair forking
+    for (int leg = 0; leg < coursePattern[0].size(); leg++) {
+      vector<int> crsLeg;
+      for (int i = 0; i < period; i++) {
+        int crs = coursePattern[i][leg];
+        if (crs != -1)
+          crsLeg.push_back(crs);
+      }
+      if (crsLeg.empty())
+        crsLeg.push_back(fallBackCrs);
+      int rot = 0;
+      for (int i = 0; i < period; i++) {
+        if (coursePattern[i][leg] == -1)
+          coursePattern[i][leg] = crsLeg[(rot++) % crsLeg.size()]; // Take courses from this leg
+      }
+    }
+
+    int patternStart = (offset - 1) % period;
+
+    if (pc->getNumStages() == 0) {
+      pc->setNumStages(coursePattern[0].size());
+    }
+    for (unsigned leg = 0; leg < pc->getNumStages() && leg < coursePattern[0].size(); leg++) {
+      pc->clearStageCourses(leg);
+      for (int m = 0; m < period; m++)
+        pc->addStageCourse(leg, coursePattern[(patternStart + m)%period][leg], -1);
+    }
+  }
 }
 
 void IOF30Interface::classCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
@@ -382,8 +508,15 @@ pCourse IOF30Interface::findCourse(gdioutput &gdi,
 
 void IOF30Interface::teamCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
                                             const map<wstring, pCourse> &courses) {
+
+  gdi.dropLine();
+  gdi.addString("", 10, "info:teamcourseassignment");
+  gdi.dropLine();
+
   vector<pTeam> allT;
   oe.getTeams(0, allT, false);
+
+  map<int, int> firstBib2Class;
 
   map<wstring, pTeam> bib2Team;
   map<pair<wstring, wstring>, pTeam> nameClass2Team;
@@ -400,18 +533,22 @@ void IOF30Interface::teamCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
     pTeam t = 0;
     wstring teamText;
     wstring bib;
+    int iBib = -1;
+    int iClass = -1;
     xTAssignment.getObjectString("BibNumber", bib);
 
     if (!bib.empty()) {
       teamText = bib;
+      iBib = _wtoi(bib.c_str());
       t = bib2Team[bib];
       if (t == nullptr) {
-        int ibib = _wtoi(bib.c_str()); 
-        if (ibib > 0) {
-          wstring bib2 = itow(ibib);
+        if (iBib > 0) {
+          wstring bib2 = itow(iBib);
           t = bib2Team[bib2];
         }
       }
+      if (t != nullptr)
+        iClass = t->getClassId(false);
     }
 
     if (t == 0) {
@@ -420,27 +557,74 @@ void IOF30Interface::teamCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
       if (!team.empty()) {
         wstring cls;
         xTAssignment.getObjectString("ClassName", cls);
+        auto pcls = oe.getClass(cls);
+        if (pcls)
+          iClass = pcls->getId();
+
         t = nameClass2Team[make_pair(team, cls)];
         teamText = team + L" / " + cls;
       }
     }
 
-    if (t == 0) {
+    if (iBib > 0 && iClass <= 0) {
+      if (firstBib2Class.empty()) {
+        map<int, int> classId2FirstBib;
+
+        auto insertClsBib = [&](int cls, int b) {
+          auto res = classId2FirstBib.find(cls);
+          if (res == classId2FirstBib.end())
+            classId2FirstBib.emplace(cls, b);
+          else
+            res->second = min(res->second, b);
+        };
+
+        for (pTeam t : allT) {
+          int b = _wtoi(t->getBib().c_str());
+          if (b <= 0)
+            continue;
+          int cls = t->getClassId(false);
+          if (cls > 0) 
+            insertClsBib(cls, b);
+        }
+        vector<pClass> allC;
+        oe.getClasses(allC, false);
+        for (pClass c : allC) {
+          int b = _wtoi(c->getDCI().getString("Bib").c_str());
+          if (b > 0) 
+            insertClsBib(c->getId(), b);
+        }
+
+        // No check for overlapping classes
+        for (auto cfb : classId2FirstBib) {
+          firstBib2Class[cfb.second] = cfb.first;
+        }
+      }
+
+      auto res = firstBib2Class.upper_bound(iBib);
+      if (res != firstBib2Class.begin()) {
+        --res;
+        iClass = res->second;
+      }
+    }
+
+    if (t == 0 && (iBib<=0 || iClass<=0)) {
       gdi.addString("", 0, L"Varning: Laget 'X' finns inte.#" + teamText).setColor(colorRed);
       continue;
     }
 
     xmlList teamMemberAssignment;
     xTAssignment.getObjects("TeamMemberCourseAssignment", teamMemberAssignment);
-    assignTeamCourse(gdi, *t, teamMemberAssignment, courses);
+    assignTeamCourse(gdi, t, iClass, iBib, teamMemberAssignment, courses);
   }
 }
 
-void IOF30Interface::assignTeamCourse(gdioutput &gdi, oTeam &team, xmlList &xAssignment,
+void IOF30Interface::assignTeamCourse(gdioutput &gdi, oTeam *team, int iClass, int iBib, xmlList &xAssignment,
                                       const map<wstring, pCourse> &courses) {
 
-  if (!team.getClassRef(false))
+  pClass cls = oe.getClass(iClass);
+  if (!cls)
     return;
+
   for (size_t k = 0; k <xAssignment.size(); k++) {
 
     // Extract courses / families
@@ -456,36 +640,49 @@ void IOF30Interface::assignTeamCourse(gdioutput &gdi, oTeam &team, xmlList &xAss
       if (xLegOrder)
         legorder = xLegOrder.getInt() - 1;
 
-      int legId = team.getClassRef(false)->getLegNumberLinear(leg, legorder);
+      int legId = cls->getLegNumberLinear(leg, legorder);
       if (legId>=0) {
-        pRunner r = team.getRunner(legId);
-        if (r == 0) {
-          r = oe.addRunner(lang.tl(L"N.N."), team.getClubId(), team.getClassId(false), 0, 0, false);
-          if (r) {
-            r->setEntrySource(entrySourceId);
-            r->flagEntryTouched(true);
+
+        classToBibLegCourse[iClass].emplace_back(iBib, legId, c);
+
+        if (team) {
+          pRunner r = team->getRunner(legId);
+          if (r == 0) {
+            r = oe.addRunner(lang.tl(L"N.N."), team->getClubId(), team->getClassId(false), 0, 0, false);
+            if (r) {
+              r->setEntrySource(entrySourceId);
+              r->flagEntryTouched(true);
+            }
+            team->setRunner(legId, r, false);
+            r = team->getRunner(legId);
           }
-          team.setRunner(legId, r, false);
-          r = team.getRunner(legId);
-        }
-        if (r) {
-          r->setCourseId(c->getId());
+          if (r) {
+            r->setCourseId(c->getId());
+          }
         }
       }
       else
-        gdi.addString("", 0, L"Bantilldelning fˆr 'X' h‰nvisar till en str‰cka som inte finns#" + team.getClass(false)).setColor(colorRed);
+        gdi.addString("", 0, L"Bantilldelning f√∂r 'X' h√§nvisar till en str√§cka som inte finns#" + cls->getName()).setColor(colorRed);
     }
     else {
       wstring name;
       xAssignment[k].getObjectString("TeamMemberName", name);
-      if (!name.empty()) {
-        for (int j = 0; j < team.getNumRunners(); j++) {
-          pRunner r = team.getRunner(j);
-          if (r && r->getName() == name) {
-            r->setCourseId(c->getId());
-            break;
+      bool done = false;
+      if (team) {
+        if (!name.empty()) {
+          for (int j = 0; j < team->getNumRunners(); j++) {
+            pRunner r = team->getRunner(j);
+            if (r && r->getName() == name) {
+              r->setCourseId(c->getId());
+              done = true;
+              break;
+            }
           }
         }
+      }
+      if (!done) {
+        gdi.addString("", 0, L"Bantilldelning h√§nvisar till en l√∂pare (X) som saknas i laget (Y)#" + 
+                      name + L"#" + team->getName()).setColor(colorRed);
       }
     }
   }
@@ -712,7 +909,7 @@ void IOF30Interface::readCompetitorList(gdioutput &gdi, const xmlobject &xo, int
   string ver;
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
 
   xmlList xl;
   xo.getObjects(xl);
@@ -734,7 +931,7 @@ void IOF30Interface::readClubList(gdioutput &gdi, const xmlobject &xo, int &club
   string ver;
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
 
   xmlList xl;
   xo.getObjects(xl);
@@ -772,7 +969,7 @@ void IOF30Interface::readEntryList(gdioutput &gdi, xmlobject &xo, bool removeNon
 
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
 
   xmlobject xEvent = xo.getObject("Event");
   map<int, vector<LegInfo> > teamClassConfig;
@@ -786,6 +983,8 @@ void IOF30Interface::readEntryList(gdioutput &gdi, xmlobject &xo, bool removeNon
   vector<pRunner> allR;
   vector<pTeam> allT;
   oe.getRunners(0, 0, allR, false);
+  oe.getStartGroups(true); // Setup transient data for start groups
+
   for (size_t k = 0; k < allR.size(); k++) {
     if (allR[k]->getEntrySource() == entrySourceId)
       allR[k]->flagEntryTouched(false);
@@ -806,7 +1005,7 @@ void IOF30Interface::readEntryList(gdioutput &gdi, xmlobject &xo, bool removeNon
     else
       entFail++;
   }
-
+  
   xo.getObjects("TeamEntry", pEntries);
   for (size_t k = 0; k < pEntries.size(); k++) {
     xmlList races;
@@ -847,6 +1046,8 @@ void IOF30Interface::readEntryList(gdioutput &gdi, xmlobject &xo, bool removeNon
     else
       entFail++;
   }
+
+  oe.updateStartGroups(); // Store any updated start groups
 
   bool hasMulti = false;
   for (map<int, vector< pair<int, int> > >::iterator it = personId2TeamLeg.begin();
@@ -1057,7 +1258,7 @@ void IOF30Interface::readServiceRequestList(gdioutput &gdi, xmlobject &xo, int &
   string ver;
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
 
   xmlList req;
   xo.getObjects("PersonServiceRequest", req);
@@ -1095,7 +1296,7 @@ void IOF30Interface::readStartList(gdioutput &gdi, xmlobject &xo, int &entRead, 
   string ver;
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
 
   map<int, vector<LegInfo> > teamClassConfig;
 
@@ -1197,11 +1398,107 @@ void IOF30Interface::readStartList(gdioutput &gdi, xmlobject &xo, int &entRead, 
   }
 }
 
+
+
+void IOF30Interface::readResultList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail) {
+  string ver;
+  xo.getObjectString("iofVersion", ver);
+  if (!ver.empty() && ver > "3.0")
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
+
+  map<int, vector<LegInfo> > teamClassConfig;
+
+  xmlobject xEvent = xo.getObject("Event");
+  if (xEvent) {
+    readEvent(gdi, xEvent, teamClassConfig);
+  }
+
+  xmlList cResults;
+  xo.getObjects("ClassResult", cResults);
+
+  struct RaceInfo {
+    int courseId;
+    int length;
+    int climb;
+    wstring startName;
+  };
+
+  for (xmlobject &xClassResult : cResults) {
+     
+    pClass pc = readClass(xClassResult.getObject("Class"),
+                          teamClassConfig);
+    int classId = pc ? pc->getId() : 0;
+
+    map<int, RaceInfo> raceToInfo;
+
+    xmlList courses;
+    xClassResult.getObjects("Course", courses);
+    for (size_t k = 0; k < courses.size(); k++) {
+      int raceNo = courses[k].getObjectInt("raceNumber");
+      if (raceNo > 0)
+        raceNo--;
+      RaceInfo &raceInfo = raceToInfo[raceNo];
+
+      raceInfo.courseId = courses[k].getObjectInt("Id");
+      raceInfo.length = courses[k].getObjectInt("Length");
+      raceInfo.climb = courses[k].getObjectInt("Climb");
+    }
+
+    if (raceToInfo.size() == 1) {
+      RaceInfo &raceInfo = raceToInfo.begin()->second;
+      if (raceInfo.courseId > 0) {
+        if (pc->getCourse() == 0) {
+          pCourse crs = oe.addCourse(pc->getName(), raceInfo.length, raceInfo.courseId);
+          crs->setStart(raceInfo.startName, false);
+          crs->getDI().setInt("Climb", raceInfo.climb);
+          pc->setCourse(crs);
+          crs->synchronize();
+        }
+      }
+    }
+    else if (raceToInfo.size() > 1) {
+    }
+
+    xmlList xPResults;
+    xClassResult.getObjects("PersonResult", xPResults);
+    //map<int, pair<wstring, int> > bibPatterns;
+    //oClass::extractBibPatterns(oe, bibPatterns);
+
+    for (size_t k = 0; k < xPResults.size(); k++) {
+      if (readPersonResult(gdi, pc, xPResults[k], 0, teamClassConfig))
+        entRead++;
+      else
+        entFail++;
+    }
+    xmlList tEntries;
+    xClassResult.getObjects("TeamResult", tEntries);
+    for (size_t k = 0; k < tEntries.size(); k++) {
+      //setupClassConfig(classId, tEntries[k], teamClassConfig);
+      entFail++; // Teams not supported
+    }
+    /*
+    //setupRelayClasses(teamClassConfig);
+    if (pc && teamClassConfig.count(pc->getId()) && !teamClassConfig[pc->getId()].empty()) {
+      setupRelayClass(pc, teamClassConfig[pc->getId()]);
+    }
+
+    for (size_t k = 0; k < tEntries.size(); k++) {
+      if (readTeamStart(gdi, pc, tEntries[k], bibPatterns, teamClassConfig))
+        entRead++;
+      else
+        entFail++;
+    }
+    */
+    pc->synchronize();
+  }
+}
+
+
 void IOF30Interface::readClassList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail) {
   string ver;
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
 
   map<int, vector<LegInfo> > teamClassConfig;
 
@@ -1239,7 +1536,7 @@ void IOF30Interface::readEventList(gdioutput &gdi, xmlobject &xo) {
   string ver;
   xo.getObjectString("iofVersion", ver);
   if (!ver.empty() && ver > "3.0")
-    gdi.addString("", 0, "Varning, ok‰nd XML-version X#" + ver);
+    gdi.addString("", 0, "Varning, ok√§nd XML-version X#" + ver);
 
   xmlList xl;
   xo.getObjects(xl);
@@ -1415,21 +1712,10 @@ void IOF30Interface::readEvent(gdioutput &gdi, const xmlobject &xo,
   bool anySG = false;
   // This is a "hack" to interpret services of the from "XXXX 14:00 - 15:00 XXXX" as a start group.
   for (auto &srv : services) {
-    vector<wstring> parts;
-    split(srv.name, L" --ñó-", parts);
-    vector<int> times;
-    for (auto &p : parts) {
-      for (auto &c : p) {
-        if (c == '.')
-          c = ':';
-      }
-      int t = oe.getRelativeTime(p);
-      if (t > 0)
-        times.push_back(t);
-    }
+    vector<int> times = parseSGTimes(oe, srv.name);
     int ts = times.size();
     if (ts >= 2 && times[ts - 2] < times[ts - 1]) {
-      oe.setStartGroup(srv.id, times[ts - 2], times[ts - 1]);
+      oe.setStartGroup(srv.id, times[ts - 2], times[ts - 1], L"");
       anySG = true;
     }
   }
@@ -1847,6 +2133,22 @@ pRunner IOF30Interface::readPersonEntry(gdioutput &gdi, xmlobject &xo, pTeam tea
       if (xx.is("TimePresentation")) {
         hasTime = xx.getObjectBool(nullptr);
       }
+      else if (xx.is("StartGroup")) {
+        int groupId = xx.getObjectInt("Id");
+        if (groupId > 0) {
+          wstring groupName;
+          xx.getObjectString("Name", groupName);
+          if (oe.getStartGroup(groupId).firstStart == -1) {
+            vector<int> times = parseSGTimes(oe, groupName);
+            int ts = times.size();
+            if (ts >= 2 && times[ts - 2] < times[ts - 1]) 
+              oe.setStartGroup(groupId, times[ts - 2], times[ts - 1], groupName);
+            else
+              oe.setStartGroup(groupId, 3600, 3600 * 2, groupName);
+          }
+          r->setStartGroup(groupId);
+        }
+      }
     }
   }
   if (!hasTime)
@@ -1922,6 +2224,180 @@ pRunner IOF30Interface::readPersonStart(gdioutput &gdi, pClass pc, xmlobject &xo
 
   if (pc && (r->getClassId(false) == 0 || !r->hasFlag(oAbstractRunner::FlagUpdateClass)) )
     r->setClassId(pc->getId(), true);
+
+  r->synchronize();
+  return r;
+}
+
+
+wstring formatStatus(RunnerStatus st, bool hasTime) {
+  switch (st) {
+  case StatusNoTiming:
+    if (!hasTime)
+      break;
+  case StatusOK:
+    return L"OK";
+  case StatusDNS:
+    return L"DidNotStart";
+  case StatusCANCEL:
+    return L"Cancelled";
+  case StatusMP:
+    return L"MissingPunch";
+  case StatusDNF:
+    return L"DidNotFinish";
+  case StatusDQ:
+    return L"Disqualified";
+  case StatusMAX:
+    return L"OverTime";
+  case StatusOutOfCompetition:
+    if (!hasTime)
+      break;
+  case StatusNotCompetiting:
+    return L"NotCompeting";
+  }
+  return L"Inactive";
+}
+
+RunnerStatus parseStatus(const wstring &status) {
+  if (status == L"OK")
+    return StatusOK;
+  else if (status == L"DidNotStart")
+    return StatusDNS;
+  else if (status == L"MissingPunch")
+    return StatusMP;
+  else if (status == L"Cancelled")
+    return StatusCANCEL;
+  else if (status == L"DidNotFinish")
+    return StatusDNF;
+  else if (status == L"Disqualified")
+    return StatusDQ;
+  else if (status == L"OverTime")
+    return StatusMAX;
+  else if (status == L"NotCompeting")
+    return StatusOutOfCompetition;
+
+  return StatusUnknown;
+}
+
+pRunner IOF30Interface::readPersonResult(gdioutput &gdi, pClass pc, xmlobject &xo, pTeam team,
+                                        const map<int, vector<LegInfo> > &teamClassConfig) {
+  xmlobject xPers = xo.getObject("Person");
+  pRunner r = 0;
+  if (xPers)
+    r = readPerson(gdi, xPers);
+  if (r == 0)
+    return 0;
+
+  if (pc && (r->getClassId(false) == 0 || !r->hasFlag(oAbstractRunner::FlagUpdateClass)))
+    r->setClassId(pc->getId(), true);
+
+  // Club
+  pClub c = readOrganization(gdi, xo.getObject("Organisation"), false);
+  if (!c)
+    c = readOrganization(gdi, xo.getObject("Organization"), false);
+
+  if (c)
+    r->setClubId(c->getId());
+
+  xmlList results;
+  xo.getObjects("Result", results);
+
+  for (size_t k = 0; k < results.size(); k++) {
+    int race = results[k].getObjectInt("raceNumber");
+    pRunner rRace = r;
+    if (race > 1 && r->getNumMulti() > 0) {
+      pRunner rr = r->getMultiRunner(race - 1);
+      if (rr)
+        rRace = rr;
+    }
+    if (rRace) {
+      // Card
+      int cardNo = results[k].getObjectInt("ControlCard");
+      if (cardNo > 0)
+        rRace->setCardNo(cardNo, false);
+
+      wstring bib;
+      results[k].getObjectString("BibNumber", bib);
+      rRace->getDI().setString("Bib", bib);
+
+      xmlobject startTime = results[k].getObject("StartTime");
+      /*
+      if (team) {
+        int leg = starts[k].getObjectInt("Leg");
+        int legorder = starts[k].getObjectInt("LegOrder");
+        int legindex = max(0, leg - 1);
+        map<int, vector<LegInfo> >::const_iterator res = teamClassConfig.find(team->getClassId(false));
+        if (res != teamClassConfig.end()) {
+          legindex = getIndexFromLegPos(leg, legorder, res->second);
+        }
+        team->setRunner(legindex, rRace, false);
+        if (rRace->getClubId() == 0)
+          rRace->setClubId(team->getClubId());
+
+        if (startTime && pc) {
+          pc->setStartType(legindex, STDrawn, false);
+
+        }
+      }*/
+      int st = parseISO8601Time(startTime);
+      rRace->setStartTime(st, true, oBase::ChangeType::Update);
+
+      xmlobject finishTime = results[k].getObject("FinishTime");
+      int ft = parseISO8601Time(finishTime);
+      rRace->setFinishTime(ft);
+
+      wstring status;
+      results[k].getObjectString("Status", status);
+      rRace->setStatus(parseStatus(status), true, oBase::ChangeType::Update);
+
+      xmlList splits;
+      results[k].getObjects("SplitTime", splits);
+      if (!splits.empty()) {
+        pCard card = oe.allocateCard(rRace);
+        card->setCardNo(cardNo);
+        vector<int> controls;
+        wstring s;
+        for (auto &split : splits) {
+          int code = split.getObjectInt("ControlCode");
+          int time = split.getObjectInt("Time");
+          split.getObjectString("status", s);
+          if (s != L"missing")
+            card->addPunch(code, st + time, 0);
+
+          if (s != L"additional")
+            controls.push_back(code);
+        }
+
+        if (ft > 0)
+          card->addPunch(oPunch::PunchFinish, ft, 0);
+
+        //Update to SQL-source
+        card->synchronize();
+
+        if (!controls.empty()) {
+          pCourse c = r->getCourse(true);
+          if (!c)
+            c = oe.addCourse(oe.getAutoCourseName());
+
+          if (c->getNumControls() == 0) {
+            for (int ctrl : controls) {
+              c->addControl(ctrl);
+            }
+
+            c->synchronize();
+          }
+
+          if (pc)
+            pc->setCourse(c);
+          else
+            rRace->setCourseId(c->getId());
+        }
+
+        vector<int> mp;
+        rRace->addPunches(card, mp);
+      }
+    }
+  }
 
   r->synchronize();
   return r;
@@ -2039,12 +2515,12 @@ pRunner IOF30Interface::readPerson(gdioutput &gdi, const xmlobject &person) {
 
   if (!r) {
     if ( pid > 0) {
-      oRunner or(&oe, pid);
-      r = oe.addRunner(or, true);
+      oRunner oR(&oe, pid);
+      r = oe.addRunner(oR, true);
     }
     else {
-      oRunner or(&oe);
-      r = oe.addRunner(or, true);
+      oRunner oR(&oe);
+      r = oe.addRunner(oR, true);
     }
   }
 
@@ -2111,7 +2587,7 @@ pClub IOF30Interface::readOrganization(gdioutput &gdi, const xmlobject &xclub, b
       pc = new oClub(&oe, oe.getRunnerDatabase().getClub(name)->getId());
       }
 
-    if (!pc) return false;
+    if (!pc) return nullptr;
   }
   else {
     pc = new oClub(&oe, clubId);
@@ -2907,34 +3383,6 @@ void IOF30Interface::writeCourseInfo(xmlparser &xml, const oCourse &c) {
     xml.write("Climb", climb);
 }
 
-wstring formatStatus(RunnerStatus st, bool hasTime) {
-  switch (st) {
-    case StatusNoTiming:
-      if (!hasTime)
-        break;
-    case StatusOK:
-      return L"OK";
-    case StatusDNS:
-      return L"DidNotStart";
-    case StatusCANCEL:
-      return L"Cancelled";
-    case StatusMP:
-      return L"MissingPunch";
-    case StatusDNF:
-      return L"DidNotFinish";
-    case StatusDQ:
-      return L"Disqualified";
-    case StatusMAX:
-      return L"OverTime";
-    case StatusOutOfCompetition:
-      if (!hasTime)
-        break;
-    case StatusNotCompetiting:
-      return L"NotCompeting";
-  }
-  return L"Inactive";
-}
-
 void IOF30Interface::writePersonResult(xmlparser &xml, const oRunner &r,
                                        bool includeCourse, bool teamMember, bool hasInputTime) {
   if (!teamMember)
@@ -2970,7 +3418,7 @@ void IOF30Interface::writePersonResult(xmlparser &xml, const oRunner &r,
     if (r.getNumMulti() > 0) {
       for (int k = 0; k <= r.getNumMulti(); k++) {
         const pRunner tr = r.getMultiRunner(k);
-        if (tr)
+        if (tr && tr->getClassRef(true) == r.getClassRef(true))
           writeResult(xml, *tr, *tr, includeCourse, includeStageRaceInfo, teamMember, hasInputTime);
       }
     }
@@ -3002,6 +3450,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
     writeLegOrder(xml, rPerson.getClassRef(false), rPerson.getLegNumber());
 
   bool patrolResult = r.getTeam() && r.getClassRef(false)->getClassType() == oClassPatrol && !teamsAsIndividual;
+  bool qualFinal = r.getTeam() && r.getTeam()->getClassRef(false) != r.getClassRef(true);
 
   wstring bib = rPerson.getBib();
   if (!bib.empty())
@@ -3082,7 +3531,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
       xml.write("Score", "type", L"Score", itow(rg));
       xml.write("Score", "type", L"Penalty", itow(r.getRogainingReduction(true)));
     }
-    if ( (r.getTeam() && r.getClassRef(false)->getClassType() != oClassPatrol && !teamsAsIndividual) || hasInputTime) {
+    if ( (r.getTeam() && r.getClassRef(false)->getClassType() != oClassPatrol && !teamsAsIndividual && !qualFinal) || hasInputTime) {
       xml.startTag("OverallResult");
 
       int rt = r.getTotalRunningTime();
@@ -3288,10 +3737,11 @@ void IOF30Interface::writeEvent(xmlparser &xml) {
 void IOF30Interface::writePerson(xmlparser &xml, const oRunner &r) {
   xml.startTag("Person");
 
-  __int64 id = r.getExtIdentifier();
-  if (id != 0)
+  if (r.getExtIdentifier() != 0)
     xml.write("Id", r.getExtIdentifierString());
-
+  else if (r.getMainRunner()->getExtIdentifier() != 0)
+    xml.write("Id", r.getMainRunner()->getExtIdentifierString());
+ 
   xml.startTag("Name");
   xml.write("Family", r.getFamilyName());
   xml.write("Given", r.getGivenName());
@@ -3429,7 +3879,7 @@ void IOF30Interface::getRunnersToUse(const pClass cls, vector<pRunner> &rToUse,
         if (leg == -1 && indRel && r[j]->getLegNumber() != 0)
           continue; // Skip all but leg 0 for individual relay
 
-        if (leg == -1 && !indRel && r[j]->getTeam())
+        if (leg == -1 && !indRel && (r[j]->getTeam() && r[j]->getTeam()->getClassRef(true) == cls))
           continue; // For teams, skip presonal results, unless individual relay
 
         if (!includeUnknown && !r[j]->hasResult())
@@ -3844,9 +4294,9 @@ bool IOF30Interface::readControl(const xmlobject &xControl) {
     if (num == 0 && finish.length()>0)
       num = int(finish[finish.length()-1])-'0';
     if (num > 0 && num<10)
-      finish = lang.tl(L"MÂl ") + itow(num);
+      finish = lang.tl(L"M√•l ") + itow(num);
     else
-      finish = lang.tl(L"MÂl");
+      finish = lang.tl(L"M√•l");
     pc = oe.getControl(getFinishIndex(num), true);
     pc->setNumbers(L"");
     pc->setName(finish);
@@ -3945,7 +4395,7 @@ pCourse IOF30Interface::readCourse(const xmlobject &xcrs) {
   for (size_t k = 0; k < xControls.size(); k++) {
     string type;
     xControls[k].getObjectString("type", type);
-    if (type == "Start") {
+    if (type == "Start" && startName.empty()) {
       wstring idStr;
       xControls[k].getObjectString("Control", idStr);
       pControl pStart = oe.getControl(getStartIndex(idStr), false);
@@ -4029,7 +4479,7 @@ void IOF30Interface::bindClassCourse(oClass &pc, const vector< vector<pCourse> >
     pc.setCourse(crs[0][0]);
   else {
     unsigned ns = pc.getNumStages();
-    ns = max(ns, crs.size());
+    ns = max<unsigned>(ns, crs.size());
     pc.setNumStages(ns);
     for (size_t k = 0; k < crs.size(); k++) {
       pc.clearStageCourses(k);

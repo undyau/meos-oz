@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -91,6 +91,13 @@ oClass::oClass(oEvent *poe, int id): oBase(poe)
   tShowMultiDialog = false;
 
   parentClass = 0;
+}
+
+void oClass::clearDuplicate() {
+  int id = oe->getFreeClassId();
+  clearDuplicateBase(id);
+  oe->qFreeClassId = max(id % MaxClassId, oe->qFreeClassId);
+  getDI().setInt("SortIndex", tSortIndex);
 }
 
 oClass::~oClass()
@@ -738,7 +745,7 @@ pClass oEvent::addClass(const oClass &c)
   Classes.push_back(c);
   Classes.back().addToEvent(this, &c);
 
-  if (HasDBConnection && !Classes.back().existInDB() && !c.isImplicitlyCreated()) {
+  if (hasDBConnection() && !Classes.back().existInDB() && !c.isImplicitlyCreated()) {
     Classes.back().changed = true;
     Classes.back().synchronize();
   }
@@ -911,7 +918,7 @@ void oClass::fillStartTypes(gdioutput &gdi, const string &name, bool firstLeg)
 
   gdi.addItem(name, lang.tl("Starttid"), STTime);
   if (!firstLeg)
-    gdi.addItem(name, lang.tl("V‰xling"), STChange);
+    gdi.addItem(name, lang.tl("V√§xling"), STChange);
   gdi.addItem(name, lang.tl("Tilldelad"), STDrawn);
   if (!firstLeg)
     gdi.addItem(name, lang.tl("Jaktstart"), STHunting);
@@ -1113,7 +1120,7 @@ void oClass::setStartType(int leg, StartTypes st, bool throwError)
     updateChanged();
 
   if (error && throwError) {
-    throw meosException("Ogiltig startmetod pÂ str‰cka X#" + itos(leg+1));
+    throw meosException("Ogiltig startmetod p√• str√§cka X#" + itos(leg+1));
   }
 }
 
@@ -1138,7 +1145,7 @@ void oClass::setLegType(int leg, LegTypes lt)
   }
 
   if (error) {
-    throw meosException("Ogiltig startmetod pÂ str‰cka X#" + itos(leg+1));
+    throw meosException("Ogiltig startmetod p√• str√§cka X#" + itos(leg+1));
   }
 }
 
@@ -1211,7 +1218,7 @@ void oClass::fillLegTypes(gdioutput &gdi, const string &name)
   types.push_back( make_pair(lang.tl("Valbar"), LTParallelOptional));
   types.push_back( make_pair(lang.tl("Extra"), LTExtra));
   types.push_back( make_pair(lang.tl("Summera"), LTSum));
-  types.push_back( make_pair(lang.tl("Medlˆpare"), LTIgnore));
+  types.push_back( make_pair(lang.tl("Medl√∂pare"), LTIgnore));
   types.push_back( make_pair(lang.tl("Gruppera"), LTGroup));
 
   gdi.addItem(name, types);
@@ -1715,8 +1722,12 @@ int oClass::getNumDistinctRunnersMinimal() const
 }
 
 void oClass::resetLeaderTime() const {
-  for (size_t k = 0; k<tLeaderTime.size(); k++)
+  tLeaderTimeOld.resize(tLeaderTime.size());
+
+  for (size_t k = 0; k < tLeaderTime.size(); k++) {
+    tLeaderTimeOld[k].updateFrom(tLeaderTime[k]); // During apply we may reset but still want to use the computed value (for pursuit)
     tLeaderTime[k].reset();
+  }
 
   tBestTimePerCourse.clear();
   leaderTimeVersion = -1;
@@ -1847,6 +1858,10 @@ oClass::LeaderInfo &oClass::getLeaderInfo(AllowRecompute recompute, int leg) con
   leg = mapLeg(leg);
   if (leg < 0)
     throw meosException();
+
+  if (recompute == AllowRecompute::NoUseOld && size_t(leg) < tLeaderTimeOld.size())
+    return tLeaderTimeOld[leg];
+
   if (size_t(leg) >= tLeaderTime.size())
     tLeaderTime.resize(leg + 1);
 
@@ -1919,6 +1934,9 @@ void oClass::updateLeaderTimes() const {
       else if (r->tLeg > leg)
         needupdate = true;
     }
+    if (leg >= tLeaderTime.size())
+      break;
+    tLeaderTime[leg].setComplete();
     leg++;
   }
   leaderTimeVersion = oe->dataRevision;
@@ -1957,8 +1975,10 @@ int oClass::LeaderInfo::getLeader(Type t, bool computed) const {
   case Type::TotalInput:
     if (computed && totalLeaderTimeInputComputed > 0)
       return totalLeaderTimeInputComputed;
-    else
+    else if (totalLeaderTimeInput > 0)
       return totalLeaderTimeInput;
+    else
+      return inputTime;
   }
 
   return 0;
@@ -2009,6 +2029,10 @@ int oClass::getTotalLegLeaderTime(AllowRecompute recompute, int leg, bool comput
 
   int res = -1;
   int iter = -1;
+  bool mayUseOld = recompute == AllowRecompute::NoUseOld;
+  if (mayUseOld)
+    recompute = AllowRecompute::No;
+
   while (res == -1 && ++iter<2) {
     if (includeInput)
       res = getLeaderInfo(recompute, leg).getLeader(LeaderInfo::Type::TotalInput, computedTime);
@@ -2019,6 +2043,8 @@ int oClass::getTotalLegLeaderTime(AllowRecompute recompute, int leg, bool comput
       recompute = AllowRecompute::No;
       updateLeaderTimes();
     }
+    else if (res == -1 && mayUseOld)
+      recompute = AllowRecompute::NoUseOld;
   }
   return res;
 }
@@ -2128,13 +2154,13 @@ void oClass::mergeClass(int classIdSec) {
 void oClass::getSplitMethods(vector< pair<wstring, size_t> > &methods) {
   methods.clear();
   methods.push_back(make_pair(lang.tl("Dela klubbvis"), SplitClub));
-  methods.push_back(make_pair(lang.tl("Dela slumpm‰ssigt"), SplitRandom));
+  methods.push_back(make_pair(lang.tl("Dela slumpm√§ssigt"), SplitRandom));
   methods.push_back(make_pair(lang.tl("Dela efter ranking"), SplitRank));
   methods.push_back(make_pair(lang.tl("Dela efter placering"), SplitResult));
   methods.push_back(make_pair(lang.tl("Dela efter tid"), SplitTime));
-  methods.push_back(make_pair(lang.tl("J‰mna klasser (ranking)"), SplitRankEven));
-  methods.push_back(make_pair(lang.tl("J‰mna klasser (placering)"), SplitResultEven));
-  methods.push_back(make_pair(lang.tl("J‰mna klasser (tid)"), SplitTimeEven));
+  methods.push_back(make_pair(lang.tl("J√§mna klasser (ranking)"), SplitRankEven));
+  methods.push_back(make_pair(lang.tl("J√§mna klasser (placering)"), SplitResultEven));
+  methods.push_back(make_pair(lang.tl("J√§mna klasser (tid)"), SplitTimeEven));
 }
 
 class ClassSplit {
@@ -2813,8 +2839,8 @@ void oEvent::getPredefinedClassTypes(map<wstring, ClassMetaType> &types) const {
   types[L"Vuxen"] = ctNormal;
   types[L"Ungdom"] = ctYouth;
   types[L"Motion"] = ctExercise;
-  types[L"÷ppen"] = ctOpen;
-  types[L"Tr‰ning"] = ctTraining;
+  types[L"√ñppen"] = ctOpen;
+  types[L"Tr√§ning"] = ctTraining;
 }
 
 const vector< pair<wstring, size_t> > &oEvent::fillClassTypes(vector< pair<wstring, size_t> > &out)
@@ -2901,12 +2927,12 @@ const shared_ptr<Table> &oClass::getTable(oEvent *oe) {
     auto table =  make_shared<Table>(oe, 20, L"Klasser", "classes");
 
     table->addColumn("Id", 70, true, true);
-    table->addColumn("ƒndrad", 70, false);
+    table->addColumn("√Ñndrad", 70, false);
 
     table->addColumn("Namn", 200, false);
 
     table->addColumn("Bana", 200, false);
-    table->addColumn("Anm‰lda", 70, true);
+    table->addColumn("Anm√§lda", 70, true);
 
     oe->oClassData->buildTableCol(table.get());
     oe->setTable("class", table);
@@ -2957,7 +2983,7 @@ void oClass::addTableRow(Table &table) const {
       for (size_t leg = 0; leg < MultiCourse.size(); leg++) {
         for (size_t j = 0; j < MultiCourse[leg].size(); j++) {
           if (j >= 3) {
-            crsStr += L"Ö";
+            crsStr += L"‚Ä¶";
             break;
           }
           if (MultiCourse[leg][j]) {
@@ -3383,8 +3409,10 @@ void oClass::calculateSplits() {
   LegResult legRes;
   LegResult legBestTime;
   vector<pRunner> rCls;
-
+  oe->getRunners(Id, -1, rCls, false);
+  /*
   if (isQualificationFinalBaseClass() || isQualificationFinalBaseClass()) {
+    
     for (auto &r : oe->Runners) {
       if (!r.isRemoved() && r.getClassRef(true) == this)
         rCls.push_back(&r);
@@ -3395,7 +3423,7 @@ void oClass::calculateSplits() {
       if (!r.isRemoved() && r.Class == this)
         rCls.push_back(&r);
     }
-  }
+  }*/
 
   for (set<pCourse>::iterator cit = cSet.begin(); cit!= cSet.end(); ++cit)  {
     pCourse pc = *cit;
@@ -3712,8 +3740,8 @@ oClass::ClassStatus oClass::getClassStatus() const {
 
 void oClass::fillClassStatus(vector<pair<wstring, wstring>> &statusClass) {
   statusClass.push_back(make_pair(L"", L"OK"));
-  statusClass.push_back(make_pair(L"IR", L"Struken med Âterbetalning"));
-  statusClass.push_back(make_pair(L"I", L"Struken utan Âterbetalning"));
+  statusClass.push_back(make_pair(L"IR", L"Struken med √•terbetalning"));
+  statusClass.push_back(make_pair(L"I", L"Struken utan √•terbetalning"));
 }
 void oClass::clearCache(bool recalculate) {
   if (recalculate)
@@ -3762,6 +3790,7 @@ void oClass::changedObject() {
   markSQLChanged(-1,-1);
   tNoTiming = -1;
   tIgnoreStartPunch = -1;
+  oe->sqlClasses.changed = true;
 }
 
 static void checkMissing(const map< pair<int, int>, int > &master,
@@ -4019,7 +4048,7 @@ pair<int, int> oClass::autoForking(const vector< vector<int> > &inputCourses) {
   }
 
   // Sample if there are very many combinations.
-  int sampleFactor = 1;
+  uint64_t sampleFactor = 1;
   while(N > 10000000) {
     sampleFactor *= 13;
     N /= 13;
@@ -4029,7 +4058,7 @@ pair<int, int> oClass::autoForking(const vector< vector<int> > &inputCourses) {
   vector<int> ws;
   for (size_t k = 0; k < Ns; k ++) {
     for (int j = 0; j < legs; j++) {
-      unsigned long long D = k * sampleFactor;
+      uint64_t D = uint64_t(k) * sampleFactor;
       if (nf[j]>0) {
         ix[j] = int((D/prod[j] + j) % nf[j]);
       }
@@ -4063,7 +4092,7 @@ pair<int, int> oClass::autoForking(const vector< vector<int> > &inputCourses) {
   for (size_t k = 0; k < Ns; k++) {
     long long forkKey = 0;
     for (int j = 0; j < legs; j++) {
-      unsigned long long D = (k * 997)%Ns * sampleFactor;
+      uint64_t D = uint64_t((k * 997)%Ns) * sampleFactor;
       if (nf[j]>0) {
         ix[j] = int((D/prod[j] + j) % nf[j]);
         forkKey = forkKey * 997 + ix[j];
@@ -4121,7 +4150,7 @@ pair<int, int> oClass::autoForking(const vector< vector<int> > &inputCourses) {
     }
   }
 
-  return make_pair(generatedForkKeys.size(), coursesUsed.size());
+  return make_pair<int, int>(generatedForkKeys.size(), coursesUsed.size());
 }
 
 int oClass::extractBibPattern(const wstring &bibInfo, wchar_t pattern[32]) {
@@ -4157,7 +4186,7 @@ int oClass::extractBibPattern(const wstring &bibInfo, wchar_t pattern[32]) {
 }
 
 AutoBibType oClass::getAutoBibType() const {
-  wstring bib = getDCI().getString("Bib");
+  const wstring &bib = getDCI().getString("Bib");
   if (bib.empty()) // Manual
     return AutoBibManual;
   else if (bib == L"*") // Consecutive
@@ -4337,7 +4366,7 @@ void oClass::getSeedingMethods(vector< pair<wstring, size_t> > &methods) {
   methods.push_back(make_pair(lang.tl("Resultat"), SeedResult));
   methods.push_back(make_pair(lang.tl("Tid"), SeedTime));
   methods.push_back(make_pair(lang.tl("Ranking"), SeedRank));
-  methods.push_back(make_pair(lang.tl("Po‰ng"), SeedPoints));
+  methods.push_back(make_pair(lang.tl("Po√§ng"), SeedPoints));
 }
 
 void oClass::drawSeeded(ClassSeedMethod seed, int leg, int firstStart, 
@@ -4427,7 +4456,7 @@ void oClass::drawSeeded(ClassSeedMethod seed, int leg, int firstStart,
   
   if (noClubNb) {
     set<int> pushed_back;
-    for (size_t k = 1; k < startOrder.size(); k++) {
+    for (int k = 1; k < startOrder.size(); k++) {
       int idMe = startOrder[k]->getClubId();
       if (idMe != 0 && idMe == startOrder[k-1]->getClubId()) {
         // Make sure the runner with worst ranking is moved back. (Swedish SM rules)
@@ -4437,11 +4466,11 @@ void oClass::drawSeeded(ClassSeedMethod seed, int leg, int firstStart,
         pushed_back.insert(startOrder[k]->getId());
         vector<pair<int, pRunner> > rqueue;
         rqueue.push_back(make_pair(k, startOrder[k]));
-        for (size_t j = k + 1; j < startOrder.size(); j++) {
+        for (int j = k + 1; j < startOrder.size(); j++) {
           if (idMe != startOrder[j]->getClubId()) {
             pushed_back.insert(startOrder[j]->getId());
             swap(startOrder[j], startOrder[k]); // k-1 now has a non-club nb behind
-            rqueue.push_back(make_pair(j, pRunner(0)));
+            rqueue.push_back(make_pair(j, nullptr));
             // Shift the queue
             for (size_t q = 1; q < rqueue.size(); q++) {
               startOrder[rqueue[q].first] = rqueue[q-1].second;
@@ -4553,7 +4582,7 @@ void oClass::initClassId(oEvent &oe) {
     long long extId = cls[k]->getExtIdentifier();
     if (extId > 0) {
       if (id2Cls.count(extId)) {
-        throw meosException(L"Klasserna X och Y har samma externa id. Anv‰nd tabell‰get fˆr att ‰ndra id.#" +
+        throw meosException(L"Klasserna X och Y har samma externa id. Anv√§nd tabell√§get f√∂r att √§ndra id.#" +
                             id2Cls[extId] + L"#" + cls[k]->getName()); 
       }
       id2Cls[extId] = cls[k]->getName();

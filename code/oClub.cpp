@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -192,7 +192,7 @@ pClub oEvent::getClubCreate(int Id, const wstring &createName)
   if (createName.empty()) {
     int id = oe->getVacantClub(true);
     //Not found. Auto add...
-    return getClubCreate(id, lang.tl("Klubblˆs"));
+    return getClubCreate(id, lang.tl("Klubbl√∂s"));
   }
   else	{
     oClubList::iterator it;
@@ -295,7 +295,7 @@ const shared_ptr<Table> &oClub::getTable(oEvent *oe) {
     auto table = make_shared<Table>(oe, 20, L"Klubbar", TB_CLUBS);
 
     table->addColumn("Id", 70, true, true);
-    table->addColumn("ƒndrad", 70, false);
+    table->addColumn("√Ñndrad", 70, false);
 
     table->addColumn("Namn", 200, false);
     oe->oClubData->buildTableCol(table.get());
@@ -452,7 +452,7 @@ void oEvent::viewClubMembers(gdioutput &gdi, int clubId)
       continue;
     if (it->getClubId() == clubId) {
       if (nr==0)
-        gdi.addString("", 1, "Lˆpare:");
+        gdi.addString("", 1, "L√∂pare:");
       gdi.addStringUT(0, it->getName() + L", " + it->getClass(true) );
       nr++;
     }
@@ -621,13 +621,13 @@ void oClub::generateInvoice(gdioutput &gdi, int &toPay, int &hasPaid,
   gdi.fillDown();
 
   if (account.empty())
-    gdi.addString("", 0, "Varning: Inget kontonummer angivet (Se t‰vlingsinst‰llningar).").setColor(colorRed);
+    gdi.addString("", 0, "Varning: Inget kontonummer angivet (Se t√§vlingsinst√§llningar).").setColor(colorRed);
 
   if (pdateI == 0)
-    gdi.addString("", 0, "Varning: Inget sista betalningsdatum angivet (Se t‰vlingsinst‰llningar).").setColor(colorRed);
+    gdi.addString("", 0, "Varning: Inget sista betalningsdatum angivet (Se t√§vlingsinst√§llningar).").setColor(colorRed);
 
   if (organizer.empty())
-    gdi.addString("", 0, "Varning: Ingen organisatˆr/avs‰ndare av fakturan angiven (Se t‰vlingsinst‰llningar).").setColor(colorRed);
+    gdi.addString("", 0, "Varning: Ingen organisat√∂r/avs√§ndare av fakturan angiven (Se t√§vlingsinst√§llningar).").setColor(colorRed);
 
   vector<pRunner> runners;
   oe->getClubRunners(getId(), runners);
@@ -757,7 +757,7 @@ void oClub::generateInvoice(gdioutput &gdi, int &toPay, int &hasPaid,
 
   yp+=lh*2;
 
-  gdi.addStringUT(yp, xs, normalText, lang.tl(L"V‰nligen betala senast ") 
+  gdi.addStringUT(yp, xs, normalText, lang.tl(L"V√§nligen betala senast ") 
                  + pdate + lang.tl(L" till ") + account + L".");
   gdi.dropLine(2);
   //gdi.addStringUT(gdi.getCY()-1, 1, pageNewPage, blank, 0, 0);
@@ -900,7 +900,7 @@ void oEvent::printInvoices(gdioutput &gdi, InvoicePrintType type,
     gdi.clearPage(true);
   k=0;
   gdi.dropLine(1);
-  gdi.addString("", boldLarge, "Sammanst‰llning, ekonomi");
+  gdi.addString("", boldLarge, "Sammanst√§llning, ekonomi");
   int yp = gdi.getCY() + 10;
 
   gdi.addString("", yp, 50, boldText, "Faktura nr");
@@ -1144,6 +1144,7 @@ int oClub::getFirstInvoiceNumber(oEvent &oe) {
 void oClub::changedObject() {
   if (oe)
     oe->globalModification = true;
+  oe->sqlClubs.changed = true;
 }
 
 bool oClub::operator<(const oClub &c) const {
@@ -1164,4 +1165,12 @@ wstring oClub::getInvoiceDate(oEvent &oe) {
 
 void oClub::setInvoiceDate(oEvent &oe, const wstring &id) {
   oe.getDI().setDate("InvoiceDate", id);
+}
+
+int oClub::getStartGroup() const {
+  return getDCI().getInt("StartGroup");
+}
+
+void oClub::setStartGroup(int sg) {
+  getDI().setInt("StartGroup", sg);
 }

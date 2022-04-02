@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 #include "oBase.h"
@@ -76,7 +76,7 @@ protected:
 
   mutable vector<TeamPlace> tPlace;
 
-  TeamPlace &oTeam::getTeamPlace(int leg) const;
+  TeamPlace &getTeamPlace(int leg) const;
 
   struct ComputedLegResult {
     int version = -1;
@@ -137,6 +137,8 @@ protected:
                       bool linearLeg, 
                       map<int, int> &classId2Linear, 
                       bool &hasRunner) const;
+
+  void changedObject() final;
 
 public:
 

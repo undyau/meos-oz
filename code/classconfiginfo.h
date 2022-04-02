@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -80,6 +80,7 @@ public:
   void getRogainingTeam(set<int> &sel) const;
 
   bool hasTeamClass() const;
+  bool hasQualificationFinal() const;
 
   void getRaceNStart(int race, set<int> &sel) const;
   void getLegNStart(int leg, set<int> &sel) const;

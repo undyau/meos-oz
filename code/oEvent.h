@@ -1,4 +1,4 @@
-// oEvent.h: interface for the oEvent class.
+﻿// oEvent.h: interface for the oEvent class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -6,7 +6,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -69,6 +69,8 @@ class DynamicResult;
 struct SpeakerString;
 struct ClassDrawSpecification;
 class ImportFormats;
+class MeosSQL;
+class MachineContainer;
 
 struct oCounter {
   int level1;
@@ -148,6 +150,11 @@ struct CompetitionInfo {
   wstring Annotation;
   wstring Date;
   wstring NameId;
+
+  wstring postEvent;
+  wstring preEvent;
+  wstring importTimeStamp;
+
   wstring FullPath;
   string Server;
   string ServerUser;
@@ -161,10 +168,12 @@ struct CompetitionInfo {
   int ServerPort;
   int numConnected; // Number of connected entities
   int backupId; // Used to identify backups
-  bool operator<(const CompetitionInfo &ci)
-  {
+
+  bool operator<(const CompetitionInfo &ci) {
     if (Date != ci.Date)
-      return Date<ci.Date;
+      return Date < ci.Date;
+    else if (Server != ci.Server)
+      return Server < ci.Server;
     else
       return Modified < ci.Modified;
   }
@@ -189,7 +198,6 @@ enum class oListId {oLRunnerId=1, oLClassId=2, oLCourseId=4,
                     oLControlId=8, oLClubId=16, oLCardId=32,
                     oLPunchId=64, oLTeamId=128, oLEventId=256};
 
-
 class Table;
 class oEvent;
 typedef oEvent * pEvent;
@@ -207,6 +215,15 @@ enum PropertyType {
   String,
   Integer,
   Boolean
+};
+
+struct StartGroupInfo {
+  wstring name;
+  int firstStart = 0;
+  int lastStart = 0;
+  StartGroupInfo() = default;
+  StartGroupInfo(const wstring &n, int first, int last) :
+    name(n), firstStart(first), lastStart(last) {}
 };
 
 class oEvent : public oBase
@@ -232,7 +249,7 @@ protected:
   wstring Name;
   wstring Annotation;
   wstring Date;
-  DWORD ZeroTime;
+  int ZeroTime;
 
   mutable map<wstring, wstring> date2LocalTZ;
   const wstring &getTimeZoneString() const;
@@ -340,13 +357,19 @@ protected:
   string MySQLUser;
   string MySQLPassword;
   int MySQLPort;
-
+  shared_ptr<MeosSQL> sqlConnection;
+  bool isConnectedToServer = false;
   string serverName;//Verified (connected) server name.
 
   MeOSFileLock *openFileLock;
 
-  bool HasDBConnection;
-  bool HasPendingDBConnection;
+  bool sqlRemove(oBase *obj);
+
+  bool hasDBConnection() const {
+    return sqlConnection != nullptr && isConnectedToServer;
+  }
+
+  bool hasPendingDBConnection;
   bool msSynchronize(oBase *ob);
   
   wstring clientName;
@@ -445,7 +468,7 @@ protected:
   mutable vector<GeneralResultCtr> generalResults;
 
   // Start group id -> first, last start
-  mutable map<int, pair<int, int>> startGroups;
+  mutable map<int, StartGroupInfo> startGroups;
 
   string encodeStartGroups() const;
   void decodeStartGroups(const string &enc) const;
@@ -454,13 +477,16 @@ protected:
   bool disableRecalculate;
 public:
 
-  void setStartGroup(int id, int firstStart, int lastStart);
+  void setStartGroup(int id, 
+                     int firstStart, 
+                     int lastStart, 
+                     const wstring &name);
+
   void updateStartGroups(); // Update to source
   void readStartGroups() const; // Read from source.
 
-  pair<int, int> getStartGroup(int id) const;
-  const map<int, pair<int, int>> &getStartGroups(bool reload) const;
-
+  StartGroupInfo getStartGroup(int id) const;
+  const map<int, StartGroupInfo> &getStartGroups(bool reload) const;
 
   enum TransferFlags {
     FlagManualName = 1,
@@ -510,6 +536,8 @@ public:
 
 private:
   NameMode currentNameMode;
+
+  unique_ptr<MachineContainer> machineContainer;
 
 public:
 
@@ -685,7 +713,7 @@ public:
   const string &getPropertyString(const char *name, const string &def);
   const wstring &getPropertyString(const char *name, const wstring &def);
   
-  wstring getPropertyStringDecrypt(const char *name, const string &def);
+  string getPropertyStringDecrypt(const char *name, const string &def);
 
   void setProperty(const char *name, int prop);
   //void setProperty(const char *name, const string &prop);
@@ -709,7 +737,8 @@ public:
   bool connectToMySQL(const string &server, const string &user,
                       const string &pwd, int port);
   bool connectToServer();
-  bool reConnect(char *errorMsg256);
+  bool reConnect(string &error);
+  bool reConnectRaw();
   void closeDBConnection();
 
   const string &getServerName() const;
@@ -838,6 +867,8 @@ public:
   vector<int> getHiredCards() const;
   void clearHiredCards();
 
+  MachineContainer &getMachineContainer();
+
 protected:
   // Returns hash key for punch based on control id, and leg. Class is marked as changed if oldHashKey != newHashKey.
   int getControlIdFromPunch(int time, int type, int card,
@@ -866,6 +897,9 @@ protected:
 
   bool calculateTeamResults(vector<const oTeam*> &teams, int leg, ResultType resultType);
   void calculateModuleTeamResults(const set<int> &cls, vector<oTeam *> &teams);
+
+  unsigned int lastTimeConsistencyCheck = 0;
+  mutable bool lastResultCalcPrelState = false;
 
 public:
   void updateStartTimes(int delta);
@@ -903,10 +937,11 @@ public:
 
   wstring getInfo() const {return Name;}
   bool verifyConnection();
-  bool isClient() const {return HasDBConnection;}
+  bool isClient() const {return hasDBConnection();}
   const wstring &getClientName() const {return clientName;}
   void setClientName(const wstring &n) {clientName=n;}
-
+  MeosSQL &sql();
+  
   void removeFreePunch(int id);
   pFreePunch getPunch(int id) const;
   pFreePunch getPunch(int runnerId, int courseControlId, int card) const;
@@ -917,6 +952,8 @@ public:
    
   bool synchronizeList(initializer_list<oListId> types);
   bool synchronizeList(oListId id, bool preSyncEvent = true, bool postSyncEvent = true);
+
+  bool checkDatabaseConsistency(bool force);
 
   void generateInForestList(gdioutput &gdi, GUICALLBACK cb,
                             GUICALLBACK cb_nostart);
@@ -1411,5 +1448,5 @@ public:
 
   friend class TestMeOS;
 
-  const gdioutput &gdiBase() const {return gdibase;}
+  gdioutput &gdiBase() const {return gdibase;}
 };

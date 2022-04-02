@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "oSSSQuickStart.h"
 #include "Download.h"
 #include "gdioutput.h"
@@ -22,8 +22,8 @@ bool oSSSQuickStart::ConfigureEvent(gdioutput &gdi)
 // retrieve competition from install or web
 wstring file = getTempFile();
 if (!GetEventTemplateFromInstall(file))
-	if (!GetEventTemplateFromWeb(file))
-		return false;
+  if (!GetEventTemplateFromWeb(file))
+    return false;
 
 // If the competition already exists (say from Eventor) then just add course, controls etc
 if (!m_Event.empty())
@@ -70,17 +70,50 @@ if (!m_Event.empty())
 else
   {
   gdi.setWaitCursor(true);
-  if(m_Event.open(file, true, false)) 
-	  {
-	  m_Event.updateTabs();
-	  gdi.setWindowTitle(m_Event.getTitleName());
+
+  // Re-write the NameId element so that it doesn't match an existing event
+//#include <stdio.h>
+  SYSTEMTIME st;
+  GetLocalTime(&st);
+  char nameid[64];
+  sprintf_s(nameid, 64, "meos_%d%02d%02d_%02d%02d%02d_%X",
+    st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+  std::vector<string> lines;
+
+//#include <sstream>
+//#include <fstream>
+//#include <iterator>
+  std::ifstream infile(file);
+  string line;
+  bool fixed(false);
+  while (getline(infile, line))
+  {
+    if (!fixed && (line.find("<NameId>") != string::npos))
+      {
+      line = "<NameId>" + string(nameid) + "</NameId>";
+      fixed = true;
+      }
+    lines.push_back(line);
+  }
+  wstring file2 = getTempFile();
+  std::ofstream outFile(file2);
+  for (const auto &e : lines) outFile << e << "\n";
+  outFile.close();
+
+  if(m_Event.open(file2, true, false)) 
+    {
+    m_Event.updateTabs();
+    gdi.setWindowTitle(m_Event.getTitleName());
+    removeTempFile(file2);
     removeTempFile(file);
-	  }
+    }
   else
-	  {
-	  removeTempFile(file);
-	  return false;
-	  }
+    {
+    removeTempFile(file2);
+    removeTempFile(file);
+    return false;
+    }
   }
 
 SYSTEMTIME st;
@@ -97,83 +130,83 @@ return true;
 
 void oSSSQuickStart::AddMeosOzCustomList(wstring a_ReportDef)
 {
-	wchar_t path[MAX_PATH];
-	if (getUserFile(path, a_ReportDef.c_str()))
-		{
-		wstring file(path);
-		if (!fileExist(path))
-			{
-			wchar_t exepath[MAX_PATH];
-			if (GetModuleFileName(NULL, exepath, MAX_PATH))
-				{
-				for (int i = wcslen(exepath) - 1; i > 1; i--)
-					if (exepath[i-1] == '\\')
-						{
-						exepath[i] = '\0';
-						break;
-						}
-				wcscat_s(exepath,a_ReportDef.c_str());
-				if (fileExist(exepath))
-					CopyFile(exepath, path, true);
-				}
-			}
-		}
-	if (fileExist(path))
-		{
-		xmlparser xml;
-		xml.read(path);
-		xmlobject xlist = xml.getObject(0);
+  wchar_t path[MAX_PATH];
+  if (getUserFile(path, a_ReportDef.c_str()))
+    {
+    wstring file(path);
+    if (!fileExists(path))
+      {
+      wchar_t exepath[MAX_PATH];
+      if (GetModuleFileName(NULL, exepath, MAX_PATH))
+        {
+        for (int i = wcslen(exepath) - 1; i > 1; i--)
+          if (exepath[i-1] == '\\')
+            {
+            exepath[i] = '\0';
+            break;
+            }
+        wcscat_s(exepath,a_ReportDef.c_str());
+        if (fileExists(exepath))
+          CopyFile(exepath, path, true);
+        }
+      }
+    }
+  if (fileExists(path))
+    {
+    xmlparser xml;
+    xml.read(path);
+    xmlobject xlist = xml.getObject(0);
 
 // Check that we don't have the list already
 // Do nothing if we have that list already
-		wstring listName;
-		xlist.getObjectString("ListName", listName);
-		MetaListContainer &lc = m_Event.getListContainer();
-		if (lc.getNumLists(MetaListContainer::ExternalList) > 0) 
-		for (int k = 0; k < lc.getNumLists(); k++) 
-			{
-			if (lc.isExternal(k)) 
-				{
-				MetaList &mc = lc.getList(k);
-				if (mc.getListName() == listName)
-					return;
-				}
-			}
+    wstring listName;
+    xlist.getObjectString("ListName", listName);
+    MetaListContainer &lc = m_Event.getListContainer();
+    if (lc.getNumLists(MetaListContainer::ExternalList) > 0) 
+    for (int k = 0; k < lc.getNumLists(); k++) 
+      {
+      if (lc.isExternal(k)) 
+        {
+        MetaList &mc = lc.getList(k);
+        if (mc.getListName() == listName)
+          return;
+        }
+      }
 
-		m_Event.synchronize();
-		m_Event.getListContainer().load(MetaListContainer::ExternalList, xlist, false);
-		m_Event.synchronize(true);
-		}
+    m_Event.synchronize();
+    m_Event.getListContainer().load(MetaListContainer::ExternalList, xlist, false);
+    m_Event.synchronize(true);
+    }
 }
 
 bool oSSSQuickStart::GetEventTemplateFromInstall(wstring& a_File)
 {
-	  TCHAR ownPth[MAX_PATH]; 
+    TCHAR ownPth[MAX_PATH]; 
 
     // Will contain exe path
     HMODULE hModule = GetModuleHandle(NULL);
     if (hModule != NULL) {
       GetModuleFileName(hModule,ownPth, (sizeof(ownPth)));
-			int pos = wcslen(ownPth) - 1;
-			while (ownPth[pos] != '\\' && pos > 0)
-				--pos;
-			if (pos == 0)
-				return false;
-			ownPth[pos] = '\0';
+      int pos = wcslen(ownPth) - 1;
+      while (ownPth[pos] != '\\' && pos > 0)
+        --pos;
+      if (pos == 0)
+        return false;
+      ownPth[pos] = '\0';
 
-			wstring templateFile(ownPth);
+      wstring templateFile(ownPth);
       if (m_Event.getPropertyString("Organizer",L"") == L"Big Foot Orienteers")
         templateFile += L"\\sss201230.xml";
       else
         templateFile += L"\\sss101130.xml";
 
-			if (!fileExist(templateFile.c_str()))
-				return false;
-			else
-				return !!CopyFile(templateFile.c_str(), a_File.c_str(), FALSE);
-		}
-		else
-			return false;
+      if (!fileExists(templateFile.c_str()))
+        return false;
+      else
+        return !!CopyFile(templateFile.c_str(), a_File.c_str(), FALSE);
+    }
+    else
+      return false;
 }
 
 bool oSSSQuickStart::GetEventTemplateFromWeb(wstring& a_File)
@@ -206,40 +239,40 @@ bool oSSSQuickStart::GetEventTemplateFromWeb(wstring& a_File)
 
 void oSSSQuickStart::CustomiseClasses()
 {
-	// Set age/gender details for each class
+  // Set age/gender details for each class
   oClassList::iterator it;
   for (it=m_Event.Classes.begin();it!=m_Event.Classes.end();++it) 
-		{
-		it->setAllowQuickEntry(true);
-		if (it->getName().size() < 4)
-			{
-			wstring gender = it->getName().substr(it->getName().size()-1,1);
-			if (gender == L"W" || gender == L"M")
-					it->setSex(gender == L"W" ? sFemale : sMale);
+    {
+    it->setAllowQuickEntry(true);
+    if (it->getName().size() < 4)
+      {
+      wstring gender = it->getName().substr(it->getName().size()-1,1);
+      if (gender == L"W" || gender == L"M")
+          it->setSex(gender == L"W" ? sFemale : sMale);
 
-			int s(0);
-			time_t t = time(0);   // get time now
-			struct tm now;
-			localtime_s(&now, &t);
+      int s(0);
+      time_t t = time(0);   // get time now
+      struct tm now;
+      localtime_s(&now, &t);
 
-			if (now.tm_mon + 1 <=6)
-				s = 1; // for second half of season split over a year boundary, use last year's age
-			if (it->getName().size() == 2)
-				{
-				switch (it->getName().at(0))
-					{
-					case 'J' : it->setAgeLimit(0 + s,20 + s); break;
-					case 'O' : it->setAgeLimit(21 + s,34 + s); break;
-					case 'M' : it->setAgeLimit(35 + s, 44 + s); break;
-					case 'V' : it->setAgeLimit(45 + s, 54 +s); break;
-					case 'L' : it->setAgeLimit(65 + s, 74 + s); break;
-					case 'I' : it->setAgeLimit(74 + s, 200 + s);  break;
-					}
-				}
-			else if (it->getName().substr(0,2) == L"SV")
-				it->setAgeLimit(55 + s,64 + s);
-			}
-		}
+      if (now.tm_mon + 1 <=6)
+        s = 1; // for second half of season split over a year boundary, use last year's age
+      if (it->getName().size() == 2)
+        {
+        switch (it->getName().at(0))
+          {
+          case 'J' : it->setAgeLimit(0 + s,20 + s); break;
+          case 'O' : it->setAgeLimit(21 + s,34 + s); break;
+          case 'M' : it->setAgeLimit(35 + s, 44 + s); break;
+          case 'V' : it->setAgeLimit(45 + s, 54 +s); break;
+          case 'L' : it->setAgeLimit(65 + s, 74 + s); break;
+          case 'I' : it->setAgeLimit(74 + s, 200 + s);  break;
+          }
+        }
+      else if (it->getName().substr(0,2) == L"SV")
+        it->setAgeLimit(55 + s,64 + s);
+      }
+    }
 }
 
 

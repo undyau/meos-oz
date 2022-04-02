@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -46,14 +46,15 @@
 #include "localizer.h"
 #include "progress.h"
 #include "intkeymapimpl.hpp"
-#include "meosdb/sqltypes.h"
 #include "socket.h"
 
+#include "machinecontainer.h"
 #include "MeOSFeatures.h"
 #include "generalresult.h"
 #include "oEventDraw.h"
 #include "oExtendedEvent.h"
-
+#include "MeosSQL.h"
+#include "TabAuto.h"
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
@@ -65,7 +66,7 @@
 #include "Table.h"
 
 //Version of database
-int oEvent::dbVersion = 84;
+int oEvent::dbVersion = 87;
 
 class RelativeTimeFormatter : public oDataDefiner {
   string name;
@@ -154,6 +155,116 @@ public:
     return table->addColumn(description, max(minWidth, 90), true, true);
   }
 };
+
+class StartGroupFormatter : public oDataDefiner {
+  mutable long rev = -1;
+  mutable map<int, wstring> sgmap;
+  mutable wstring out;
+
+  int static getGroup(const oBase *ob) {
+    const oRunner *r = dynamic_cast<const oRunner *>(ob);
+    int sg = 0;
+    if (r)
+      sg = r->getStartGroup(false);
+    else {
+      const oClub *c = dynamic_cast<const oClub *>(ob);
+      if (c)
+        sg = c->getStartGroup();
+    }
+    return sg;
+  }
+
+public:
+  StartGroupFormatter() {}
+
+  void prepare(oEvent *oe) const override {
+    auto &sg = oe->getStartGroups(true);
+    for (auto &g : sg) {
+      int t = g.second.firstStart;
+      sgmap[g.first] = oe->getAbsTimeHM(t);
+    }
+  }
+  
+  const wstring &formatData(const oBase *ob) const override {
+    if (ob->getEvent()->getRevision() != rev)
+      prepare(ob->getEvent());
+    int sg = getGroup(ob);
+    if (sg > 0) {
+      auto res = sgmap.find(sg);
+      if (res != sgmap.end())
+        out = itow(sg) + L" (" + res->second + L")";
+      else
+        out = itow(sg) + L" (??)";
+
+      return out;
+    }
+    else
+      return _EmptyWString;
+  }
+
+  pair<int, bool> setData(oBase *ob, const wstring &input, wstring &output, int inputId) const override {
+    int g = inputId;
+    if (inputId <= 0 && !input.empty()) {
+      vector<wstring> sIn;
+      split(input, L" ", sIn);
+      for (wstring &in : sIn) {
+        int num = _wtoi(in.c_str());
+        if (in.find_first_of(':') != input.npos) {
+          int t = ob->getEvent()->convertAbsoluteTime(input);
+          if (t > 0) {
+            for (auto &sg : ob->getEvent()->getStartGroups(false)) {
+              if (sg.second.firstStart == t) {
+                g = sg.first;
+                break;
+              }
+            }
+          }
+        }
+        else if (sgmap.count(num)) {
+          g = num;
+          break;
+        }
+      }
+    }
+    oRunner *r = dynamic_cast<oRunner *>(ob);
+    if (r) {
+      r->setStartGroup(g);
+    }
+    else {
+      oClub *c = dynamic_cast<oClub *>(ob);
+      if (c)
+        c->setStartGroup(g);
+    }
+    output = formatData(ob);
+    return make_pair(0, false);
+  }
+
+  int addTableColumn(Table *table, const string &description, int minWidth) const override {
+    return table->addColumn(description, max(minWidth, 90), true, false);
+  }
+
+  // Return the desired cell type
+  CellType getCellType() const {
+    return CellType::cellSelection;
+  }
+
+  void fillInput(const oBase *obj, vector<pair<wstring, size_t>> &out, size_t &selected) const final {
+    if (obj->getEvent()->getRevision() != rev)
+      prepare(obj->getEvent());
+
+    int sg = getGroup(obj);
+
+    out.emplace_back(_EmptyWString, 0);
+    selected = 0;
+    for (auto &v : sgmap) {
+      out.emplace_back(v.second, v.first);
+
+      if (sg == v.first)
+        selected = sg;
+    }
+  }
+};
+
 
 class DataHider : public oDataDefiner {
 public:
@@ -259,23 +370,8 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   GetComputerName(cp, &size);
   clientName = cp;
 
-  HasDBConnection = false;
-  HasPendingDBConnection = false;
-
-#ifdef BUILD_DB_DLL
-  msSynchronizeList=0;
-  msSynchronizeRead=0;
-  msSynchronizeUpdate=0;
-  msOpenDatabase=0;
-  msRemove=0;
-  msMonitor=0;
-  msUploadRunnerDB = 0;
-
-  msGetErrorState=0;
-  msResetConnection=0;
-  msReConnect=0;
-#endif
-
+  isConnectedToServer = false;
+  hasPendingDBConnection = false;
   currentNameMode = FirstLast;
 
   nextTimeLineEvent = 0;
@@ -290,15 +386,15 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oEventData->addVariableCurrency("EliteFee", "Elitavgift");
   oEventData->addVariableCurrency("EntryFee", "Normalavgift");
   oEventData->addVariableCurrency("YouthFee", "Ungdomsavgift");
-  oEventData->addVariableInt("YouthAge", oDataContainer::oIS8U, "≈ldersgr‰ns ungdom");
-  oEventData->addVariableInt("SeniorAge", oDataContainer::oIS8U, "≈ldersgr‰ns ‰ldre");
+  oEventData->addVariableInt("YouthAge", oDataContainer::oIS8U, "√Öldersgr√§ns ungdom");
+  oEventData->addVariableInt("SeniorAge", oDataContainer::oIS8U, "√Öldersgr√§ns √§ldre");
 
   oEventData->addVariableString("Account", 30, "Konto");
   oEventData->addVariableDate("PaymentDue", "Sista betalningsdatum");
-  oEventData->addVariableDate("OrdinaryEntry", "Ordinarie anm‰lningsdatum");
-  oEventData->addVariableString("LateEntryFactor", 6, "Avgiftshˆjning (procent)");
+  oEventData->addVariableDate("OrdinaryEntry", "Ordinarie anm√§lningsdatum");
+  oEventData->addVariableString("LateEntryFactor", 6, "Avgiftsh√∂jning (procent)");
 
-  oEventData->addVariableString("Organizer", "Arrangˆr");
+  oEventData->addVariableString("Organizer", "Arrang√∂r");
   oEventData->addVariableString("CareOf", 31, "c/o");
 
   oEventData->addVariableString("Street", 32, "Adress");
@@ -312,11 +408,12 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oEventData->addVariableInt("SkipRunnerDb", oDataContainer::oIS8U, "Databas");
   oEventData->addVariableInt("ExtId", oDataContainer::oIS64, "Externt Id");
 
-  oEventData->addVariableInt("MaxTime", oDataContainer::oISTime, "Gr‰ns fˆr maxtid");
-  oEventData->addVariableInt("DiffTime", oDataContainer::oISTime, "St‰mplingsintervall, rogaining-patrull");
+  oEventData->addVariableInt("MaxTime", oDataContainer::oISTime, "Gr√§ns f√∂r maxtid");
+  oEventData->addVariableInt("DiffTime", oDataContainer::oISTime, "St√§mplingsintervall, rogaining-patrull");
 
   oEventData->addVariableString("PreEvent", 64, "");
   oEventData->addVariableString("PostEvent", 64, "");
+  oEventData->addVariableString("ImportStamp", 14, "Stamp");
 
   // Positive number -> stage number, negative number -> no stage number. Zero = unknown
   oEventData->addVariableInt("EventNumber", oDataContainer::oIS8, "");
@@ -324,7 +421,7 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oEventData->addVariableInt("CurrencyFactor", oDataContainer::oIS16, "Valutafaktor");
   oEventData->addVariableString("CurrencySymbol", 5, "Valutasymbol");
   oEventData->addVariableString("CurrencySeparator", 2, "Decimalseparator");
-  oEventData->addVariableInt("CurrencyPreSymbol", oDataContainer::oIS8, "Symboll‰ge");
+  oEventData->addVariableInt("CurrencyPreSymbol", oDataContainer::oIS8, "Symboll√§ge");
   oEventData->addVariableString("CurrencyCode", 5, "Valutakod");
   oEventData->addVariableInt("UTC", oDataContainer::oIS8, "UTC");
   
@@ -341,15 +438,14 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oEventData->addVariableString("EntryExtra", "Extra rader");
   oEventData->addVariableInt("NumStages", oDataContainer::oIS8, "Antal etapper");
   oEventData->addVariableInt("BibGap", oDataContainer::oIS8U, "Nummerlappshopp");
-  oEventData->addVariableInt("LongTimes", oDataContainer::oIS8U, "LÂnga tider");
-  oEventData->addVariableString("PayModes", "Betals‰tt");
-  oEventData->addVariableInt("TransferFlags", oDataContainer::oIS32, "÷verfˆring");
+  oEventData->addVariableInt("LongTimes", oDataContainer::oIS8U, "L√•nga tider");
+  oEventData->addVariableString("PayModes", "Betals√§tt");
+  oEventData->addVariableInt("TransferFlags", oDataContainer::oIS32, "√ñverf√∂ring");
   oEventData->addVariableDate("InvoiceDate", "Fakturadatum");
   oEventData->addVariableString("StartGroups", "Startgrupper");
   oEventData->addVariableString("MergeTag", 12, "Tag");
   oEventData->addVariableString("MergeInfo", "MergeInfo");
-  oEventData->addVariableString("ImportStamp", 14, "Stamp");
-
+  
   oEventData->initData(this, dataSize);
 
   oClubData=new oDataContainer(oClub::dataSize);
@@ -370,23 +466,23 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
 
   vector< pair<wstring,wstring> > eInvoice;
   eInvoice.push_back(make_pair(L"E", L"Elektronisk"));
-  eInvoice.push_back(make_pair(L"A", L"Elektronisk godk‰nd"));
+  eInvoice.push_back(make_pair(L"A", L"Elektronisk godk√§nd"));
   eInvoice.push_back(make_pair(L"P", L"Ej elektronisk"));
   eInvoice.push_back(make_pair(L"", makeDash(L"-")));
   oClubData->addVariableEnum("Invoice", 1, "Faktura", eInvoice);
   oClubData->addVariableInt("InvoiceNo", oDataContainer::oIS16U, "Fakturanummer");
+  oClubData->addVariableInt("StartGroup", oDataContainer::oIS32, "Startgrupp", make_shared<StartGroupFormatter>());
 
   oRunnerData=new oDataContainer(oRunner::dataSize);
   oRunnerData->addVariableCurrency("Fee", "Anm. avgift");
   oRunnerData->addVariableCurrency("CardFee", "Brickhyra");
   oRunnerData->addVariableCurrency("Paid", "Betalat");
-  oRunnerData->addVariableInt("PayMode", oDataContainer::oIS8U, "Betals‰tt", make_shared<PayMethodFormatter>());
+  oRunnerData->addVariableInt("PayMode", oDataContainer::oIS8U, "Betals√§tt", make_shared<PayMethodFormatter>());
   oRunnerData->addVariableCurrency("Taxable", "Skattad avgift");
-  oRunnerData->addVariableInt("BirthYear", oDataContainer::oIS32, "FˆdelseÂr");
+  oRunnerData->addVariableInt("BirthYear", oDataContainer::oIS32, "F√∂delse√•r");
   oRunnerData->addVariableString("Bib", 8, "Nummerlapp").zeroSortPadding = 5;
   oRunnerData->addVariableInt("Rank", oDataContainer::oIS16U, "Ranking");
-  //oRunnerData->addVariableInt("VacRank", oDataContainer::oIS16U, "Vak. ranking");
-
+  
   oRunnerData->addVariableDate("EntryDate", "Anm. datum");
   oRunnerData->addVariableInt("EntryTime", oDataContainer::oIS32, "Anm. tid",  make_shared<AbsoluteTimeFormatter>("EntryTime"));
 
@@ -395,7 +491,7 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   sex.push_back(make_pair(L"F", L"Kvinna"));
   sex.push_back(make_pair(L"", makeDash(L"-")));
 
-  oRunnerData->addVariableEnum("Sex", 1, "Kˆn", sex);
+  oRunnerData->addVariableEnum("Sex", 1, "K√∂n", sex);
   oRunnerData->addVariableString("Nationality", 3, "Nationalitet");
   oRunnerData->addVariableString("Country", 23, "Land");
   oRunnerData->addVariableInt("ExtId", oDataContainer::oIS64, "Externt Id");
@@ -405,15 +501,15 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oRunnerData->addVariableInt("RaceId", oDataContainer::oIS32, "Lopp-id", make_shared<oRunner::RaceIdFormatter>());
 
   oRunnerData->addVariableInt("TimeAdjust", oDataContainer::oIS16, "Tidsjustering");
-  oRunnerData->addVariableInt("PointAdjust", oDataContainer::oIS32, "Po‰ngjustering");
-  oRunnerData->addVariableInt("TransferFlags", oDataContainer::oIS32, "÷verfˆring");
+  oRunnerData->addVariableInt("PointAdjust", oDataContainer::oIS32, "Po√§ngjustering");
+  oRunnerData->addVariableInt("TransferFlags", oDataContainer::oIS32, "√ñverf√∂ring");
   oRunnerData->addVariableInt("Shorten", oDataContainer::oIS8U, "Avkortning");
-  oRunnerData->addVariableInt("EntrySource", oDataContainer::oIS32, "K‰lla");
+  oRunnerData->addVariableInt("EntrySource", oDataContainer::oIS32, "K√§lla");
   oRunnerData->addVariableInt("Heat", oDataContainer::oIS8U, "Heat");
   oRunnerData->addVariableInt("Reference", oDataContainer::oIS32, "Referens", make_shared<oRunner::RunnerReference>());
   oRunnerData->addVariableInt("NoRestart", oDataContainer::oIS8U, "Ej omstart", make_shared<DataBoolean>("NoRestart"));
   oRunnerData->addVariableString("InputResult", "Tidigare resultat", make_shared<DataHider>());
-  oRunnerData->addVariableInt("StartGroup", oDataContainer::oIS32, "Startgrupp");
+  oRunnerData->addVariableInt("StartGroup", oDataContainer::oIS32, "Startgrupp", make_shared<StartGroupFormatter>());
   oRunnerData->addVariableInt("Family", oDataContainer::oIS32, "Familj");
 
   oControlData=new oDataContainer(oControl::dataSize);
@@ -424,19 +520,19 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oControlData->addVariableDecimal("latcrd", "Latitud", 6);
   oControlData->addVariableDecimal("longcrd", "Longitud", 6);
 
-  oControlData->addVariableInt("Rogaining", oDataContainer::oIS32, "Po‰ng");
+  oControlData->addVariableInt("Rogaining", oDataContainer::oIS32, "Po√§ng");
   oControlData->addVariableInt("Radio", oDataContainer::oIS8U, "Radio");
 
   oCourseData=new oDataContainer(oCourse::dataSize);
   oCourseData->addVariableInt("NumberMaps", oDataContainer::oIS16, "Kartor");
   oCourseData->addVariableString("StartName", 16, "Start");
   oCourseData->addVariableInt("Climb", oDataContainer::oIS16, "Stigning");
-  oCourseData->addVariableInt("RPointLimit", oDataContainer::oIS32, "Po‰nggr‰ns");
-  oCourseData->addVariableInt("RTimeLimit", oDataContainer::oIS32, "Tidsgr‰ns");
-  oCourseData->addVariableInt("RReduction", oDataContainer::oIS32, "Po‰ngreduktion");
+  oCourseData->addVariableInt("RPointLimit", oDataContainer::oIS32, "Po√§nggr√§ns");
+  oCourseData->addVariableInt("RTimeLimit", oDataContainer::oIS32, "Tidsgr√§ns");
+  oCourseData->addVariableInt("RReduction", oDataContainer::oIS32, "Po√§ngreduktion");
   oCourseData->addVariableInt("RReductionMethod", oDataContainer::oIS8U, "Reduktionsmetod");
 
-  oCourseData->addVariableInt("FirstAsStart", oDataContainer::oIS8U, "FrÂn fˆrsta", make_shared<DataBoolean>("FirstAsStart"));
+  oCourseData->addVariableInt("FirstAsStart", oDataContainer::oIS8U, "Fr√•n f√∂rsta", make_shared<DataBoolean>("FirstAsStart"));
   oCourseData->addVariableInt("LastAsFinish", oDataContainer::oIS8U, "Till sista", make_shared<DataBoolean>("LastAsFinish"));
 
   oCourseData->addVariableInt("CControl", oDataContainer::oIS16U, "Varvningskontroll"); //Common control index
@@ -444,28 +540,28 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
  
   oClassData=new oDataContainer(oClass::dataSize);
   oClassData->addVariableInt("ExtId", oDataContainer::oIS64, "Externt Id");
-  oClassData->addVariableString("LongName", 32, "LÂngt namn");
-  oClassData->addVariableInt("LowAge", oDataContainer::oIS8U, "Undre Âlder");
-  oClassData->addVariableInt("HighAge", oDataContainer::oIS8U, "÷vre Âlder");
+  oClassData->addVariableString("LongName", 32, "L√•ngt namn");
+  oClassData->addVariableInt("LowAge", oDataContainer::oIS8U, "Undre √•lder");
+  oClassData->addVariableInt("HighAge", oDataContainer::oIS8U, "√ñvre √•lder");
   oClassData->addVariableInt("HasPool", oDataContainer::oIS8U, "Banpool", make_shared<DataBoolean>("HasPool"));
-  oClassData->addVariableInt("AllowQuickEntry", oDataContainer::oIS8U, "Direktanm‰lan", make_shared<DataBoolean>("AllowQuickEntry"));
+  oClassData->addVariableInt("AllowQuickEntry", oDataContainer::oIS8U, "Direktanm√§lan", make_shared<DataBoolean>("AllowQuickEntry"));
 
   oClassData->addVariableString("ClassType", 40, "Klasstyp");
 
   vector< pair<wstring,wstring> > sexClass;
-  sexClass.push_back(make_pair(L"M", L"M‰n"));
+  sexClass.push_back(make_pair(L"M", L"M√§n"));
   sexClass.push_back(make_pair(L"F", L"Kvinnor"));
   sexClass.push_back(make_pair(L"B", L"Alla"));
   sexClass.push_back(make_pair(L"", makeDash(L"-")));
 
-  oClassData->addVariableEnum("Sex", 1, "Kˆn", sexClass);
+  oClassData->addVariableEnum("Sex", 1, "K√∂n", sexClass);
   oClassData->addVariableString("StartName", 16, "Start");
   oClassData->addVariableInt("StartBlock", oDataContainer::oIS8U, "Block");
   oClassData->addVariableInt("NoTiming", oDataContainer::oIS8U, "Ej tidtagning", make_shared<DataBoolean>("NoTiming"));
   oClassData->addVariableInt("FreeStart", oDataContainer::oIS8U, "Fri starttid", make_shared<DataBoolean>("FreeStart"));
-  oClassData->addVariableInt("IgnoreStart", oDataContainer::oIS8U, "Ej startst‰mpling", make_shared<DataBoolean>("IgnoreStart"));
+  oClassData->addVariableInt("IgnoreStart", oDataContainer::oIS8U, "Ej startst√§mpling", make_shared<DataBoolean>("IgnoreStart"));
 
-  oClassData->addVariableInt("FirstStart", oDataContainer::oIS32, "Fˆrsta start", make_shared<RelativeTimeFormatter>("FirstStart"));
+  oClassData->addVariableInt("FirstStart", oDataContainer::oIS32, "F√∂rsta start", make_shared<RelativeTimeFormatter>("FirstStart"));
   oClassData->addVariableInt("StartInterval", oDataContainer::oIS16, "Intervall", make_shared<AbsoluteTimeFormatter>("StartInterval"));
   oClassData->addVariableInt("Vacant", oDataContainer::oIS8U, "Vakanser");
   oClassData->addVariableInt("Reserved", oDataContainer::oIS16U, "Extraplatser");
@@ -481,27 +577,27 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   vector<pair<wstring, wstring>> statusClass;
   oClass::fillClassStatus(statusClass);
   oClassData->addVariableEnum("Status", 2, "Status", statusClass);
-  oClassData->addVariableInt("DirectResult", oDataContainer::oIS8, "Resultat vid mÂlst‰mpling", make_shared<DataBoolean>("DirectResult"));
+  oClassData->addVariableInt("DirectResult", oDataContainer::oIS8, "Resultat vid m√•lst√§mpling", make_shared<DataBoolean>("DirectResult"));
   oClassData->addVariableString("Bib", 8, "Nummerlapp");
 
   vector< pair<wstring,wstring> > bibMode;
-  bibMode.push_back(make_pair(L"", L"FrÂn lag"));
-  bibMode.push_back(make_pair(L"A", L"Lag + str‰cka"));
+  bibMode.push_back(make_pair(L"", L"Fr√•n lag"));
+  bibMode.push_back(make_pair(L"A", L"Lag + str√§cka"));
   bibMode.push_back(make_pair(L"F", L"Fritt"));
 
   oClassData->addVariableEnum("BibMode", 1, "Nummerlappshantering", bibMode);
   oClassData->addVariableInt("Unordered", oDataContainer::oIS8U, "Oordnade parallella");
   oClassData->addVariableInt("Heat", oDataContainer::oIS8U, "Heat");
-  oClassData->addVariableInt("Locked", oDataContainer::oIS8U, "LÂst gaffling", make_shared<DataBoolean>("Locked"));
+  oClassData->addVariableInt("Locked", oDataContainer::oIS8U, "L√•st gaffling", make_shared<DataBoolean>("Locked"));
   oClassData->addVariableString("Qualification", "Kvalschema", make_shared<DataHider>());
   oClassData->addVariableInt("NumberMaps", oDataContainer::oIS16, "Kartor");
   oClassData->addVariableString("Result", 24, "Result module", make_shared<ResultModuleFormatter>());
-  oClassData->addVariableInt("TransferFlags", oDataContainer::oIS32, "÷verfˆring", make_shared<DataHider>());
+  oClassData->addVariableInt("TransferFlags", oDataContainer::oIS32, "√ñverf√∂ring", make_shared<DataHider>());
 
   oTeamData = new oDataContainer(oTeam::dataSize);
   oTeamData->addVariableCurrency("Fee", "Anm. avgift");
   oTeamData->addVariableCurrency("Paid", "Betalat");
-  oTeamData->addVariableInt("PayMode", oDataContainer::oIS8U, "Betals‰tt");
+  oTeamData->addVariableInt("PayMode", oDataContainer::oIS8U, "Betals√§tt");
   oTeamData->addVariableCurrency("Taxable", "Skattad avgift");
   oTeamData->addVariableDate("EntryDate", "Anm. datum");
   oTeamData->addVariableInt("EntryTime", oDataContainer::oIS32, "Anm. tid", make_shared<AbsoluteTimeFormatter>("EntryTime"));
@@ -512,9 +608,9 @@ oEvent::oEvent(gdioutput &gdi):oBase(0), gdibase(gdi)
   oTeamData->addVariableInt("Priority", oDataContainer::oIS8U, "Prioritering");
   oTeamData->addVariableInt("SortIndex", oDataContainer::oIS16, "Sortering");
   oTeamData->addVariableInt("TimeAdjust", oDataContainer::oIS16, "Tidsjustering");
-  oTeamData->addVariableInt("PointAdjust", oDataContainer::oIS32, "Po‰ngjustering");
-  oTeamData->addVariableInt("TransferFlags", oDataContainer::oIS32, "÷verfˆring");
-  oTeamData->addVariableInt("EntrySource", oDataContainer::oIS32, "K‰lla");
+  oTeamData->addVariableInt("PointAdjust", oDataContainer::oIS32, "Po√§ngjustering");
+  oTeamData->addVariableInt("TransferFlags", oDataContainer::oIS32, "√ñverf√∂ring");
+  oTeamData->addVariableInt("EntrySource", oDataContainer::oIS32, "K√§lla");
   oTeamData->addVariableInt("Heat", oDataContainer::oIS8U, "Heat");
   oTeamData->addVariableInt("NoRestart", oDataContainer::oIS8U, "Ej omstart");
   oTeamData->addVariableString("InputResult", "Tidigare resultat", make_shared<DataHider>());
@@ -560,6 +656,8 @@ void oEvent::initProperties() {
   getPropertyInt("UseHourFormat", 1);
   getPropertyInt("UseDirectSocket", true);
   getPropertyInt("UseEventorUTC", 0);
+  getPropertyInt("UseHourFormat", 1);
+  getPropertyInt("NameMode", FirstLast);
 }
 
 void oEvent::listProperties(bool userProps, vector< pair<string, PropertyType> > &propNames) const {
@@ -580,6 +678,7 @@ void oEvent::listProperties(bool userProps, vector< pair<string, PropertyType> >
     filter.insert("Email"); 
     filter.insert("TextSize");
     filter.insert("PayModes");
+    filter.insert("ReadVoltageExp");
   }
 
   // Boolean and integer properties
@@ -608,6 +707,9 @@ void oEvent::listProperties(bool userProps, vector< pair<string, PropertyType> >
   b.insert("ExportCSVSplits");
   b.insert("DrawInterlace");
   b.insert("PreferLongClassNames");
+  b.insert("PlaySound");
+  b.insert("showheader");
+
   // Integers
   i.insert("YouthFee");
   i.insert("YouthAge");
@@ -633,6 +735,8 @@ void oEvent::listProperties(bool userProps, vector< pair<string, PropertyType> >
   propNames.clear();
   for(map<string, wstring>::const_iterator it = eventProperties.begin(); 
       it != eventProperties.end(); ++it) {
+    if (it->first.size() > 1 && it->first[0] == '@')
+      continue;
     if (!filter.count(it->first)) {
       if (b.count(it->first)) {
         assert(!i.count(it->first));
@@ -962,7 +1066,7 @@ bool oEvent::save()
   bool res;
   if (finalRenameTarget.empty()) {
     res = save(CurrentFile);
-    if (!(HasDBConnection || HasPendingDBConnection))
+    if (!(hasDBConnection() || hasPendingDBConnection))
       openFileLock->lockFile(CurrentFile);
   }
   else {
@@ -973,7 +1077,7 @@ bool oEvent::save()
       _wrename(CurrentFile, finalRenameTarget.c_str());
       _wrename(tmpName.c_str(), CurrentFile);
   
-      if (!(HasDBConnection || HasPendingDBConnection))
+      if (!(hasDBConnection() || hasPendingDBConnection))
         openFileLock->lockFile(CurrentFile);
     }
   }
@@ -1050,6 +1154,12 @@ bool oEvent::save(const wstring &fileIn) {
   xml.startTag("Lists");
   listContainer->save(MetaListContainer::ExternalList, xml, this);
   xml.endTag();
+
+  if (machineContainer) {
+    xml.startTag("Machines");
+    machineContainer->save(xml);
+    xml.endTag();
+  }
 
   xml.closeOut();
   pw.setProgress(p[i++]);
@@ -1141,6 +1251,34 @@ static void toc(const string &str) {
   timer = t;
 }
 
+namespace {
+  void getNewFileName(wstring &fn, wstring &nameId) {
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+
+    wchar_t file[260];
+    wchar_t filename[64];
+    swprintf_s(filename, 64, L"meos_%d%02d%02d_%02d%02d%02d_%X.meos",
+               st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+    //strcpy_s(CurrentNameId, filename);
+    getUserFile(file, filename);
+
+    wchar_t CurrentNameId[64];
+    _wsplitpath_s(file, NULL, 0, NULL, 0, CurrentNameId, 64, NULL, 0);
+    int i = 0;
+    while (CurrentNameId[i]) {
+      if (CurrentNameId[i] == '.') {
+        CurrentNameId[i] = 0;
+        break;
+      }
+      i++;
+    }
+
+    fn = file;
+    nameId = CurrentNameId;
+  }
+}
 
 bool oEvent::open(const wstring &file, bool Import, bool forMerge) {
   if (!Import)
@@ -1152,11 +1290,26 @@ bool oEvent::open(const wstring &file, bool Import, bool forMerge) {
   string log;
   xml.read(file);
 
+  string tag = xml.getObject(0).getName();
+  wstring iof;
+  xml.getObject(0).getObjectString("iofVersion", iof);
+  if (tag == "EntryList" || tag == "StartList" || iof.length() > 0)
+    throw meosException(L"Filen (X) inneh√•ller IOF-XML t√§vlingsdata och kan importeras i en existerande t√§vling#" + file);
+
+  if (tag == "MeOSListDefinition")
+    throw meosException(L"Filen (X) √§r en listdefinition#" + file);
+
+  if (tag == "MeOSResultCalculationSet")
+    throw meosException(L"Filen (X) √§r en resultatmodul#" + file);
+
+  if (tag != "meosdata")
+    throw meosException(L"Filen (X) √§r inte en MeOS-t√§vling#" + file);
+
   xmlattrib ver = xml.getObject(0).getAttrib("version");
   if (ver) {
     wstring vs = ver.wget();
     if (vs > getMajorVersion()) {
-      // T‰vlingen ‰r skapad i MeOS X. Data kan gÂ fˆrlorad om du ˆppnar t‰vlingen.\n\nVill du forts‰tta?
+      // T√§vlingen √§r skapad i MeOS X. Data kan g√• f√∂rlorad om du √∂ppnar t√§vlingen.\n\nVill du forts√§tta?
       bool cont = gdibase.ask(L"warn:opennewversion#" + vs);
       if (!cont)
         return false;
@@ -1184,6 +1337,18 @@ bool oEvent::open(const wstring &file, bool Import, bool forMerge) {
   bool res = open(xml);
   if (res && !Import)
     openFileLock->lockFile(file);
+
+  if (Import) {
+    for (auto &cmp : cinfo) {
+      if (cmp.NameId == currentNameId) {
+        if (!gdibase.ask(L"ask:importcopy#" + cmp.Name + L", " + cmp.Date)) {
+          wstring fn;
+          getNewFileName(fn, currentNameId);
+        }
+        break;
+      }
+    }
+  }
 
   getMergeTag(Import && !forMerge);
 
@@ -1215,7 +1380,7 @@ bool oEvent::open(const xmlparser &xml) {
   if (xo)  Name=xo.getw();
 
   if (Name.empty()) {
-    Name = lang.tl("Ny t‰vling");
+    Name = lang.tl("Ny t√§vling");
   }
 
   xo = xml.getObject("Annotation");
@@ -1436,7 +1601,7 @@ bool oEvent::open(const xmlparser &xml) {
     xmlobject xList = xml.getObject("Lists");
     if (xList) {
       if (!listContainer->load(MetaListContainer::ExternalList, xList, true)) {
-        err = L"Visa listor ‰r gjorda i en senare version av MeOS och kunde inte laddas.";
+        err = L"Visa listor √§r gjorda i en senare version av MeOS och kunde inte laddas.";
       }
     }
   }
@@ -1448,7 +1613,25 @@ bool oEvent::open(const xmlparser &xml) {
     if (err.empty())
       err = gdibase.widen(ex.what());
   }
+
   getMeOSFeatures().deserialize(getDCI().getString("Features"), *this);
+
+
+  try {
+    xmlobject xMachine = xml.getObject("Machines");
+    if (xMachine) {
+      getMachineContainer().load(xMachine);
+    }
+  }
+  catch (const meosException &ex) {
+    if (err.empty())
+      err = ex.wwhat();
+  }
+  catch (const std::exception &ex) {
+    if (err.empty())
+      err = gdibase.widen(ex.what());
+  }
+
 
   if (!err.empty())
     throw meosException(err);
@@ -1479,13 +1662,13 @@ bool oEvent::openRunnerDatabase(const wchar_t* filename)
   wcscat_s(fwrunner, L".wpersons");
 
   try {
-    if ((fileExist(fwclub) || fileExist(fclub)) && (fileExist(frunner) || fileExist(fwrunner)) ) {
-      if (fileExist(fwclub))
+    if ((fileExists(fwclub) || fileExists(fclub)) && (fileExists(frunner) || fileExists(fwrunner)) ) {
+      if (fileExists(fwclub))
         runnerDB->loadClubs(fwclub);
       else
         runnerDB->loadClubs(fclub);
 
-      if (fileExist(fwrunner))
+      if (fileExists(fwrunner))
         runnerDB->loadRunners(fwrunner);
       else
         runnerDB->loadRunners(frunner);
@@ -1594,7 +1777,7 @@ bool oEvent::saveRunnerDatabase(const wchar_t *filename, bool onlyLocal)
 
 void oEvent::updateRunnerDatabase()
 {
-  if (Name == L"!TESTTƒVLING")
+  if (Name == L"!TESTT√ÑVLING")
     return;
 
   if (useRunnerDb()) {
@@ -1614,7 +1797,7 @@ void oEvent::updateRunnerDatabase()
         wstring uid = gdibase.widen(ml.getUniqueId()) + L".meoslist";
         wchar_t file[260];
         getUserFile(file, uid.c_str());
-        if (!fileExist(file)) {
+        if (!fileExists(file)) {
           ml.save(file, this);
         }
       }
@@ -1625,7 +1808,7 @@ void oEvent::updateRunnerDatabase()
       wstring uid = gdibase.widen(freeMod[k].first) + L".rules";
       wchar_t file[260];
       getUserFile(file, uid.c_str());
-      if (!fileExist(file)) {
+      if (!fileExists(file)) {
         freeMod[k].second->save(file);
       }
     }
@@ -1672,7 +1855,7 @@ pCourse oEvent::addCourse(const oCourse &oc)
   pCourse pc = &Courses.back();
   pc->addToEvent(this, &oc);
 
-  if (HasDBConnection && !pc->existInDB() && !pc->isImplicitlyCreated()) {
+  if (hasDBConnection() && !pc->existInDB() && !pc->isImplicitlyCreated()) {
     pc->changed = true;
     pc->synchronize();
   }
@@ -1743,7 +1926,8 @@ pRunner oEvent::addRunner(const wstring &name, int clubId, int classId,
     return addRunnerFromDB(db_r, classId, autoAdd);
   }
   oRunner r(this);
-  r.sName = name;
+  //r.sName = name;
+  r.setName(name, false);
   r.getRealName(r.sName, r.tRealName);
   r.Club = getClub(clubId);
   r.Class = getClass(classId);
@@ -1848,7 +2032,7 @@ pRunner oEvent::addRunner(const oRunner &r, bool updateStartNo) {
   if (pr->Card)
     pr->Card->tOwner = pr;
 
-  if (HasDBConnection) {
+  if (hasDBConnection()) {
     if (!pr->existInDB() && !pr->isImplicitlyCreated())
       pr->synchronize();
   }
@@ -2063,14 +2247,14 @@ int oEvent::getVacantClub(bool returnNoClubClub) {
       if (pc != 0 && !pc->isRemoved())
         return noClubId;
     }
-    pClub pc = getClub(L"Klubblˆs");
+    pClub pc = getClub(L"Klubbl√∂s");
     if (pc == 0)
       pc = getClub(L"No club"); //eng
     if (pc == 0)
-      pc = getClub(lang.tl("Klubblˆs")); //other lang?
+      pc = getClub(lang.tl("Klubbl√∂s")); //other lang?
 
     if (pc == 0)
-      pc=getClubCreate(cNoClubId, lang.tl("Klubblˆs"));
+      pc=getClubCreate(cNoClubId, lang.tl("Klubbl√∂s"));
 
     noClubId = pc->getId();
     return noClubId;
@@ -2105,11 +2289,11 @@ int oEvent::getVacantClubIfExist(bool returnNoClubClub) const
     }
     if (noClubId == -1)
       return 0;
-    pClub pc=getClub(L"Klubblˆs");
+    pClub pc=getClub(L"Klubbl√∂s");
     if (pc == 0)
-      pc = getClub(L"Klubblˆs");
+      pc = getClub(L"Klubbl√∂s");
     if (pc == 0)
-      pc = getClub(lang.tl(L"Klubblˆs")); //other lang?
+      pc = getClub(lang.tl(L"Klubbl√∂s")); //other lang?
 
     if (!pc) {
       noClubId = -1;
@@ -2185,7 +2369,7 @@ wstring oEvent::getZeroTime() const
 
 void oEvent::setZeroTime(wstring m, bool manualSet)
 {
-  unsigned nZeroTime = convertAbsoluteTime(m);
+  const unsigned nZeroTime = convertAbsoluteTime(m);
   if (nZeroTime!=ZeroTime && nZeroTime != -1) {
     if (manualSet)
       setFlag(TransferFlags::FlagManualDateTime, true);
@@ -2193,13 +2377,16 @@ void oEvent::setZeroTime(wstring m, bool manualSet)
     updateChanged();
     ZeroTime=nZeroTime;
   }
+  else if (manualSet && !hasFlag(oEvent::TransferFlags::FlagManualDateTime)) {
+    setFlag(TransferFlags::FlagManualDateTime, true);
+  }
 }
 
 void oEvent::setName(const wstring &m, bool manualSet)
 { 
   wstring tn = trim(m);
   if (tn.empty())
-    throw meosException("Tomt namn ‰r inte tillÂtet.");
+    throw meosException("Tomt namn √§r inte till√•tet.");
 
   if (tn != getName()) {
     if (manualSet)
@@ -2220,10 +2407,10 @@ void oEvent::setAnnotation(const wstring &m)
 wstring oEvent::getTitleName() const {
   if (empty())
     return L"";
-  if (HasPendingDBConnection)
-    return getName() + lang.tl(L" (pÂ server)") + lang.tl(L" DATABASE ERROR");
+  if (hasPendingDBConnection)
+    return getName() + lang.tl(L" (p√• server)") + lang.tl(L" DATABASE ERROR");
   else if (isClient())
-    return getName() + lang.tl(L" (pÂ server)");
+    return getName() + lang.tl(L" (p√• server)");
   else
     return getName() + lang.tl(L" (lokalt)");
 }
@@ -2233,7 +2420,7 @@ void oEvent::setDate(const wstring &m, bool manualSet)
   if (m!=Date) {
     int d = convertDateYMS(m, true);
     if (d <= 0)
-      throw meosException(L"Felaktigt datumformat 'X' (Anv‰nd ≈≈≈≈-MM-DD).#" + m);
+      throw meosException(L"Felaktigt datumformat 'X' (Anv√§nd √Ö√Ö√Ö√Ö-MM-DD).#" + m);
     wstring nDate = formatDate(d, true);
     if (Date != nDate) {
       Date = nDate;
@@ -2537,9 +2724,19 @@ void oEvent::removeRunner(const vector<int> &ids)
 
     if (r==0)
       continue;
-
-    r = r->tParentRunner ? r->tParentRunner : r;
-
+    
+    if (r->tInTeam) // XXX
+      r = r->tParentRunner ? r->tParentRunner : r;
+    else if (r->tParentRunner) {      
+      r->tParentRunner->createMultiRunner(true, true);
+      r = getRunner(Id, 0);
+      if (r == nullptr)
+        continue;
+      else {
+        auto &mlr = r->tParentRunner->multiRunner;
+        mlr.erase(std::remove(mlr.begin(), mlr.end(), r), mlr.end());
+      }
+    }
     if (toRemove.count(r->getId()))
       continue; //Already found.
 
@@ -2562,8 +2759,8 @@ void oEvent::removeRunner(const vector<int> &ids)
     if (toRemove.count(cr.getId())> 0) {
       if (cr.Class)
         affectedCls.insert(cr.Class);
-      if (HasDBConnection)
-        msRemove(&cr);
+      if (hasDBConnection())
+        sqlRemove(&cr);
       toRemove.erase(cr.getId());
       runnerById.erase(cr.getId());
       if (cr.Card) {
@@ -2604,8 +2801,8 @@ void oEvent::removeCourse(int Id)
 
   for (it=Courses.begin(); it != Courses.end(); ++it){
     if (it->Id==Id){
-      if (HasDBConnection)
-        msRemove(&*it);
+      if (hasDBConnection())
+        sqlRemove(&*it);
       dataRevision++;
       Courses.erase(it);
       courseIdIndex.erase(Id);
@@ -2627,8 +2824,8 @@ void oEvent::removeClass(int Id)
             subRemove.push_back(pc->getId());
         }
       }
-      if (HasDBConnection)
-        msRemove(&*it);
+      if (hasDBConnection())
+        sqlRemove(&*it);
       Classes.erase(it);
       dataRevision++;
       updateTabs();
@@ -2646,8 +2843,8 @@ void oEvent::removeControl(int Id)
 
   for (it=Controls.begin(); it != Controls.end(); ++it){
     if (it->Id==Id){
-      if (HasDBConnection)
-        msRemove(&*it);
+      if (hasDBConnection())
+        sqlRemove(&*it);
       Controls.erase(it);
       dataRevision++;
       return;
@@ -2661,8 +2858,8 @@ void oEvent::removeClub(int Id)
 
   for (it=Clubs.begin(); it != Clubs.end(); ++it){
     if (it->Id==Id) {
-      if (HasDBConnection)
-        msRemove(&*it);
+      if (hasDBConnection())
+        sqlRemove(&*it);
       Clubs.erase(it);
       clubIdIndex.erase(Id);
       dataRevision++;
@@ -2686,8 +2883,8 @@ void oEvent::removeCard(int Id)
         if (it->tOwner->Card == &*it)
           it->tOwner->Card = 0;
       }
-      if (HasDBConnection)
-        msRemove(&*it);
+      if (hasDBConnection())
+        sqlRemove(&*it);
       Cards.erase(it);
       dataRevision++;
       return;
@@ -2899,7 +3096,7 @@ void oEvent::generateVacancyList(gdioutput &gdi, GUICALLBACK cb)
     nRunner++;
   }
   if (nVac==0)
-    gdi.addString("", y, x, 0, "Inga vakanser tillg‰ngliga. Vakanser skapas vanligen vid lottning.");
+    gdi.addString("", y, x, 0, "Inga vakanser tillg√§ngliga. Vakanser skapas vanligen vid lottning.");
   gdi.updateScrollbars();
 }
 
@@ -3049,7 +3246,7 @@ void oEvent::generateInForestList(gdioutput &gdi, GUICALLBACK cb, GUICALLBACK cb
         for (size_t k = 0; k < rr.size(); k++) {
           if (!rr[k]->skip() && rr[k]->getId() != it->getId()) {
             if (otherRunners.empty()) {
-              otherRunners = lang.tl("Bricka X anv‰nds ocksÂ av: #" + itos(it->getCardNo()));
+              otherRunners = lang.tl("Bricka X anv√§nds ocks√• av: #" + itos(it->getCardNo()));
             }
             else {
               otherRunners += L", ";
@@ -3069,12 +3266,12 @@ void oEvent::generateInForestList(gdioutput &gdi, GUICALLBACK cb, GUICALLBACK cb
 
         if (hasPunch) {
           if (otherRunners.empty()) {
-            RECT rc = gdi.addString("", y, x+dx[2], 0, "(har st‰mplat)", dx[3]-dx[2]-4).textRect;
+            RECT rc = gdi.addString("", y, x+dx[2], 0, "(har st√§mplat)", dx[3]-dx[2]-4).textRect;
             capitalize(punches);
             gdi.addToolTip("", L"#" + punches, 0, &rc);
           }
           else {
-            // ≈teranv‰nd bricka
+            // √Öteranv√§nd bricka
             RECT rc = gdi.addString("", y, x+dx[2], 0, L"#(" + lang.tl("reused card") + L")", dx[3]-dx[2]-4).textRect;
             capitalize(punches);
             gdi.addToolTip("", L"#" + punches + L". " + otherRunners, 0, &rc);
@@ -3295,7 +3492,7 @@ bool oEvent::enumerateCompetitions(const wchar_t *file, const wchar_t *filetype)
       xmlparser xp;
 
       try {
-        xp.read(FullPathFile, 8);
+        xp.read(FullPathFile, 30);
 
         const xmlobject date=xp.getObject("Date");
 
@@ -3318,6 +3515,20 @@ bool oEvent::enumerateCompetitions(const wchar_t *file, const wchar_t *filetype)
         if (nameid)
           ci.NameId = nameid.getw();
 
+        auto oData = xp.getObject("oData");
+        if (oData) {
+          auto preEvent = oData.getObject("PreEvent");
+          if (preEvent)
+            ci.preEvent = preEvent.getw();
+
+          auto postEvent = oData.getObject("PostEvent");
+          if (postEvent)
+            ci.postEvent = postEvent.getw();
+
+          auto importStamp = oData.getObject("ImportStamp");
+          if (importStamp)
+            ci.importTimeStamp = importStamp.getw();
+        }
         cinfo.push_front(ci);
       }
       catch (std::exception &) {
@@ -3330,13 +3541,26 @@ bool oEvent::enumerateCompetitions(const wchar_t *file, const wchar_t *filetype)
   FindClose(h);
 
   if (!getServerName().empty())
-    msListCompetitions(this);
+    sqlConnection->listCompetitions(this, true);
 
   for (list<CompetitionInfo>::iterator it=cinfo.begin(); it!=cinfo.end(); ++it) {
     if (it->Name.size() > 1 && it->Name[0] == '%')
       it->Name = lang.tl(it->Name.substr(1));
   }
 
+/*
+  vector<pair<wstring, wstring>> cc;
+  for (auto &c : cinfo) {
+    cc.emplace_back(c.NameId, c.Date + L": " + c.Name);
+  }
+  sort(cc.begin(), cc.end());
+  for (auto &c : cc) {
+    OutputDebugString(c.first.c_str());
+    OutputDebugString(L", ");
+    OutputDebugString(c.second.c_str());
+    OutputDebugString(L"\n");
+  }
+*/
   return true;
 }
 
@@ -3534,10 +3758,32 @@ bool oEvent::fillCompetitions(gdioutput &gdi,
   cinfo.sort();
   cinfo.reverse();
   list<CompetitionInfo>::iterator it;
+  const CompetitionInfo *bestMatch = nullptr; 
+
+  auto accept = [this, &bestMatch](const CompetitionInfo &ci) {
+    if (bestMatch == nullptr)
+      bestMatch = &ci;
+    else {
+      bool matchPrevNextId = bestMatch->preEvent == currentNameId || bestMatch->postEvent == currentNameId;
+      bool ciMatchPrevNextId = ci.preEvent == currentNameId || ci.postEvent == currentNameId;
+      if (matchPrevNextId != ciMatchPrevNextId) {
+        if (ciMatchPrevNextId)
+          bestMatch = &ci;
+      }
+      else {
+        if (ci.Date > bestMatch->Date) {
+          bestMatch = &ci;
+        }
+        else {
+          if (ci.importTimeStamp > bestMatch->importTimeStamp)
+            bestMatch = &ci;
+        }
+      }
+    }
+  };
 
   gdi.clearList(name);
   string b;
-  int idSel = -1;
   //char bf[128];
   for (it=cinfo.begin(); it!=cinfo.end(); ++it) {
     wstring annotation;
@@ -3546,14 +3792,14 @@ bool oEvent::fillCompetitions(gdioutput &gdi,
     if (it->Server.length()==0) {
       if (type==0 || type==1) {
         if (it->NameId == select && !select.empty())
-          idSel = it->Id;
+          accept(*it);
         wstring bf = L"[" + it->Date + L"] " + it->Name;
         gdi.addItem(name, bf + annotation, it->Id);
       }
     }
     else if (type==0 || type==2) {
       if (it->NameId == select && !select.empty())
-        idSel = it->Id;
+        accept(*it);
       wstring bf;
       if (type==0)
         bf = lang.tl(L"Server: [X] Y#" + it->Date + L"#" + it->Name);
@@ -3564,23 +3810,22 @@ bool oEvent::fillCompetitions(gdioutput &gdi,
     }
   }
 
-  if (idSel != -1)
-    gdi.selectItemByData(name.c_str(), idSel);
+  if (bestMatch)
+    gdi.selectItemByData(name.c_str(), bestMatch->Id);
+
   return true;
 }
 
-void tabAutoKillMachines();
-
 void oEvent::checkDB()
 {
-  if (HasDBConnection) {
+  if (hasDBConnection()) {
     vector<wstring> err;
     int k=checkChanged(err);
 
 #ifdef _DEBUG
     if (k>0) {
       wchar_t bf[256];
-      swprintf_s(bf, L"Databasen innehÂller %d osynkroniserade ‰ndringar.", k);
+      swprintf_s(bf, L"Databasen inneh√•ller %d osynkroniserade √§ndringar.", k);
       wstring msg(bf);
       for(int i=0;i < min<int>(err.size(), 10);i++)
         msg+=wstring(L"\n")+err[i];
@@ -3599,11 +3844,11 @@ void oEvent::clear()
 {
   checkDB();
 
-  if (HasDBConnection)
-    msMonitor(0);
+  if (hasDBConnection())
+    sqlConnection->checkConnection(0);
 
-  HasDBConnection=false;
-  HasPendingDBConnection = false;
+  isConnectedToServer = false;
+  hasPendingDBConnection = false;
 
   destroyExtraWindows();
 
@@ -3622,7 +3867,7 @@ void oEvent::clear()
   Annotation.clear();
 
   //Make sure no daemon is hunting us.
-  tabAutoKillMachines();
+  TabAuto::tabAutoKillMachines();
 
   delete directSocket;
   directSocket = 0;
@@ -3689,6 +3934,8 @@ void oEvent::clear()
   // Cleanup user interface
   gdibase.getTabs().clearCompetitionData();
   
+  machineContainer.release();
+
   MeOSUtil::useHourFormat = getPropertyInt("UseHourFormat", 1) != 0;
 
   currentNameMode = (NameMode) getPropertyInt("NameMode", FirstLast);
@@ -3708,7 +3955,7 @@ void oEvent::setTable(const string &key, const shared_ptr<Table> &table) {
 
 bool oEvent::deleteCompetition()
 {
-  if (!empty() && !HasDBConnection) {
+  if (!empty() && !hasDBConnection()) {
     wstring removed = wstring(CurrentFile)+L".removed";
     ::_wremove(removed.c_str()); //Delete old removed file
     openFileLock->unlockFile();
@@ -3722,7 +3969,6 @@ void oEvent::newCompetition(const wstring &name)
 {
   openFileLock->unlockFile();
   clear();
-
 
   SYSTEMTIME st;
   GetLocalTime(&st);
@@ -3762,26 +4008,10 @@ void oEvent::newCompetition(const wstring &name)
 
   setCurrency(-1, L"", L"", 0);
 
-  wchar_t file[260];
-  wchar_t filename[64];
-  swprintf_s(filename, 64, L"meos_%d%02d%02d_%02d%02d%02d_%X.meos",
-    st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+  wstring file;
+  getNewFileName(file, currentNameId);
+  wcscpy_s(CurrentFile, MAX_PATH, file.c_str());
 
-  //strcpy_s(CurrentNameId, filename);
-  getUserFile(file, filename);
-
-  wcscpy_s(CurrentFile, MAX_PATH, file);
-  wchar_t CurrentNameId[64];
-  _wsplitpath_s(CurrentFile, NULL, 0, NULL,0, CurrentNameId, 64, NULL, 0);
-  int i=0;
-  while (CurrentNameId[i]) {
-    if (CurrentNameId[i]=='.') {
-      CurrentNameId[i]=0;
-      break;
-    }
-    i++;
-  }
-  currentNameId = CurrentNameId;
   oe->updateTabs();
 }
 
@@ -3870,6 +4100,13 @@ void oEvent::reEvaluateAll(const set<int> &cls, bool doSync)
     leg++;
   }
 
+  // Mark info as complete
+  for (auto& c : Classes) {
+    if (!c.isRemoved() && (cls.empty() || cls.count(c.Id)))
+      for (auto &i : c.tLeaderTime)
+        i.setComplete();
+  }
+
   // Update team start times etc.
   for(oTeamList::iterator tit=Teams.begin();tit!=Teams.end();++tit) {
     if (!tit->isRemoved()) {
@@ -3915,6 +4152,7 @@ void oEvent::reEvaluateChanged()
       it->resetLeaderTime();
       it->reinitialize(true);
       resetClasses[it->getId()] = it->hasClassGlobalDependence();
+      it->updateLeaderTimes();
     }
   }
 
@@ -3937,8 +4175,8 @@ void oEvent::reEvaluateChanged()
       if (it->isRemoved())
         continue;
       int clz = it->getClassId(true);
-      if (resetClasses.count(clz))
-        it->storeTimes();
+      //if (resetClasses.count(clz))
+      //  it->storeTimes();
 
       if (!it->wasSQLChanged() && !resetClasses[clz])
         continue;
@@ -4116,15 +4354,28 @@ void oEvent::convertTimes(pRunner runner, SICard &sic) const
 
   if (sic.convertedTime == ConvertedTimeStatus::Hour12) {
 
-    int startTime = ZeroTime + 3600; //Add one hour. Subtracted below
+    int startTime = ZeroTime + 2*3600; //Add two hours. Subtracted below
     if (useLongTimes())
-      startTime = 5 * 3600; // Avoid midnight as default. Prefer morning
+      startTime = 7 * 3600; // Avoid midnight as default. Prefer morning
 
     int st = -1;
     if (runner) {
       st = runner->getStartTime();
       if (st > 0) {
-        startTime = (ZeroTime + st) % (3600 * 24);
+        if (sic.StartPunch.Code == -1)
+          startTime = (ZeroTime + st) % (3600 * 24); // No start punch
+        else {
+          // Got start punch. If this is close to specified start time,
+          // use specified start time
+          const int stPunch = sic.StartPunch.Time; // 12 hour
+          const int stStart = startTime = (ZeroTime + st) % (3600 * 12); // 12 hour
+          if (std::abs(stPunch - stStart) < 1800) {
+            startTime = (ZeroTime + st) % (3600 * 24); // Use specified start time (for conversion)
+          }
+          else {
+            st = -1; // Ignore start time
+          }
+        }
       }
       else {
         st = -1;
@@ -4145,13 +4396,13 @@ void oEvent::convertTimes(pRunner runner, SICard &sic) const
         startTime = (ZeroTime + relT12) % (3600 * 24);
       }
     }
-    int zt = (startTime + 23 * 3600) % (24 * 3600); // Subtract one hour
+    int zt = (startTime + 22 * 3600) % (24 * 3600); // Subtract two hours from start time
     sic.analyseHour12Time(zt);
   }
   sic.convertedTime = ConvertedTimeStatus::Done;
 
   if (sic.CheckPunch.Code!=-1){
-    if (sic.CheckPunch.Time<ZeroTime)
+    if (sic.CheckPunch.Time<unsigned(ZeroTime))
       sic.CheckPunch.Time+=(24*3600);
 
     sic.CheckPunch.Time-=ZeroTime;
@@ -4208,7 +4459,7 @@ void oEvent::convertTimes(pRunner runner, SICard &sic) const
   }
 
   if (sic.StartPunch.Code != -1) {
-    if (sic.StartPunch.Time<ZeroTime)
+    if (sic.StartPunch.Time<unsigned(ZeroTime))
       sic.StartPunch.Time+=(24*3600);
 
     sic.StartPunch.Time-=ZeroTime;
@@ -4216,7 +4467,7 @@ void oEvent::convertTimes(pRunner runner, SICard &sic) const
 
   for (unsigned k = 0; k < sic.nPunch; k++){
     if (sic.Punch[k].Code!=-1){
-      if (sic.Punch[k].Time<ZeroTime)
+      if (sic.Punch[k].Time<unsigned(ZeroTime))
         sic.Punch[k].Time+=(24*3600);
 
       sic.Punch[k].Time-=ZeroTime;
@@ -4224,7 +4475,7 @@ void oEvent::convertTimes(pRunner runner, SICard &sic) const
   }
 
   if (sic.FinishPunch.Code!=-1){
-    if (sic.FinishPunch.Time<ZeroTime)
+    if (sic.FinishPunch.Time<unsigned(ZeroTime))
       sic.FinishPunch.Time+=(24*3600);
 
     sic.FinishPunch.Time-=ZeroTime;
@@ -4636,14 +4887,14 @@ void oEvent::fillStatus(gdioutput &gdi, const string& id)
 const vector< pair<wstring, size_t> > &oEvent::fillStatus(vector< pair<wstring, size_t> > &out) {
   out.clear();
   out.push_back(make_pair(lang.tl(L"-"), StatusUnknown));
-  out.push_back(make_pair(lang.tl(L"Godk‰nd"), StatusOK));
+  out.push_back(make_pair(lang.tl(L"Godk√§nd"), StatusOK));
   out.push_back(make_pair(lang.tl(L"Ej start"), StatusDNS));
-  out.push_back(make_pair(lang.tl(L"≈terbud[status]"), StatusCANCEL));
+  out.push_back(make_pair(lang.tl(L"√Öterbud[status]"), StatusCANCEL));
   out.push_back(make_pair(lang.tl(L"Felst."), StatusMP));
   out.push_back(make_pair(lang.tl(L"Utg."), StatusDNF));
   out.push_back(make_pair(lang.tl(L"Disk."), StatusDQ));
   out.push_back(make_pair(lang.tl(L"Maxtid"), StatusMAX));
-  out.push_back(make_pair(lang.tl(L"Utom t‰vlan"), StatusOutOfCompetition));
+  out.push_back(make_pair(lang.tl(L"Utom t√§vlan"), StatusOutOfCompetition));
   out.push_back(make_pair(lang.tl(L"Utan tidtagning"), StatusNoTiming));
   out.push_back(make_pair(lang.tl(L"Deltar ej"), StatusNotCompetiting));
   return out;
@@ -4685,13 +4936,13 @@ const string &oEvent::getPropertyString(const char *name, const string &def)
   }
 }
 
-wstring oEvent::getPropertyStringDecrypt(const char *name, const string &def)
+string oEvent::getPropertyStringDecrypt(const char *name, const string &def)
 {
   wchar_t bf[MAX_COMPUTERNAME_LENGTH + 1];
   DWORD len = MAX_COMPUTERNAME_LENGTH + 1;
   GetComputerName(bf, &len);
   string prop = getPropertyString(name, def);
-  wstring prop2;
+  string prop2;
   int code = 0;
   const int s = 337;
 
@@ -4843,7 +5094,7 @@ void oEvent::assignCardInteractive(gdioutput &gdi, GUICALLBACK cb)
   }
 
   if (k==0)
-    gdi.addString("", 0, "Ingen lˆpare saknar bricka");
+    gdi.addString("", 0, "Ingen l√∂pare saknar bricka");
 }
 
 void oEvent::calcUseStartSeconds()
@@ -4860,9 +5111,9 @@ void oEvent::calcUseStartSeconds()
 
 const wstring &oEvent::formatStatus(RunnerStatus status, bool forPrint)
 {
-  const static wstring stats[11] = { L"?", L"Godk‰nd", L"Ej start", L"Felst.", L"Utg.", L"Disk.",
-                                 L"Maxtid", L"Deltar ej", L"≈terbud[status]", L"Utom t‰vlan",
-                                 L"Utan tidtagning" };
+  const static wstring stats[12] = { L"?", L"Godk√§nd", L"Ej start", L"Felst.", L"Utg.", L"Disk.",
+                                 L"Maxtid", L"Deltar ej", L"√Öterbud[status]", L"Utom t√§vlan",
+                                 L"Utan tidtagning", L"\u2014" };
   switch (status) {
   case StatusOK:
     return lang.tl(stats[1]);
@@ -4879,7 +5130,10 @@ const wstring &oEvent::formatStatus(RunnerStatus status, bool forPrint)
   case StatusMAX:
     return lang.tl(stats[6]);
   case StatusNotCompetiting:
-    return lang.tl(stats[7]);
+    if (forPrint)
+      return stats[11];
+    else
+      return lang.tl(stats[7]);
   case StatusOutOfCompetition:
     return lang.tl(stats[9]);
   case StatusUnknown: {
@@ -5116,7 +5370,7 @@ pCourse oEvent::generateTestCourse(int nCtrl)
 
   for (;i<nCtrl-1;i++)
     pc->addControl(rand()%(99-32)+32);
-  pc->addControl(100)->setName(L"Fˆrvarning");
+  pc->addControl(100)->setName(L"F√∂rvarning");
 
   return pc;
 }
@@ -5174,7 +5428,7 @@ pClass oEvent::generateTestClass(int nlegs, int nrunners,
 void oEvent::generateTestCompetition(int nClasses, int nRunners,
                                      bool generateTeams) {
   if (nClasses > 0) {
-    oe->newCompetition(L"!TESTTƒVLING");
+    oe->newCompetition(L"!TESTT√ÑVLING");
     oe->setZeroTime(L"05:00:00", true);
     oe->getMeOSFeatures().useAll(*oe);
   }
@@ -5276,7 +5530,7 @@ void oEvent::generateTestCompetition(int nClasses, int nRunners,
         drawList(spec, DrawMethod::MeOS, 1, oEvent::DrawType::DrawAll);
       }
       else
-        cls->Name += L" ÷ppen";
+        cls->Name += L" √ñppen";
     }
     else {
       int dr=cls->getNumDistinctRunners();
@@ -5360,7 +5614,7 @@ void oEvent::fillFees(gdioutput &gdi, const string &name, bool onlyDirect, bool 
   }
   vector< pair<wstring, size_t> > ff;
   if (withAuto)
-    ff.push_back(make_pair(lang.tl(L"FrÂn klassen"), -1));
+    ff.push_back(make_pair(lang.tl(L"Fr√•n klassen"), -1));
   for (set<int>::iterator it = fees.begin(); it != fees.end(); ++it)
     ff.push_back(make_pair(formatCurrency(*it), *it));
 
@@ -5406,7 +5660,7 @@ void oEvent::fillLegNumbers(const set<int> &cls,
   out.reserve(legs.size() + 1);
   for (set< pair<int, int> >::const_iterator it = legs.begin(); it != legs.end(); ++it) {
     if (it->second == 0) {
-      out.push_back( make_pair(lang.tl("Str‰cka X#" + itos(it->first + 1)), it->first));
+      out.push_back( make_pair(lang.tl("Str√§cka X#" + itos(it->first + 1)), it->first));
     }
   }
   if (includeSubLegs) {
@@ -5416,16 +5670,16 @@ void oEvent::fillLegNumbers(const set<int> &cls,
         int sub = it->second - 1000;
         char bf[64];
         char symb = 'a' + sub;
-        sprintf_s(bf, "Str‰cka X#%d%c", leg+1, symb);
+        sprintf_s(bf, "Str√§cka X#%d%c", leg+1, symb);
         out.push_back( make_pair(lang.tl(bf), (leg + 1) * 10000 + sub));
       }
     }
   }
   
   if (isTeamList)
-    out.push_back(make_pair(lang.tl("Sista str‰ckan"), 1000));
+    out.push_back(make_pair(lang.tl("Sista str√§ckan"), 1000));
   else
-    out.push_back(make_pair(lang.tl("Alla str‰ckor"), 1000));
+    out.push_back(make_pair(lang.tl("Alla str√§ckor"), 1000));
 }
 
 void oEvent::generateTableData(const string &tname, Table &table, TableUpdateInfo &tui)
@@ -5624,7 +5878,7 @@ bool oEvent::checkCardUsed(gdioutput &gdi, oRunner &runnerToAssignCard, int card
   wchar_t bf[1024];
 
   if (pold) {
-    swprintf_s(bf, (L"#" + lang.tl("Bricka %d anv‰nds redan av %s och kan inte tilldelas.")).c_str(),
+    swprintf_s(bf, (L"#" + lang.tl("Bricka %d anv√§nds redan av %s och kan inte tilldelas.")).c_str(),
                   cardNo, pold->getCompleteIdentification().c_str());
     gdi.alert(bf);
     return true;
@@ -5666,8 +5920,8 @@ void oEvent::sanityCheck(gdioutput &gdi, bool expectResult, int onlyThisClass) {
     if (it->sName.empty()) {
       if (!warnNoName) {
         warnNoName = true;
-        gdi.alert("Varning: deltagare med blankt namn pÂtr‰ffad. MeOS "
-                  "kr‰ver att alla deltagare har ett namn, och tilldelar namnet 'N.N.'");
+        gdi.alert("Varning: deltagare med blankt namn p√•tr√§ffad. MeOS "
+                  "kr√§ver att alla deltagare har ett namn, och tilldelar namnet 'N.N.'");
       }
       it->setName(lang.tl("N.N."), false);
       it->synchronize();
@@ -5692,7 +5946,7 @@ void oEvent::sanityCheck(gdioutput &gdi, bool expectResult, int onlyThisClass) {
       else if (type == oClassRelay) {
         if (!warnNoTeam) {
           gdi.alert(L"Deltagaren 'X' deltar i stafettklassen 'Y' men saknar lag. Klassens start- "
-                    L"och resultatlistor kan d‰rmed bli felaktiga.#" + it->getName() +
+                    L"och resultatlistor kan d√§rmed bli felaktiga.#" + it->getName() +
                      L"#" + it->getClass(false));
           warnNoTeam = true;
         }
@@ -5700,7 +5954,7 @@ void oEvent::sanityCheck(gdioutput &gdi, bool expectResult, int onlyThisClass) {
       else if (type == oClassPatrol) {
         if (!warnNoPatrol) {
           gdi.alert(L"Deltagaren 'X' deltar i patrullklassen 'Y' men saknar patrull. Klassens start- "
-                    L"och resultatlistor kan d‰rmed bli felaktiga.#" + it->getName() +
+                    L"och resultatlistor kan d√§rmed bli felaktiga.#" + it->getName() +
                      + L"#" + it->getClass(false));
           warnNoPatrol = true;
         }
@@ -5721,8 +5975,8 @@ void oEvent::sanityCheck(gdioutput &gdi, bool expectResult, int onlyThisClass) {
     if (it->sName.empty()) {
       if (!warnNoName) {
         warnNoName = true;
-        gdi.alert("Varning: lag utan namn pÂtr‰ffat. "
-                  "MeOS kr‰ver att alla lag har ett namn, och tilldelar namnet 'N.N.'");
+        gdi.alert("Varning: lag utan namn p√•tr√§ffat. "
+                  "MeOS kr√§ver att alla lag har ett namn, och tilldelar namnet 'N.N.'");
       }
       it->setName(lang.tl("N.N."), false);
       it->synchronize();
@@ -5740,7 +5994,7 @@ void oEvent::sanityCheck(gdioutput &gdi, bool expectResult, int onlyThisClass) {
     if (type == oClassIndividual) {
       if (!warnIndividualTeam) {
         gdi.alert(L"Laget 'X' deltar i individuella klassen 'Y'. Klassens start- och resultatlistor "
-                  L"kan d‰rmed bli felaktiga.#" + it->getName() + L"#" + it->getClass(true));
+                  L"kan d√§rmed bli felaktiga.#" + it->getName() + L"#" + it->getClass(true));
         warnIndividualTeam = true;
       }
     }
@@ -5748,7 +6002,7 @@ void oEvent::sanityCheck(gdioutput &gdi, bool expectResult, int onlyThisClass) {
 
 
   if (expectResult && !hasResult)
-    gdi.alert("T‰vlingen innehÂller inga resultat.");
+    gdi.alert("T√§vlingen inneh√•ller inga resultat.");
 
 
   bool warnBadStart = false;
@@ -5771,12 +6025,12 @@ void oEvent::sanityCheck(gdioutput &gdi, bool expectResult, int onlyThisClass) {
         LegTypes lt = it->getLegType(k);
         if (k==0 && (st == STChange || st == STHunting) && !warnBadStart) {
           warnBadStart = true;
-          gdi.alert(L"Klassen 'X' har jaktstart/v‰xling pÂ fˆrsta str‰ckan.#" + it->getName());
+          gdi.alert(L"Klassen 'X' har jaktstart/v√§xling p√• f√∂rsta str√§ckan.#" + it->getName());
         }
         if (st == STTime && it->getStartData(k)<=0 && !warnBadStart &&
               (lt == LTNormal || lt == LTSum)) {
           warnBadStart = true;
-          gdi.alert(L"Ogiltig starttid i 'X' pÂ str‰cka Y.#" + it->getName() + L"#" + itow(k+1));
+          gdi.alert(L"Ogiltig starttid i 'X' p√• str√§cka Y.#" + it->getName() + L"#" + itow(k+1));
         }
       }
     }
@@ -5849,7 +6103,7 @@ int oEvent::interpretCurrency(double val, const wstring &cur)  {
   if (_wcsicmp(L"sek", cur.c_str()) == 0)
     setCurrency(1, L"kr", L",", false);
   else if (_wcsicmp(L"eur", cur.c_str()) == 0)
-    setCurrency(100, L"Ä", L".", false);//WCS
+    setCurrency(100, L"‚Ç¨", L".", false);//WCS
 
   return int(floor(val * tCurrencyFactor+0.5));
 }
@@ -6110,7 +6364,7 @@ void oEvent::setPayMode(int id, const wstring &mode) {
         }
 
         if (!valid)
-          throw meosException("Betalnings‰ttet behˆvs och kan inte tas bort.");
+          throw meosException("Betalnings√§ttet beh√∂vs och kan inte tas bort.");
 
         lines.erase(lines.begin() + k);
         k--;
@@ -6156,7 +6410,7 @@ static void checkValid(oEvent &oe, int &time, int delta, const wstring &name) {
   if (time > 24 * 3600)
     time -= 24 * 3600;
   if (time < 0 || time > 22 * 3600) {
-    throw meosException(L"X har en tid (Y) som inte ‰r kompatibel med fˆr‰ndringen.#" + name + L"#" + oe.getAbsTime(srcTime));
+    throw meosException(L"X har en tid (Y) som inte √§r kompatibel med f√∂r√§ndringen.#" + name + L"#" + oe.getAbsTime(srcTime));
   }
 }
 
@@ -6280,7 +6534,17 @@ string oEvent::encodeStartGroups() const {
   string tmp;
   for (auto &sg : startGroups) {
     tmp = itos(sg.first) + "," +
-        itos(sg.second.first) + "," + itos(sg.second.second);
+      itos(sg.second.firstStart) + "," + itos(sg.second.lastStart);
+    if (!sg.second.name.empty()) {
+      wstring name = sg.second.name;
+      for (int j = 0; j < name.length(); j++) {
+        if (name[j] == L',')
+          name[j] = L'|';
+        if (name[j] == L';')
+          name[j] = L'^';
+      }
+      tmp += "," + gdioutput::toUTF8(name);
+    }
     if (ss.empty())
       ss = tmp;
     else
@@ -6295,20 +6559,30 @@ void oEvent::decodeStartGroups(const string &enc) const {
   startGroups.clear();
   for (string &grp : g) {
     split(grp, ",", sg);
-    if (sg.size() == 3) {
+    if (sg.size() == 3 || sg.size() == 4) {
       int id = atoi(sg[0].c_str());
       int start = atoi(sg[1].c_str());
       int end = atoi(sg[2].c_str());
-      startGroups.emplace(id, make_pair(start, end));
+      wstring name;
+      if (sg.size() == 4) {
+        name = gdioutput::fromUTF8(sg[3]);
+        for (int j = 0; j < name.length(); j++) {
+          if (name[j] == L'|')
+            name[j] = L',';
+          if (name[j] == L'^')
+            name[j] = L';';
+        }
+      }
+      startGroups.emplace(id, StartGroupInfo(name, start, end));
     }
   }
 }
 
-void oEvent::setStartGroup(int id, int firstStart, int lastStart) {
+void oEvent::setStartGroup(int id, int firstStart, int lastStart, const wstring &name) {
   if (firstStart < 0)
     startGroups.erase(id);
   else
-    startGroups[id] = make_pair(firstStart, lastStart);
+    startGroups[id] = StartGroupInfo(name, firstStart, lastStart);
 }
 
 void oEvent::updateStartGroups() {
@@ -6320,15 +6594,23 @@ void oEvent::readStartGroups() const {
   decodeStartGroups(gdibase.narrow(sg));
 }
 
-const map<int, pair<int, int>> &oEvent::getStartGroups(bool reload) const {
+const map<int, StartGroupInfo> &oEvent::getStartGroups(bool reload) const {
   if (reload)
     readStartGroups();
   return startGroups;
 }
 
-pair<int, int> oEvent::getStartGroup(int id) const {
-  if (startGroups.count(id))
-    return startGroups.find(id)->second;
+StartGroupInfo oEvent::getStartGroup(int id) const {
+  auto res = startGroups.find(id);
+  if (res != startGroups.end())
+    return res->second;
   else
-    return make_pair(-1, -1);
+    return StartGroupInfo(L"", -1, -1);
+}
+
+MachineContainer &oEvent::getMachineContainer() {
+  if (!machineContainer)
+    machineContainer = make_unique<MachineContainer>();
+
+  return *machineContainer;
 }

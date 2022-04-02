@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -166,7 +166,7 @@ void Toolbar::createToolbar(const string &id, const wstring &title)
                   WS_POPUP | WS_THICKFRAME | WS_CAPTION,
                   rc.right-300, rc.top+10, 600, 64, hParent, NULL, GetModuleHandle(0), NULL);
 
-    SetWindowLongPtr(hwndFloater, GWL_USERDATA, LONG_PTR(this));
+    SetWindowLongPtr(hwndFloater, GWLP_USERDATA, LONG_PTR(this));
   }
   else  {
     SetWindowText(hwndFloater, t.c_str());
@@ -213,7 +213,7 @@ void Toolbar::createToolbar(const string &id, const wstring &title)
   // Tell the toolbar to resize itself, and show it.
   SendMessage(hwndToolbar, TB_AUTOSIZE, 0, 0);
 
-  DWORD bsize = SendMessage(hwndToolbar, TB_GETBUTTONSIZE, 0,0);
+  LRESULT bsize = SendMessage(hwndToolbar, TB_GETBUTTONSIZE, 0,0);
   int bw = LOWORD(bsize);
   int bh = HIWORD(bsize);
 
@@ -278,7 +278,7 @@ LRESULT CALLBACK ToolProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       return DefWindowProc(hWnd, message, wParam, lParam);
 
     case WM_NCACTIVATE: {
-      Toolbar *tb = (Toolbar *)GetWindowLongPtr(hWnd, GWL_USERDATA);
+      Toolbar *tb = (Toolbar *)GetWindowLongPtr(hWnd, GWLP_USERDATA);
       if (tb) {
         //DefWindowProc(tb->gdi.getHWND(), message, wParam, lParam);
         SendMessage(tb->gdi.getHWNDMain(), message, wParam, lParam);
@@ -295,7 +295,7 @@ LRESULT CALLBACK ToolProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       break;
 
     case WM_COMMAND: {
-      Toolbar *tb = (Toolbar *)GetWindowLongPtr(hWnd, GWL_USERDATA);
+      Toolbar *tb = (Toolbar *)GetWindowLongPtr(hWnd, GWLP_USERDATA);
       int id = LOWORD(wParam);
       int code = HIWORD(wParam);
       if (tb) {

@@ -1,6 +1,6 @@
-/************************************************************************
+﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -34,6 +34,10 @@ protected:
   GuiHandler *handler;
   bool dataString;
 public:
+
+  bool matchExtra(int requireExtraMatch) const {
+    return requireExtraMatch == -1 || requireExtraMatch == getExtraInt();
+  }
 
   bool hasEventHandler() const {
     return handler != 0;
@@ -59,12 +63,15 @@ public:
 
   BaseInfo &setExtra(const wchar_t *e) {extra=(void *)e; dataString = true; return *this;}
 
-  BaseInfo &setExtra(int e) {extra = (void *)(e); return *this;}
+  BaseInfo &setExtra(int e) {extra = (void *)size_t(e); return *this;}
   BaseInfo &setExtra(size_t e) {extra = (void *)(e); return *this;}
+#ifdef _M_X64
+  BaseInfo &setExtra(unsigned int e) { extra = (void *)size_t(e); return *this; }
+#endif 
 
   bool isExtraString() const {return dataString;}
   wchar_t *getExtra() const {assert(extra == 0 || dataString); return (wchar_t *)extra;}
-  int getExtraInt() const {return int(extra);}
+  int getExtraInt() const {return (int)size_t(extra);}
   size_t getExtraSize() const {return size_t(extra);}
 
   GuiHandler &getHandler() const;
@@ -165,8 +172,8 @@ public:
   wstring text;
   wstring font;
 
-  int xp;
-  int yp;
+  int xp = -1;
+  int yp = -1;
 
   int format;
   DWORD color;
@@ -176,8 +183,8 @@ public:
   int absPrintY;
 
   bool hasTimer;
-  DWORD zeroTime;
-  DWORD timeOut;
+  DWORD zeroTime = -1;
+  DWORD timeOut = 0;
 
   bool hasCapture;
   GUICALLBACK callBack;
@@ -293,6 +300,8 @@ public:
               updateLastData(0) {}
   wstring text;
   size_t data;
+  int getDataInt() const { return (int)data; }
+
   int index;
   bool changed() const {return text!=original;}
   void ignore(bool ig) {ignoreCheck=ig;}
@@ -323,10 +332,10 @@ private:
   bool isEditControl;
   bool writeLock;
   wstring original;
-  int originalIdx;
+  size_t originalIdx;
   bool ignoreCheck; // True if changed-state should be ignored
 
-  map<int, int> data2Index;
+  map<size_t, int> data2Index;
 
   // Synchronize with other list box
   WNDPROC originalProc;
@@ -423,7 +432,7 @@ struct ToolInfo {
   string name;
   TOOLINFOW ti;
   wstring tip;
-  int id;
+  uintptr_t id;
 };
 
 

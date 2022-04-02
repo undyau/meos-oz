@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -93,7 +93,7 @@ csvparser::CSV csvparser::iscsv(const wstring &file) {
     return CSV::RAID;
 
   if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)
-   return CSV::OR; //”rreturn CSV::OR; //”r
+   return CSV::OR; //√ìrreturn CSV::OR; //√ìr
 
   if (sp.size()<2)//No csv
     return CSV::NoCSV;
@@ -650,7 +650,7 @@ bool csvparser::importOCAD_CSV(oEvent &event, const wstring &file, bool addClass
       }
 
       if (wtoi(sp[firstIndex])<30 || wtoi(sp[firstIndex])>1000) {
-        wstring str = L"Ogiltig banfil. Kontroll fˆrv‰ntad pÂ position X, men hittade 'Y'.#"
+        wstring str = L"Ogiltig banfil. Kontroll f√∂rv√§ntad p√• position X, men hittade 'Y'.#"
                       + itow(firstIndex+1) + L"#" + sp[firstIndex];
         throw meosException(str.c_str());
       }
@@ -714,7 +714,7 @@ bool csvparser::importOCAD_CSV(oEvent &event, const wstring &file, bool addClass
             if (ctrl >= 30 && ctrl < 1000)
               pc->addControl(wtoi(sp[k]));
             else {
-              wstring str = L"Ov‰ntad kontroll 'X' i bana Y.#" + ctrlStr + L"#" + pc->getName();
+              wstring str = L"Ov√§ntad kontroll 'X' i bana Y.#" + ctrlStr + L"#" + pc->getName();
               throw meosException(str);
             }
           }
@@ -1402,13 +1402,13 @@ void csvparser::importTeamLineup(const wstring &file,
     if (!line.empty()) {
       if (membersToRead == 0) {
         if (line.size() < 2 || line.size() > 3)
-          throw meosException(L"Ogiltigt lag pÂ rad X.#" + itow(lineNo) + L": " + line[0]);
+          throw meosException(L"Ogiltigt lag p√• rad X.#" + itow(lineNo) + L": " + line[0]);
         const wstring cls = trim(line[0]);
         map<wstring, int>::const_iterator res = classNameToNumber.find(cls);
         if (res == classNameToNumber.end())
-          throw meosException(L"Ok‰nd klass pÂ rad X.#" + itow(lineNo) + L": " + cls);
+          throw meosException(L"Ok√§nd klass p√• rad X.#" + itow(lineNo) + L": " + cls);
         if (res->second <= 1)
-          throw meosException(L"Klassen X ‰r individuell.#" + cls);
+          throw meosException(L"Klassen X √§r individuell.#" + cls);
 
         membersToRead = res->second;
         teams.push_back(TeamLineup());
@@ -1531,7 +1531,7 @@ int csvparser::importRanking(oEvent &oe, const wstring &file, vector<wstring> &p
 
   if ((name2RankDup.size() < data.size() / 2 || name2RankDup.empty()) &&
     (id2Rank.size() < data.size() / 2 || id2Rank.empty())) {
-    throw meosException(L"Felaktigt rankingformat i X. Fˆrv‰ntat: Y#" + file + L"#ID; First name; Last name; Rank");
+    throw meosException(L"Felaktigt rankingformat i X. F√∂rv√§ntat: Y#" + file + L"#ID; First name; Last name; Rank");
   }
 
   vector<pRunner> runners;

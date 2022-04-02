@@ -1,6 +1,6 @@
-/************************************************************************
+﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -174,7 +174,7 @@ protected:
   struct FucusInfo {
     bool wasTabbed;
     HWND hWnd;
-    FucusInfo() : wasTabbed(false), hWnd(false) {}
+    FucusInfo() : wasTabbed(false), hWnd(0) {}
     FucusInfo(HWND wnd) : wasTabbed(false), hWnd(wnd) {}
   };
 
@@ -225,10 +225,10 @@ protected:
 
   void initCommon(double scale, const wstring &font);
 
-  void processButtonMessage(ButtonInfo &bi, DWORD wParam);
-  void processEditMessage(InputInfo &bi, DWORD wParam);
-  void processComboMessage(ListBoxInfo &bi, DWORD wParam);
-  void processListMessage(ListBoxInfo &bi, DWORD wParam);
+  void processButtonMessage(ButtonInfo &bi, WPARAM wParam);
+  void processEditMessage(InputInfo &bi, WPARAM wParam);
+  void processComboMessage(ListBoxInfo &bi, WPARAM wParam);
+  void processListMessage(ListBoxInfo &bi, WPARAM wParam);
 
   void doEnter();
   void doEscape();
@@ -289,6 +289,8 @@ protected:
   shared_ptr<AnimationData> animationData;
 
   shared_ptr<AutoCompleteInfo> autoCompleteInfo;
+
+  wstring delayedAlert;
 public:
 
   AutoCompleteInfo &addAutoComplete(const string &key);
@@ -363,7 +365,7 @@ public:
   DWORD getBGColor2() const;
   const wstring &getBGImage() const;
 
-  void setAnimationMode(shared_ptr<AnimationData> &mode);
+  void setAnimationMode(const shared_ptr<AnimationData> &mode);
 
   void setAutoScroll(double speed);
   void getAutoScroll(double &speed, double &pos) const;
@@ -531,11 +533,13 @@ public:
   BaseInfo *setInputFocus(const string &id, bool select=false);
   InputInfo *getInputFocus();
 
-  void enableInput(const char *id, bool acceptMissing = false) {setInputStatus(id, true, acceptMissing);}
-  void disableInput(const char *id, bool acceptMissing = false) {setInputStatus(id, false, acceptMissing);}
-  void setInputStatus(const char *id, bool status, bool acceptMissing = false);
-  void setInputStatus(const string &id, bool status, bool acceptMissing = false)
-    {setInputStatus(id.c_str(), status, acceptMissing);}
+  void enableInput(const char *id, bool acceptMissing = false, 
+                   int requireExtraMatch = -1) {setInputStatus(id, true, acceptMissing, requireExtraMatch);}
+  void disableInput(const char *id, bool acceptMissing = false, 
+                    int requireExtraMatch = -1) {setInputStatus(id, false, acceptMissing, requireExtraMatch);}
+  void setInputStatus(const char *id, bool status, bool acceptMissing = false, int requireExtraMatch = -1);
+  void setInputStatus(const string &id, bool status, bool acceptMissing = false, int requireExtraMatch = -1)
+    {setInputStatus(id.c_str(), status, acceptMissing, requireExtraMatch);}
 
   void setTabStops(const string &Name, int t1, int t2=-1);
   void setData(const string &id, DWORD data);
@@ -543,6 +547,8 @@ public:
   void setData(const string &id, const string &data);
 
   void *getData(const string &id) const;
+  int getDataInt(const string &id) const { return int(size_t(getData(id))); }
+
   bool getData(const string &id, string &out) const;
 
 
@@ -569,7 +575,11 @@ public:
 
   void alert(const string &msg) const;
   void alert(const wstring &msg) const;
-  
+  // Alert from main thread (via callback)
+  void delayAlert(const wstring& msg);
+  // Get and clear any delayed alert
+  wstring getDelayedAlert();
+
   void fillDown(){Direction=1;}
   void fillRight(){Direction=0;}
   void fillNone(){Direction=-1;}
@@ -603,7 +613,7 @@ public:
 
   bool hasWidget(const string &id) const;
   
-  const wstring &getText(const char *id, bool acceptMissing = false) const;
+  const wstring &getText(const char *id, bool acceptMissing = false, int requireExtraMatch = -1) const;
   
   BaseInfo &getBaseInfo(const string &id) const {
     return getBaseInfo(id.c_str());
@@ -634,7 +644,7 @@ public:
   BaseInfo *setTextTranslate(const string &id, const wstring &text, bool update=false);
 
 
-  BaseInfo *setText(const char *id, const wstring &text, bool update=false);
+  BaseInfo *setText(const char *id, const wstring &text, bool update=false, int requireExtraMatch = -1);
   BaseInfo *setText(const wchar_t *id, const wstring &text, bool update=false) {
     return setText(narrow(id), text, update);
   }
@@ -760,8 +770,9 @@ public:
 
   void closeWindow();
 
+  int popupMenu(int x, int y, const vector<pair<wstring, int>> &menuItems) const;
+
   void setDBErrorState(bool state);
-  friend int TablesCB(gdioutput *gdi, int type, void *data);
   friend class Table;
   friend gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x, int max_y, bool fixedSize);
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "oExtendedEvent.h"
 #pragma warning (disable: 4512)
 class oSSSQuickStart

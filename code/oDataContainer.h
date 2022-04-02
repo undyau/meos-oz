@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -76,9 +76,9 @@ struct oVariableInt {
 
 class oVariableString {
   public:
-    oVariableString(wchar_t *buff, int size) : data(buff), maxSize(size), strData(0), strIndex(-2) {}
-    oVariableString(vector<wstring> &vec) : data(0), maxSize(0), strData(&vec), strIndex(-1) {}
-    oVariableString(vector<wstring> &vec, int position) : data(0), maxSize(0), strData(&vec), strIndex(position) {}
+    oVariableString(wchar_t *buff, int size) : data(buff), maxSize(size), strData(0), strIndex(-2) { name[0] = 0; }
+    oVariableString(vector<wstring> &vec) : data(0), maxSize(0), strData(&vec), strIndex(-1) { name[0] = 0; }
+    oVariableString(vector<wstring> &vec, int position) : data(0), maxSize(0), strData(&vec), strIndex(position) { name[0] = 0; }
     char name[20];
     bool store(const wchar_t *str);
   private:

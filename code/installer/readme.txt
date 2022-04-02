@@ -1,3 +1,7 @@
+  08 May 2022 3.8.1306.0
+- Merge with MeOS 3.8.1306
+- Shrink text on label printing
+
   15 December 2021 3.7.122.7
 - Fixed regression where autoupload didn't work (sorry folks).
 

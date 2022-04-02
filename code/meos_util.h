@@ -1,6 +1,6 @@
-/************************************************************************
+﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -40,14 +40,14 @@ public:
   std::string &get() {
     if ( (++ix) >= cache.size() )
       ix = 0;
-    int lx = ix;
+    size_t lx = ix;
     return cache[lx];
   }
 
   std::wstring &wget() {
     if ( (++wix) >= wcache.size() )
       wix = 0;
-    int lx = wix;
+    size_t lx = wix;
     return wcache[lx];
   }
 };
@@ -127,14 +127,16 @@ const wstring &makeDash(const wchar_t *t);
 
 wstring formatRank(int rank);
 const string &itos(int i);
-string itos(unsigned long i);
 string itos(unsigned int i);
-string itos(__int64 i);
+string itos(unsigned long i);
+string itos(int64_t i);
+string itos(uint64_t i);
 
 const wstring &itow(int i);
-wstring itow(unsigned long i);
 wstring itow(unsigned int i);
-wstring itow(__int64 i);
+wstring itow(unsigned long i);
+wstring itow(int64_t i);
+wstring itow(uint64_t i);
 
 
 ///Lower case match (filt_lc must be lc)
@@ -156,7 +158,7 @@ int countWords(const wchar_t *p);
 wstring trim(const wstring &s);
 string trim(const string &s);
 
-bool fileExist(const wchar_t *file);
+bool fileExists(const wstring &file);
 
 bool stringMatch(const wstring &a, const wstring &b);
 
@@ -237,6 +239,7 @@ PersonSex interpretSex(const wstring &sex);
 wstring encodeSex(PersonSex sex);
 
 wstring makeValidFileName(const wstring &input, bool strict);
+string makeValidFileName(const string& input, bool strict);
 
 /** Initial capital letter. */
 void capitalize(wstring &str);

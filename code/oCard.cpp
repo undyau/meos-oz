@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -68,7 +68,8 @@ bool oCard::Write(xmlparser &xml)
   xml.startTag("Card");
   xml.write("CardNo", cardNo);
   xml.write("Punches", getPunchString());
-  xml.write("ReadId", readId);
+  xml.write("ReadId", int(readId));
+  xml.write("Voltage", miliVolt);
   xml.write("Id", Id);
   xml.write("Updated", getStamp());
   xml.endTag();
@@ -86,11 +87,14 @@ void oCard::Set(const xmlobject &xo)
     if (it->is("CardNo")){
       cardNo = it->getInt();
     }
+    if (it->is("Voltage")) {
+      miliVolt = it->getInt();
+    }
     else if (it->is("Punches")){
       importPunches(it->getRaw());
     }
     else if (it->is("ReadId")){
-      readId = it->getInt();
+      readId = it->getInt(); // COded as signed int
     }
     else if (it->is("Id")){
       Id = it->getInt();
@@ -334,14 +338,14 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, oCourse *crs) {
       }
     }
 
-    gdi.addItem(name, lang.tl("Mål")+L"\t\u2013", -1);
+    gdi.addItem(name, lang.tl("MÃ¥l")+L"\t\u2013", -1);
   }
 
   if (extra) {
     //Show punches that are not used.
     k=0;
     gdi.addItem(name, L"", -1);
-    gdi.addItem(name, lang.tl("Extra stämplingar"), -1);
+    gdi.addItem(name, lang.tl("Extra stÃ¤mplingar"), -1);
     for (it=punches.begin(); it != punches.end(); ++it) {
       if (!it->isUsed && !(it->isFinish() && showFinish) && !(it->isStart() && showStart))
         gdi.addItem(name, it->getString(), it->tCardIndex);
@@ -397,7 +401,7 @@ void oCard::deletePunch(pPunch pp)
 wstring oCard::getInfo() const
 {
   wchar_t bf[128];
-  swprintf_s(bf, lang.tl("Löparbricka %d").c_str(), cardNo);
+  swprintf_s(bf, lang.tl("LÃ¶parbricka %d").c_str(), cardNo);
   return bf;
 }
 
@@ -542,8 +546,8 @@ pCard oEvent::getCardByNumber(int cno) const
   oCardList::const_reverse_iterator it;
   pCard second = 0;
   for (it=Cards.rbegin(); it != Cards.rend(); ++it){
-    if (it->cardNo==cno) {
-      if (it->getOwner() == 0)
+    if (!it->isRemoved() && it->cardNo==cno) {
+      if (it->getOwner() == nullptr)
         return const_cast<pCard>(&*it);
       else if (second == 0)
         second = const_cast<pCard>(&*it);
@@ -572,14 +576,15 @@ const shared_ptr<Table> &oCard::getTable(oEvent *oe) {
     auto table = make_shared<Table>(oe, 20, L"Brickor", "cards");
 
     table->addColumn("Id", 70, true, true);
-    table->addColumn("Ändrad", 70, false);
+    table->addColumn("Ã„ndrad", 70, false);
 
     table->addColumn("Bricka", 120, true);
     table->addColumn("Deltagare", 200, false);
+    table->addColumn("SpÃ¤nning", 70, false);
 
     table->addColumn("Starttid", 70, false);
-    table->addColumn("Måltid", 70, false);
-    table->addColumn("Stämplingar", 70, true);
+    table->addColumn("MÃ¥ltid", 70, false);
+    table->addColumn("StÃ¤mplingar", 70, true);
 
     table->setTableProp(Table::CAN_DELETE);
     oe->setTable("cards", table);
@@ -621,6 +626,8 @@ void oCard::addTableRow(Table &table) const {
   table.set(row++, it, TID_CARD, getCardNoString(), true, cellAction);
 
   table.set(row++, it, TID_RUNNER, runner, true, cellAction);
+
+  table.set(row++, it, TID_VOLTAGE, getCardVoltage(), false, cellAction);
 
   oPunch *p=getPunchByType(oPunch::PunchStart);
   wstring time;
@@ -724,7 +731,9 @@ void oCard::setupFromRadioPunches(oRunner &r) {
 
 void oCard::changedObject() {
   if (tOwner)
-    tOwner->markClassChanged(-1);
+    tOwner->changedObject();
+
+  oe->sqlCards.changed = true;
 }
 
 int oCard::getNumControlPunches(int startPunchType, int finishPunchType) const {
@@ -777,3 +786,24 @@ void oCard::adaptTimes(int startTime) {
     updateChanged();
   }
 }
+
+wstring oCard::getCardVoltage() const {
+  if (miliVolt == 0)
+    return L"";
+  int vi = miliVolt / 1000;
+  int vd = (miliVolt % 1000)/10;
+
+  wchar_t bf[64];
+  swprintf_s(bf, L"%d.%02d V", vi, vd);
+  return bf;
+}
+
+oCard::BatteryStatus oCard::isCriticalCardVoltage() const {
+  if (miliVolt > 0 && miliVolt < 2445)
+    return BatteryStatus::Bad;
+  else if (miliVolt > 0 && miliVolt <= 2710)
+    return BatteryStatus::Warning;
+
+  return BatteryStatus::OK;
+}
+

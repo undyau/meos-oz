@@ -1,17 +1,7 @@
-// oClass.h: interface for the oClass class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#if !defined(AFX_OCLASS_H__63E948E3_3C06_4404_8E72_2185582FF30F__INCLUDED_)
-#define AFX_OCLASS_H__63E948E3_3C06_4404_8E72_2185582FF30F__INCLUDED_
-
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
-
+﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -40,6 +30,7 @@ class oClass;
 typedef oClass* pClass;
 class oDataInterface;
 class GeneralResult;
+class oRunner;
 
 const int MaxClassId = 1000000;
 
@@ -154,7 +145,7 @@ class oClass : public oBase
 {
 public:
   enum class ClassStatus {Normal, Invalid, InvalidRefund};
-  enum class AllowRecompute {Yes, No };
+  enum class AllowRecompute {Yes, No, NoUseOld };
 
   static void getSplitMethods(vector< pair<wstring, size_t> > &methods);
   static void getSeedingMethods(vector< pair<wstring, size_t> > &methods);
@@ -180,6 +171,8 @@ protected:
     int totalLeaderTimeInputComputed; //Team total including input
 
     int inputTime;
+
+    bool complete = false;
   public:
     LeaderInfo() {
       reset();
@@ -195,6 +188,26 @@ protected:
       inputTime = -1;
       totalLeaderTimeInput = -1;
       totalLeaderTimeInputComputed = -1;
+      complete = false;
+    }
+
+    void updateFrom(const LeaderInfo& i) {
+      if (i.complete) {
+        if (i.bestTimeOnLeg != -1)
+          bestTimeOnLeg = i.bestTimeOnLeg;
+        if (i.bestTimeOnLegComputed != -1)
+          bestTimeOnLegComputed = i.bestTimeOnLegComputed;
+        if (i.totalLeaderTime != -1)
+          totalLeaderTime = i.totalLeaderTime;
+        if (i.totalLeaderTimeComputed != -1)
+          totalLeaderTimeComputed = i.totalLeaderTimeComputed;
+        if (i.inputTime != -1)
+          inputTime = i.inputTime;
+        if (i.totalLeaderTimeInput != -1)
+          totalLeaderTimeInput = i.totalLeaderTimeInput;
+        if (i.totalLeaderTimeInputComputed != -1)
+          totalLeaderTimeInputComputed = i.totalLeaderTimeInputComputed;
+      }
     }
     
     enum class Type {
@@ -208,11 +221,17 @@ protected:
       return inputTime;
     }
     
-    void resetComputed(Type t);
-    
+    void resetComputed(Type t);    
     bool update(int rt, Type t);
     bool updateComputed(int rt, Type t);
     int getLeader(Type t, bool computed) const;
+
+    void setComplete() {
+      complete = true;
+    }
+
+    // For non-team classes, input is the same as total input and computed total input
+    void copyInputToTotalInput();
   };
 
   void updateLeaderTimes() const;
@@ -221,6 +240,7 @@ protected:
 
   mutable int leaderTimeVersion = -1;
   mutable vector<LeaderInfo> tLeaderTime;
+  mutable vector<LeaderInfo> tLeaderTimeOld;
   mutable map<int, int> tBestTimePerCourse;
 
   int tSplitRevision;
@@ -425,7 +445,7 @@ public:
   // Autoassign new bibs
   static void extractBibPatterns(oEvent &oe, map<int, pair<wstring, int> > &patterns);
   pair<int, wstring> getNextBib(map<int, pair<wstring, int> > &patterns); // Version that calculates next free bib from cached data (fast, no gap usage)
-  pair<int, wstring> oClass::getNextBib(); // Version that calculates next free bib (slow, but reuses gaps)
+  pair<int, wstring> getNextBib(); // Version that calculates next free bib (slow, but reuses gaps)
 
   bool usesCourse(const oCourse &crs) const;
   
@@ -681,7 +701,7 @@ public:
   int getEntryFee(const wstring &date, int age) const;
 
   /// Get all class fees
-  vector<pair<wstring, size_t>> oClass::getAllFees() const;
+  vector<pair<wstring, size_t>> getAllFees() const;
 
   // Clear cached data
   void clearCache(bool recalculate);
@@ -712,6 +732,7 @@ public:
   oClass(oEvent *poe);
   oClass(oEvent *poe, int id);
   virtual ~oClass();
+  void clearDuplicate();
 
   friend class oAbstractRunner;
   friend class oEvent;
@@ -724,5 +745,3 @@ public:
 static const oClass::DrawSpecified DrawKeys[4] = { oClass::DrawSpecified::FixedTime,
                                                    oClass::DrawSpecified::Vacant, 
                                                    oClass::DrawSpecified::Extra };
-
-#endif // !defined(AFX_OCLASS_H__63E948E3_3C06_4404_8E72_2185582FF30F__INCLUDED_)

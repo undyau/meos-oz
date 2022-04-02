@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -745,19 +745,26 @@ const wstring &itow(int i) {
   return res;
 }
 
-wstring itow(unsigned int i) {
-  wchar_t bf[32];
-  _ultow_s(i, bf, 10);
-  return bf;
-}
-
 wstring itow(unsigned long i) {
   wchar_t bf[32];
   _ultow_s(i, bf, 10);
   return bf;
 }
 
-wstring itow(__int64 i) {
+
+wstring itow(unsigned int i) {
+  wchar_t bf[32];
+  _ultow_s(i, bf, 10);
+  return bf;
+}
+
+wstring itow(int64_t i) {
+  wchar_t bf[32];
+  _i64tow_s(i, bf, 32, 10);
+  return bf;
+}
+
+wstring itow(uint64_t i) {
   wchar_t bf[32];
   _i64tow_s(i, bf, 32, 10);
   return bf;
@@ -786,12 +793,20 @@ string itos(unsigned long i)
   return bf;
 }
 
-string itos(__int64 i)
+string itos(int64_t i)
 {
   char bf[32];
   _i64toa_s(i, bf, 32, 10);
   return bf;
 }
+
+string itos(uint64_t i)
+{
+  char bf[32];
+  _ui64toa_s(i, bf, 32, 10);
+  return bf;
+}
+
 
 bool filterMatchString(const string &c, const char *filt_lc)
 {
@@ -867,9 +882,9 @@ wstring trim(const wstring &s) {
   else return L"";
 }
 
-bool fileExist(const wchar_t *file)
+bool fileExists(const wstring &file)
 {
-  return GetFileAttributes(file) != INVALID_FILE_ATTRIBUTES;
+  return GetFileAttributes(file.c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
 bool stringMatch(const wstring &a, const wstring &b) {
@@ -1132,70 +1147,70 @@ int toLowerStripped(wchar_t c) {
     for (int i = 0; i < 65536; i++)
       map[i] = i;
 
-    setChar(map, L'Å', L'å');
-    setChar(map, L'Ä', L'ä');
-    setChar(map, L'Ö', L'ö');
+    setChar(map, L'Ã…', L'Ã¥');
+    setChar(map, L'Ã„', L'Ã¤');
+    setChar(map, L'Ã–', L'Ã¶');
 
-    setChar(map, L'É', L'e');
-    setChar(map, L'é', L'e');
-    setChar(map, L'è', L'e');
-    setChar(map, L'È', L'e');
-    setChar(map, L'ë', L'e');
-    setChar(map, L'Ë', L'e');
-    setChar(map, L'ê', L'e');
-    setChar(map, L'Ê', L'e');
+    setChar(map, L'Ã‰', L'e');
+    setChar(map, L'Ã©', L'e');
+    setChar(map, L'Ã¨', L'e');
+    setChar(map, L'Ãˆ', L'e');
+    setChar(map, L'Ã«', L'e');
+    setChar(map, L'Ã‹', L'e');
+    setChar(map, L'Ãª', L'e');
+    setChar(map, L'ÃŠ', L'e');
 
-    setChar(map, L'û', L'u');
-    setChar(map, L'Û', L'u');
-    setChar(map, L'ü', L'u');
-    setChar(map, L'Ü', L'u');
-    setChar(map, L'ú', L'u');
-    setChar(map, L'Ú', L'u');
-    setChar(map, L'ù', L'u');
-    setChar(map, L'Ù', L'u');
+    setChar(map, L'Ã»', L'u');
+    setChar(map, L'Ã›', L'u');
+    setChar(map, L'Ã¼', L'u');
+    setChar(map, L'Ãœ', L'u');
+    setChar(map, L'Ãº', L'u');
+    setChar(map, L'Ãš', L'u');
+    setChar(map, L'Ã¹', L'u');
+    setChar(map, L'Ã™', L'u');
 
-    setChar(map, L'ñ', L'n');
-    setChar(map, L'Ñ', L'n');
+    setChar(map, L'Ã±', L'n');
+    setChar(map, L'Ã‘', L'n');
 
-    setChar(map, L'á', L'a');
-    setChar(map, L'Á', L'a');
-    setChar(map, L'à', L'a');
-    setChar(map, L'À', L'a');
-    setChar(map, L'â', L'a');
-    setChar(map, L'Â', L'a');
-    setChar(map, L'ã', L'a');
-    setChar(map, L'Ã', L'a');
+    setChar(map, L'Ã¡', L'a');
+    setChar(map, L'Ã', L'a');
+    setChar(map, L'Ã ', L'a');
+    setChar(map, L'Ã€', L'a');
+    setChar(map, L'Ã¢', L'a');
+    setChar(map, L'Ã‚', L'a');
+    setChar(map, L'Ã£', L'a');
+    setChar(map, L'Ãƒ', L'a');
 
-    setChar(map, L'ï', L'i');
-    setChar(map, L'Ï', L'i');
-    setChar(map, L'î', L'i');
-    setChar(map, L'Î', L'i');
-    setChar(map, L'í', L'i');
-    setChar(map, L'Í', L'i');
-    setChar(map, L'ì', L'i');
-    setChar(map, L'Ì', L'i');
+    setChar(map, L'Ã¯', L'i');
+    setChar(map, L'Ã', L'i');
+    setChar(map, L'Ã®', L'i');
+    setChar(map, L'ÃŽ', L'i');
+    setChar(map, L'Ã­', L'i');
+    setChar(map, L'Ã', L'i');
+    setChar(map, L'Ã¬', L'i');
+    setChar(map, L'ÃŒ', L'i');
 
-    setChar(map, L'ó', L'o');
-    setChar(map, L'Ó', L'o');
-    setChar(map, L'ò', L'o');
-    setChar(map, L'Ò', L'o');
-    setChar(map, L'õ', L'o');
-    setChar(map, L'Õ', L'o');
-    setChar(map, L'ô', L'o');
-    setChar(map, L'Ô', L'o');
+    setChar(map, L'Ã³', L'o');
+    setChar(map, L'Ã“', L'o');
+    setChar(map, L'Ã²', L'o');
+    setChar(map, L'Ã’', L'o');
+    setChar(map, L'Ãµ', L'o');
+    setChar(map, L'Ã•', L'o');
+    setChar(map, L'Ã´', L'o');
+    setChar(map, L'Ã”', L'o');
 
-    setChar(map, L'ý', L'y');
-    setChar(map, L'Ý', L'Y');
-    setChar(map, L'ÿ', L'y');
+    setChar(map, L'Ã½', L'y');
+    setChar(map, L'Ã', L'Y');
+    setChar(map, L'Ã¿', L'y');
 
-    setChar(map, L'Æ', L'ä');
-    setChar(map, L'æ', L'ä');
+    setChar(map, L'Ã†', L'Ã¤');
+    setChar(map, L'Ã¦', L'Ã¤');
 
-    setChar(map, L'Ø', L'ö');
-    setChar(map, L'ø', L'ö');
+    setChar(map, L'Ã˜', L'Ã¶');
+    setChar(map, L'Ã¸', L'Ã¶');
 
-    setChar(map, L'Ç', L'c');
-    setChar(map, L'ç', L'c');
+    setChar(map, L'Ã‡', L'c');
+    setChar(map, L'Ã§', L'c');
   }
   int a = map[c];
   return a;
@@ -1395,7 +1410,7 @@ static void decomposeClassName(const wstring &name, vector<wstring> &dec) {
   sort(dec.begin(), dec.end());
 }
 
-/** Matches H21 L with H21 Lång and H21L 
+/** Matches H21 L with H21 LÃ¥ng and H21L 
  but not Violet with Violet Court, which is obviously wrong.
  */
 bool compareClassName(const wstring &a, const wstring &b)
@@ -1785,23 +1800,23 @@ wstring makeValidFileName(const wstring &input, bool strict) {
         
         if (b >= 'a' && b <= 'z')
           b = b;
-        else if ( b == L'ö')
+        else if ( b == L'Ã¶')
           b = 'o';
-        else if (b == L'ä' || b == L'å' || b== L'à' || b == L'á' || b == L'â' || b == L'ã' || b == L'æ')
+        else if (b == L'Ã¤' || b == L'Ã¥' || b== L'Ã ' || b == L'Ã¡' || b == L'Ã¢' || b == L'Ã£' || b == L'Ã¦')
           b = 'a';
-        else if (b == L'ç')
+        else if (b == L'Ã§')
           b = 'c';
-        else if (b == L'è' || b == L'é' || b == L'ê' || b == L'ë')
+        else if (b == L'Ã¨' || b == L'Ã©' || b == L'Ãª' || b == L'Ã«')
           b = 'e';
-        else if (b == L'ð')
+        else if (b == L'Ã°')
           b = 't';
-        else if (b == L'ï' || b == L'ì' || b == L'ï' || b == L'î' || b == L'í')
+        else if (b == L'Ã¯' || b == L'Ã¬' || b == L'Ã¯' || b == L'Ã®' || b == L'Ã­')
           b = 'i';
-        else if (b == L'ò' || b == L'ó' || b == L'ô' || b == L'õ' || b == L'ø')
+        else if (b == L'Ã²' || b == L'Ã³' || b == L'Ã´' || b == L'Ãµ' || b == L'Ã¸')
           b = 'o';
-        else if (b == L'ù' || b == L'ú' || b == L'û' || b == L'ü')
+        else if (b == L'Ã¹' || b == L'Ãº' || b == L'Ã»' || b == L'Ã¼')
           b = 'u';
-        else if (b == L'ý')
+        else if (b == L'Ã½')
           b = 'y';
         else
           b = '-';
@@ -1820,6 +1835,60 @@ wstring makeValidFileName(const wstring &input, bool strict) {
   }
   return out;
 }
+
+
+string makeValidFileName(const string& input, bool strict) {
+  string out;
+  out.reserve(input.size());
+
+  if (strict) {
+    for (size_t k = 0; k < input.length(); k++) {
+      char b = input[k];
+      if ((b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_' || b == '.')
+        out.push_back(b);
+      else if (b == ' ' || b == ',')
+        out.push_back('_');
+      else {
+        b = toLowerStripped(b);
+
+        if (b >= 'a' && b <= 'z')
+          b = b;
+        else if (b == 'Ã¶')
+          b = 'o';
+        else if (b == 'Ã¤' || b == 'Ã¥' || b == 'Ã ' || b == 'Ã¡' || b == 'Ã¢' || b == 'Ã£' || b == 'Ã¦')
+          b = 'a';
+        else if (b == 'Ã§')
+          b = 'c';
+        else if (b == 'Ã¨' || b == 'Ã©' || b == 'Ãª' || b == 'Ã«')
+          b = 'e';
+        else if (b == 'Ã°')
+          b = 't';
+        else if (b == 'Ã¯' || b == 'Ã¬' || b == 'Ã¯' || b == 'Ã®' || b == 'Ã­')
+          b = 'i';
+        else if (b == 'Ã²' || b == 'Ã³' || b == 'Ã´' || b == 'Ãµ' || b == 'Ã¸')
+          b = 'o';
+        else if (b == 'Ã¹' || b == 'Ãº' || b == 'Ã»' || b == 'Ã¼')
+          b = 'u';
+        else if (b == 'Ã½')
+          b = 'y';
+        else
+          b = '-';
+
+        out.push_back(b);
+      }
+    }
+  }
+  else {
+    for (size_t k = 0; k < input.length(); k++) {
+      char b = input[k];
+      if (b < 32 || b == '*' || b == '?' || b == ':' || b == '/' || b == '\\')
+        b = '_';
+      out.push_back(b);
+    }
+  }
+  return out;
+}
+
 
 void capitalize(wstring &str) {
   if (str.length() > 0) {
@@ -2211,7 +2280,7 @@ void checkWriteAccess(const wstring &file) {
     wchar_t absPath[260];
     _wfullpath(absPath, file.c_str(), 260);
 
-    throw meosException(wstring(L"Du saknar behörighet att skriva till 'X'.#") + absPath);
+    throw meosException(wstring(L"Du saknar behÃ¶righet att skriva till 'X'.#") + absPath);
   }
   CloseHandle(h);
 }
@@ -2219,4 +2288,9 @@ void checkWriteAccess(const wstring &file) {
 int compareStringIgnoreCase(const wstring &a, const wstring &b) {
   return CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, a.c_str(), a.length(),
                        b.c_str(), b.length()) - CSTR_EQUAL;
+}
+
+const char* meosException::narrow(const wstring& msg) {
+  static string nmsg(msg.begin(), msg.end());
+  return nmsg.c_str();
 }

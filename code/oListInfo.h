@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -106,6 +106,14 @@ enum EPostType
   lRunnerRogainingPointGross,
   lRunnerTimeAdjustment,
   lRunnerPointAdjustment,
+  lRunnerCardVoltage,
+
+  lRunnerStageTime,
+  lRunnerStageStatus,
+  lRunnerStageTimeStatus,
+  lRunnerStagePlace,
+  lRunnerStagePoints,
+  lRunnerStageNumber,
 
   lRunnerUMMasterPoint,
   lRunnerTimePlaceFixed,
@@ -264,6 +272,7 @@ enum EFilterList
   EFilterAnyResult, // With any (radio) punch on a leg
   EFilterAPIEntry, // Entry via API
   EFilterWrongFee,
+  EFilterIncludeNotParticipating,
   _EFilterMax
 };
 
@@ -308,6 +317,7 @@ struct oPrintPost {
     return *this;
   }
   int fixedWidth;
+  bool useStrictWidth = false; // Crop text
   bool doMergeNext;
   mutable const oPrintPost *mergeWithTmp; // Merge text with this output
 };
@@ -586,7 +596,7 @@ public:
                       const set<int> &clsSel,
                       const vector< pair<EPostType, wstring> > &typeFormats,
                       gdiFonts font,
-                      const wchar_t *fontFace = 0,
+                      const wchar_t *fontFace = nullptr,
                       bool large = false, 
                       int minSize = 0) const;
 
@@ -596,7 +606,7 @@ public:
                       EPostType type, 
                       wstring formats,
                       gdiFonts font,
-                      const wchar_t *fontFace = 0,
+                      const wchar_t *fontFace = nullptr,
                       bool large = false, 
                       int minSize = 0) const {
     vector< pair<EPostType, wstring> > typeFormats(1, make_pair(type, formats));

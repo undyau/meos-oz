@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -200,7 +200,7 @@ vector<wstring> oCourse::getCourseReadable(int limit) const
   if (needFinish && !useLastAsFinish()) {
     if (!str.empty())
       str += L"-";
-    str += lang.tl("MÂl").substr(0,1);
+    str += lang.tl("M√•l").substr(0,1);
   }
   if (!str.empty()) {
     if (str.length()<5 && !res.empty())
@@ -247,7 +247,7 @@ pControl oCourse::doAddControl(int Id)
     return c;
   }
   else
-    throw meosException("Fˆr mÂnga kontroller.");
+    throw meosException("F√∂r m√•nga kontroller.");
 }
 
 void oCourse::splitControls(const string &ctrls, vector<int> &nr) {
@@ -388,7 +388,7 @@ bool oCourse::fillCourse(gdioutput &gdi, const string &name)
     if (k == startIx)
       c += L" (" + lang.tl("Start") + L")";
     else if (k == finishIx)
-      c += L" (" + lang.tl("MÂl") + L")";
+      c += L" (" + lang.tl("M√•l") + L")";
 
     int multi = Controls[k]->getNumMulti();
     int submulti = 0;
@@ -412,7 +412,7 @@ bool oCourse::fillCourse(gdioutput &gdi, const string &name)
     offset += submulti;
   }
   if (finishIx == -1)
-    gdi.addItem(name, lang.tl("MÂl"), -1);
+    gdi.addItem(name, lang.tl("M√•l"), -1);
 
   return true;
 }
@@ -455,7 +455,8 @@ int oCourse::distance(const SICard &card)
   for (int k=0;k<nControls;k++) {
     if (Controls[k]->isRogaining(hasRogaining()) || 
         Controls[k]->getStatus() == oControl::StatusBad || 
-        Controls[k]->getStatus() == oControl::StatusOptional)
+        Controls[k]->getStatus() == oControl::StatusOptional ||
+        Controls[k]->getStatus() == oControl::StatusBadNoTiming)
       continue;
 
     if (Controls[k]->getStatus() == oControl::StatusMultiple) {
@@ -826,7 +827,7 @@ double oCourse::getPartOfCourse(int start, int end) const
 const wstring &oCourse::getControlOrdinal(int controlIndex) const
 {
   if ( (controlIndex + 1 == nControls && useLastAsFinish())  || controlIndex == nControls)
-    return lang.tl("MÂl");
+    return lang.tl("M√•l");
 
   if (oe->dataRevision != cacheDataRevision)
     clearCache();
@@ -938,7 +939,7 @@ wstring oCourse::getCourseProblems() const
     }
 
     if (max_p < min_point) {
-      return L"Banans kontroller ger fˆr fÂ po‰ng fˆr att t‰cka po‰ngkravet.";
+      return L"Banans kontroller ger f√∂r f√• po√§ng f√∂r att t√§cka po√§ngkravet.";
     }
   }
   return L"";
@@ -1034,7 +1035,7 @@ void oCourse::setCommonControl(int ctrlId) {
         found++;
     }
     if (found == 0)
-      throw meosException("Kontroll X finns inte pÂ banan#" + itos(ctrlId));
+      throw meosException("Kontroll X finns inte p√• banan#" + itos(ctrlId));
   }
   getDI().setInt("CControl", ctrlId);
 }
@@ -1073,8 +1074,8 @@ pCourse oCourse::getAdapetedCourse(const oCard &card, oCourse &tmpCourse, int &n
   }
 
   map<int, vector< pair<int,int> > > preferences;
-  for (size_t k = 0; k < punchSequence.size(); k++) {
-    for (size_t j = 0; j < loopKeys.size(); j++) {
+  for (int k = 0; k < punchSequence.size(); k++) {
+    for (int j = 0; j < loopKeys.size(); j++) {
       int v = matchLoopKey(punchSequence[k], loopKeys[j]);
       if (v < 1000)
         preferences[v].push_back(make_pair(k, j));
@@ -1324,6 +1325,7 @@ bool oCourse::constructLoopKeys(int cc, vector< vector<pControl> > &loopKeys, ve
 void oCourse::changedObject() {
   if (oe)
     oe->globalModification = true;
+  oe->sqlCourses.changed = true;
 }
 
 int oCourse::getCourseControlId(int controlIx) const {
@@ -1453,7 +1455,7 @@ const shared_ptr<Table> &oCourse::getTable(oEvent *oe) {
     auto table = make_shared<Table>(oe, 20, L"Banor", "courses");
 
     table->addColumn("Id", 70, true, true);
-    table->addColumn("ƒndrad", 70, false);
+    table->addColumn("√Ñndrad", 70, false);
     table->addColumn("Namn", 200, false);
     table->addColumn("Startande", 70, true);
     table->addColumn("Klasser", 200, false);

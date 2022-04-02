@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -64,7 +64,7 @@ SI_StationInfo::SI_StationInfo()
   localZeroTime=0;
 }
 
-SportIdent::SportIdent(HWND hWnd, DWORD Id)
+SportIdent::SportIdent(HWND hWnd, DWORD Id, bool readVoltage) : readVoltage(readVoltage)
 {
   ClassId=Id;
   hWndNotify=hWnd;
@@ -1301,6 +1301,7 @@ void SportIdent::getSI9DataExt(HANDLE hComm)
   BYTE b[128*5];
   memset(b, 0, 128*5);
   BYTE c[16];
+  int miliVolt = 0;
 //	STX, 0xE1, 0x01, BN, CRC1,
 //CRC0, ETX
   debugLog(L"STARTREAD9 EXT-");
@@ -1309,7 +1310,7 @@ void SportIdent::getSI9DataExt(HANDLE hComm)
   int blocks_10_11_SIAC[5]={0,4,5,6,7};
   int limit = 1;
   int *blocks = blocks_8_9_p_t;
-
+  bool readBattery = false;
   DWORD written=0;
 
   for(int k=0; k < limit; k++){
@@ -1339,13 +1340,17 @@ void SportIdent::getSI9DataExt(HANDLE hComm)
       if (bf[0]==STX && bf[1]==0xEf) {
         if (checkCRC(bf+1, 200)) {
           memcpy(b+k*128, bf+6, 128);
-
         if (k == 0) {
           int series = b[24] & 15;
           if (series == 15) {
             int nPunch = min(int(b[22]), 128);
             blocks = blocks_10_11_SIAC;
             limit = 1 + (nPunch+31) / 32;
+
+            int cardNo = GetExtCardNumber(b);
+            if (cardNo > 8000000 && cardNo < 9000000) {
+              readBattery = readVoltage;
+            }
           }
           else {
             limit = 2; // Card 8, 9, p, t
@@ -1365,14 +1370,97 @@ void SportIdent::getSI9DataExt(HANDLE hComm)
     }
   }
 
+  if (readBattery) {
+    c[0] = STX;
+    c[1] = 0xEA;
+    c[2] = 0x05;
+    c[3] = 0x7E;
+    c[4] = 0x05;
+    c[5] = 0x05;
+    c[6] = 0x05;
+    c[7] = 0x05;
+    c[10] = ETX;
+    setCRC(c + 1);
+
+    written = 0;
+    WriteFile(hComm, c, 11, &written, NULL); // Measure batt voltage
+
+    if (written == 11) {
+      BYTE bf[256];
+      int read = readBytes(bf, 9, hComm);
+      if (read == 0) {
+        debugLog(L"TIMING");
+        Sleep(300);
+        read = readBytes(bf, 9, hComm);
+      }
+
+      if (read == 9) {
+        /*for (int i = 0; i < read; i++) {
+          char xx[20];
+          sprintf_s(xx, "%02x ", bf[i]);
+          OutputDebugStringA(xx);
+        }
+        OutputDebugStringA("\n\n");*/
+
+        c[0] = STX;
+        c[1] = 0xEF;
+        c[2] = 0x01;
+        c[3] = 3;
+        setCRC(c + 1);
+        c[6] = ETX;
+
+        written = 0;
+        WriteFile(hComm, c, 7, &written, NULL);
+        
+        memset(bf, 0, 256);
+        int read = readBytes(bf, 128 + 9, hComm);
+        if (read == 0) {
+          debugLog(L"TIMING");
+          Sleep(300);
+          read = readBytes(bf, 128 + 9, hComm);
+        }
+
+        if (bf[0] == STX && bf[1] == 0xEf) {
+          /*
+          for (int i = 0; i < read; i++) {
+            char xx[20];
+            sprintf_s(xx, "%02x ", bf[i]);
+            OutputDebugStringA(xx);
+            if (i%20==19)
+              OutputDebugStringA("\n");
+          }
+          OutputDebugStringA("\n\n");
+          */
+          if (checkCRC(bf + 1, 200)) {
+            BYTE battVoltageRow = bf[77];
+            double voltage = 1.9 + (battVoltageRow * 0.09);
+            miliVolt = int(1000 * voltage);
+
+            if (miliVolt > 5000)
+              miliVolt = 900; // Not allowed
+            /*char xx[30];
+            sprintf_s(xx, "V = %f\n\n", voltage);
+            OutputDebugStringA(xx);*/
+          }
+        }
+      }
+
+    }
+    //02 EA 05 7E 05 05 05 05 B2 31 03
+
+  }
+
+
   c[0]=ACK;
   WriteFile(hComm, c, 1, &written, NULL);
 
   debugLog(L"-ACK-");
 
   SICard card(ConvertedTimeStatus::Hour24);
-  if (getCard9Data(b, card))
+  if (getCard9Data(b, card)) {
+    card.miliVolt = miliVolt;
     addCard(card);
+  }
 }
 
 bool SportIdent::readSI6Block(HANDLE hComm, BYTE *data)
@@ -1588,7 +1676,7 @@ bool SportIdent::getCard5Data(BYTE *data, SICard &card)
   return true;
 }
 
-DWORD SportIdent::GetExtCardNumber(BYTE *data) const {
+DWORD SportIdent::GetExtCardNumber(const BYTE *data) const {
   DWORD cnr = 0;
   BYTE *p = (BYTE *)&cnr;
   p[0] = data[27];
@@ -1820,7 +1908,7 @@ void SICard::analyseHour12Time(DWORD zeroTime) {
 void SIPunch::analyseHour12Time(DWORD zeroTime) {
   if (Code != -1 && Time>=0 && Time <=12*3600) {
     if (zeroTime < 12 * 3600) {
-      //Förmiddag
+      //FÃ¶rmiddag
       if (Time < zeroTime)
         Time += 12 * 3600; //->Eftermiddag
     }
@@ -1835,97 +1923,49 @@ void SIPunch::analyseHour12Time(DWORD zeroTime) {
   }
 }
 
-void SportIdent::EnumrateSerialPorts(list<int> &ports)
+void SportIdent::EnumrateSerialPorts(list<int>& ports)
 {
   //Make sure we clear out any elements which may already be in the array
   ports.clear();
 
-  //Determine what OS we are running on
-  OSVERSIONINFO osvi;
-  osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-  BOOL bGetVer = GetVersionEx(&osvi);
-
-  //On NT use the QueryDosDevice API
-  if (bGetVer && (osvi.dwPlatformId == VER_PLATFORM_WIN32_NT))
-  {
     //Use QueryDosDevice to look for all devices of the form COMx. This is a better
     //solution as it means that no ports have to be opened at all.
-    TCHAR szDevices[65535];
-    DWORD dwChars = QueryDosDevice(NULL, szDevices, 65535);
-    if (dwChars)
+  TCHAR szDevices[65535];
+  DWORD dwChars = QueryDosDevice(NULL, szDevices, 65535);
+  if (dwChars)
+  {
+    int i = 0;
+
+    for (;;)
     {
-      int i=0;
+      //Get the current device name
+      TCHAR* pszCurrentDevice = &szDevices[i];
 
-      for (;;)
+      //If it looks like "COMX" then
+      //add it to the array which will be returned
+      int nLen = _tcslen(pszCurrentDevice);
+      if (nLen > 3 && _tcsnicmp(pszCurrentDevice, _T("COM"), 3) == 0)
       {
-        //Get the current device name
-        TCHAR* pszCurrentDevice = &szDevices[i];
+        //Work out the port number
+        int nPort = _ttoi(&pszCurrentDevice[3]);
+        ports.push_front(nPort);
+      }
 
-        //If it looks like "COMX" then
-        //add it to the array which will be returned
-        int nLen = _tcslen(pszCurrentDevice);
-        if (nLen > 3 && _tcsnicmp(pszCurrentDevice, _T("COM"), 3) == 0)
-        {
-          //Work out the port number
-          int nPort = _ttoi(&pszCurrentDevice[3]);
-          ports.push_front(nPort);
-        }
-
-        // Go to next NULL character
-        while(szDevices[i] != _T('\0'))
-          i++;
-
-        // Bump pointer to the next string
+      // Go to next NULL character
+      while (szDevices[i] != _T('\0'))
         i++;
 
-        // The list is double-NULL terminated, so if the character is
-        // now NULL, we're at the end
-        if (szDevices[i] == _T('\0'))
-          break;
-      }
-    }
-    //else
-    //  TRACE(_T("Failed in call to QueryDosDevice, GetLastError:%d\n"), GetLastError());
-  }
-  else
-  {
-    //On 95/98 open up each port to determine their existence
+      // Bump pointer to the next string
+      i++;
 
-    //Up to 255 COM ports are supported so we iterate through all of them seeing
-    //if we can open them or if we fail to open them, get an access denied or general error error.
-    //Both of these cases indicate that there is a COM port at that number.
-    for (UINT i=1; i<256; i++)
-    {
-      //Form the Raw device name
-      wchar_t sPort[256];
-
-      swprintf_s(sPort, 256, L"\\\\.\\COM%d", i);
-
-      //Try to open the port
-      BOOL bSuccess = FALSE;
-      HANDLE hPort = ::CreateFile(sPort, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
-      if (hPort == INVALID_HANDLE_VALUE)
-      {
-        DWORD dwError = GetLastError();
-
-        //Check to see if the error was because some other app had the port open or a general failure
-        if (dwError == ERROR_ACCESS_DENIED || dwError == ERROR_GEN_FAILURE)
-          bSuccess = TRUE;
-      }
-      else
-      {
-        //The port was opened successfully
-        bSuccess = TRUE;
-
-        //Don't forget to close the port, since we are going to do nothing with it anyway
-        CloseHandle(hPort);
-      }
-
-      //Add the port number to the array which will be returned
-      if (bSuccess)
-        ports.push_front(i);
+      // The list is double-NULL terminated, so if the character is
+      // now NULL, we're at the end
+      if (szDevices[i] == _T('\0'))
+        break;
     }
   }
+
+
 }
 
 
@@ -2074,7 +2114,7 @@ void checkport_si_thread(void *ptr)
   int *port=(int *)ptr;
   wchar_t bf[16];
   swprintf_s(bf, 16, L"COM%d", *port);
-  SportIdent si(NULL, *port);
+  SportIdent si(NULL, *port, false);
 
   if (!si.openCom(bf))
     *port=0; //No SI found here
@@ -2176,8 +2216,8 @@ void SportIdent::getInfoString(const wstring &com, vector<wstring> &infov)
       info += makeDash(L"-") + itow(k+1);
 
     const SI_StationData &da = si->data[k];
-    if (da.extended) info+=lang.tl(L": Utökat protokoll. ");
-    else info+=lang.tl(L": Äldre protokoll. ");
+    if (da.extended) info+=lang.tl(L": UtÃ¶kat protokoll. ");
+    else info+=lang.tl(L": Ã„ldre protokoll. ");
 
     switch(da.stationMode){
       case 2:
@@ -2185,16 +2225,16 @@ void SportIdent::getInfoString(const wstring &com, vector<wstring> &infov)
         info+=lang.tl(L"Kontrol");
         break;
       case 4:
-        info+=lang.tl(L"Mål");
+        info+=lang.tl(L"MÃ¥l");
         break;
       case 3:
         info+=lang.tl(L"Start");
         break;
       case 5:
-        info+=lang.tl(L"Läs brickor");
+        info+=lang.tl(L"LÃ¤s brickor");
         break;
       case 7:
-        info+=lang.tl(L"Töm");
+        info+=lang.tl(L"TÃ¶m");
         break;
       case 10:
         info+=lang.tl(L"Check");
@@ -2203,7 +2243,7 @@ void SportIdent::getInfoString(const wstring &com, vector<wstring> &infov)
         info+=lang.tl(L"SRR Dongle ") + (da.radioChannel == 0? lang.tl(L"red channel.") : lang.tl(L"blue channel."));
         break;
       default:
-        info+=lang.tl(L"Okänd funktion");
+        info+=lang.tl(L"OkÃ¤nd funktion");
     }
 
     if (da.stationNumber) {
@@ -2213,9 +2253,9 @@ void SportIdent::getInfoString(const wstring &com, vector<wstring> &infov)
     }
 
     info += lang.tl(L" Kommunikation: ");
-    if (da.autoSend) info+=lang.tl(L"skicka stämplar.");
+    if (da.autoSend) info+=lang.tl(L"skicka stÃ¤mplar.");
     else if (da.handShake) info+=lang.tl(L"handskakning.");
-    else info+=lang.tl(L"[VARNING] ingen/okänd.");
+    else info+=lang.tl(L"[VARNING] ingen/okÃ¤nd.");
 
     infov.push_back(info);
   }
@@ -2361,7 +2401,7 @@ vector<string> SICard::logHeader()
   return log;
 }
 
-unsigned SICard::calculateHash() const {
+unsigned int SICard::calculateHash() const {
   unsigned h = nPunch * 100000 + FinishPunch.Time;
   for (unsigned i = 0; i < nPunch; i++) {
     h = h * 31 + Punch[i].Code;

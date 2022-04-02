@@ -1,6 +1,6 @@
-/************************************************************************
+﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -125,7 +125,7 @@ bool oBase::synchronize(bool writeOnly)
     oe->dataRevision++;
   }
   transientChanged = false;
-  if (oe && oe->HasDBConnection && (changed || !writeOnly)) {
+  if (oe && oe->hasDBConnection() && (changed || !writeOnly)) {
     correctionNeeded = false;
     if (localObject)
       return false;
@@ -133,7 +133,7 @@ bool oBase::synchronize(bool writeOnly)
   }
   else {
     if (changed) {
-      if (!oe->HasPendingDBConnection) // True if we are trying to reconnect to mysql
+      if (!oe->hasPendingDBConnection) // True if we are trying to reconnect to mysql
         changed = false;
     }
   }
@@ -277,4 +277,18 @@ void oBase::makeQuietChangePermanent() {
 void oBase::update(SqlUpdated &info) const {
   info.updated = max(sqlUpdated, info.updated);
   info.counter = max(counter, info.counter);
+}
+
+void oBase::clearDuplicateBase(int newId) {
+  Id = newId;
+  Modified.update();
+  sqlUpdated = ""; //SQL TIMESTAMP
+  myReference.reset();
+  counter = 0;
+  Removed = false;
+  implicitlyAdded = false;
+  addedToEvent = false;
+  changed = true;
+  transientChanged = false;
+  localObject = false;
 }

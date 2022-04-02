@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -50,7 +50,6 @@ class Position
   void update(int ix, const string &newname, int width, bool alignBlock, bool alignLock);
 
 public:
-
   int getWidth() const;
 
   bool postAdjust();
@@ -86,7 +85,10 @@ private:
   EPostType alignType;
   int leg;
   int minimalIndent;
-  bool alignBlock; // True if the next item should also be align (table style block)
+  bool alignBlock; //Legacy: not used. True if the next item should also be align (table style block)
+  
+  bool packPrevious = false;
+  bool limitWidth = false;
   int blockWidth;
   bool mergeWithPrevious;
   gdiFonts font;
@@ -104,6 +106,9 @@ public:
   MetaListPost &align(bool alignBlock_ = true) {return align(lAlignNext, alignBlock_);}
   MetaListPost &alignText(const wstring &t) {alignWithText = t; return *this;}
   MetaListPost &mergePrevious(bool m_=true) {mergeWithPrevious = m_; return *this;}
+  MetaListPost &limitBlockWidth(bool lim = true) { limitWidth = lim; return *this; }
+  MetaListPost &packWithPrevious(bool pack = true) { packPrevious = pack; return *this; }
+
 
   MetaListPost &indent(int ind) {minimalIndent = ind; return *this;}
 
@@ -111,6 +116,7 @@ public:
 
   const wstring &getType() const;
   MetaListPost &setType(EPostType type_) {type = type_; return *this;}
+  EPostType getTypeRaw() const { return type; }
 
   const wstring &getText() const {return text;}
   const string &getResultModule() const {return resultModule;}
@@ -120,10 +126,12 @@ public:
   void setLeg(int leg_) {leg = leg_;}
 
   int getMinimalIndent() const {return minimalIndent;}
-  bool getAlignBlock() const {return alignBlock;}
+  //bool getAlignBlock() const {return alignBlock;}
   bool isMergePrevious() const {return mergeWithPrevious;}
 
   int getBlockWidth() const {return blockWidth;}
+  bool getLimitBlockWidth() const { return limitWidth; }
+  bool getPackWithPrevious() const { return packPrevious; }
 
   const string &getFont() const;
   void setFont(gdiFonts font_) {font = font_;}
@@ -151,6 +159,8 @@ struct DynamicResultRef {
   wstring getAnnotation() const;
 };
 
+struct AutoCompleteRecord;
+
 class MetaList {
 private:
 
@@ -170,7 +180,7 @@ private:
     }
   };
 
-  vector< vector< vector<MetaListPost> > > data;
+  vector<vector<vector<MetaListPost>>> data;
   vector<FontInfo> fontFaces;
 
   wstring listName;
@@ -196,9 +206,7 @@ private:
   enum ListIndex {MLHead = 0, MLSubHead = 1, MLList = 2, MLSubList=3};
   MetaListPost &add(ListIndex ix, const MetaListPost &post);
   void addRow(int ix);
-  wstring encode(const wstring &input) const;
-  bool isBreak(int x) const;
-
+  
   static map<EPostType, wstring> typeToSymbol;
   static map<wstring, EPostType> symbolToType;
 
@@ -226,12 +234,29 @@ private:
   int getResultModuleIndex(oEvent *oe, oListInfo &li, const MetaListPost &lp) const;
   mutable map<string, int> resultToIndex;
 
+  static bool isBreak(int x);
+
 public:
+
+  static wstring encode(EPostType type, const wstring &input, bool &foundSymbol);
+  static const wstring &fromResultModuleNumber(const wstring &in, int nr, wstring &out);
+
+  static void getAutoComplete(const wstring &w, vector<AutoCompleteRecord> &records);
+
   MetaList();
   virtual ~MetaList() {}
 
-  bool supportClasses() const;
+  static constexpr bool isAllStageType(EPostType type) {
+    return type == lRunnerStagePlace || type == lRunnerStageStatus ||
+      type == lRunnerStageTime || type == lRunnerStageTimeStatus ||
+      type == lRunnerStagePoints || type == lRunnerStageNumber;
+  }
 
+  static constexpr bool isResultModuleOutput(EPostType type) {
+    return type == lResultModuleNumber || type == lResultModuleTime ||
+      type == lResultModuleTimeTeam || type == lResultModuleNumberTeam;
+  }
+  bool supportClasses() const;
   const wstring &getListInfo(const oEvent &oe) const;
   void clearTag() {tag.clear();}
 
@@ -330,6 +355,8 @@ public:
   vector< vector<MetaListPost> > &getSubList() {return data[MLSubList];}
   vector< vector<MetaListPost> > &getHead() {return data[MLHead];}
   vector< vector<MetaListPost> > &getSubHead() {return data[MLSubHead];}
+
+  int getNumPostsOnLine(int groupIx, int lineIx) const { return data[groupIx][lineIx].size(); }
 
   void newListRow() {addRow(MLList);}
   void newSubListRow() {addRow(MLSubList);}

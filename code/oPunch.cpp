@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -53,7 +53,7 @@ oPunch::~oPunch()
 
 wstring oPunch::getInfo() const
 {
-  return L"Stämpling "+oe->gdiBase().widen(codeString());
+  return L"StÃ¤mpling "+oe->gdiBase().widen(codeString());
 }
 
 string oPunch::codeString() const
@@ -109,7 +109,7 @@ wstring oPunch::getSimpleString() const
   if (Type==oPunch::PunchStart)
     return lang.tl(L"starten (X)#" + time);
   else if (Type==oPunch::PunchFinish)
-    return lang.tl(L"målet (X)#" + time);
+    return lang.tl(L"mÃ¥let (X)#" + time);
   else if (Type==oPunch::PunchCheck)
     return lang.tl(L"check (X)#" + time);
   else
@@ -186,7 +186,7 @@ const wstring &oPunch::getType(int t) {
   if (t==oPunch::PunchStart)
     return lang.tl("Start");
   else if (t==oPunch::PunchFinish)
-    return lang.tl("Mål");
+    return lang.tl("MÃ¥l");
   else if (t==oPunch::PunchCheck)
     return lang.tl("Check");
   else if (t>10 && t<10000) {

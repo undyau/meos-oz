@@ -1,4 +1,4 @@
-// oCard.h: interface for the oCard class.
+﻿// oCard.h: interface for the oCard class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -53,9 +53,11 @@ class oCard : public oBase {
 protected:
   oPunchList punches;
   int cardNo;
-  DWORD readId; //Identify a specific read-out
+  int miliVolt = 0; // Measured voltage of SIAC, if not zero.
 
-  const static DWORD ConstructedFromPunches = 1;
+  unsigned int readId; //Identify a specific read-out
+
+  const static int ConstructedFromPunches = 1;
 
   pRunner tOwner;
   oPunch *getPunch(const pPunch punch);
@@ -70,6 +72,15 @@ protected:
   mutable string punchString;
 
 public:
+
+  void setMeasuredVoltage(int miliVolt) { this->miliVolt = miliVolt; }
+  wstring getCardVoltage() const;
+  enum class BatteryStatus {
+    OK,
+    Warning,
+    Bad
+  };
+  BatteryStatus isCriticalCardVoltage() const;
 
   static const shared_ptr<Table> &getTable(oEvent *oe);
 

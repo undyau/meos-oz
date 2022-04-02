@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -119,7 +119,7 @@ HWND hMainTab=NULL;
 
 list<TabObject> *tabList = nullptr;
 void scrollVertical(gdioutput *gdi, int yInc, HWND hWnd);
-static int currentFocusIx = 0;
+static size_t currentFocusIx = 0;
 
 void resetSaveTimer() {
   if (autoTask)
@@ -199,7 +199,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   int       nCmdShow)
 {
   hInst = hInstance; // Store instance handle in our global variable
-  
+    
   atexit(dumpLeaks);	//
   _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -295,7 +295,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     return 0;
   }
 
-  if (fileExist(settings)) {
+  if (fileExists(settings)) {
     gEvent->loadProperties(settings);
   }
   else {
@@ -304,24 +304,25 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     getUserFile(oldSettings, L"meospref.xml");
     gEvent->loadProperties(oldSettings);
   }
-  
+  gEvent->clear();
+
   lang.get().addLangResource(L"English", L"104");
   lang.get().addLangResource(L"Svenska", L"103");
   lang.get().addLangResource(L"Deutsch", L"105");
   lang.get().addLangResource(L"Dansk", L"106");
-  lang.get().addLangResource(L"Cesk˝", L"108");
-  lang.get().addLangResource(L"FranÁais", L"110");
-  lang.get().addLangResource(L"EspaÒol", L"111");
+  lang.get().addLangResource(L"Cesk√Ω", L"108");
+  lang.get().addLangResource(L"Fran√ßais", L"110");
+  lang.get().addLangResource(L"Espa√±ol", L"111");
   lang.get().addLangResource(L"Russian", L"107");
 
-  if (fileExist(L"extra.lng")) {
-    lang.get().addLangResource(L"ExtrasprÂk", L"extra.lng");
+  if (fileExists(L"extra.lng")) {
+    lang.get().addLangResource(L"Extraspr√•k", L"extra.lng");
   }
   else {
     wchar_t lpath[260];
     getUserFile(lpath, L"extra.lng");
-    if (fileExist(lpath))
-      lang.get().addLangResource(L"ExtrasprÂk", lpath);
+    if (fileExists(lpath))
+      lang.get().addLangResource(L"Extraspr√•k", lpath);
   }
 
   wstring defLang = gEvent->getPropertyString("Language", L"English");
@@ -479,7 +480,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   // Main message loop:
   mainMessageLoop(hAccelTable, 0);
 
-  tabAutoRegister(0);
+  TabAuto::tabAutoRegister(nullptr);
   tabList->clear();
   delete tabList;
   tabList = nullptr;
@@ -730,6 +731,14 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
         gdi->keyCommand(KC_FINDBACK);
     }
   }
+  else if (wParam == 'A' && ctrlPressed) {
+    if (gdi)
+      gdi->keyCommand(KC_MARKALL);
+  }
+  else if (wParam == 'D' && ctrlPressed) {
+    if (gdi)
+      gdi->keyCommand(KC_CLEARALL);
+  }
   else if (wParam == VK_DELETE) {
     if (gdi)
       gdi->keyCommand(KC_DELETE);
@@ -923,7 +932,7 @@ gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x,
   else {
     gdi->initRecorder(&gdi_main->getRecorder());
   }
-  SetWindowLong(hWnd, GWL_USERDATA, gdi_extra.size());
+  SetWindowLongPtr(hWnd, GWLP_USERDATA, gdi_extra.size());
   currentFocusIx = gdi_extra.size();
   gdi_extra.push_back(gdi);
 
@@ -1072,19 +1081,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   int wmId, wmEvent;
   PAINTSTRUCT ps;
   HDC hdc;
+  static bool connectionAlert = false;
 
   switch (message)
   {
     case WM_CREATE:
 
-      tabList->push_back(TabObject(gdi_main->getTabs().get(TCmpTab), "T‰vling"));
+      tabList->push_back(TabObject(gdi_main->getTabs().get(TCmpTab), "T√§vling"));
       tabList->push_back(TabObject(gdi_main->getTabs().get(TRunnerTab), "Deltagare"));
       tabList->push_back(TabObject(gdi_main->getTabs().get(TTeamTab), "Lag(flera)"));
       tabList->push_back(TabObject(gdi_main->getTabs().get(TListTab), "Listor"));
       {
         TabAuto *ta = (TabAuto *)gdi_main->getTabs().get(TAutoTab);
         tabList->push_back(TabObject(ta, "Automater"));
-        tabAutoRegister(ta);
+        TabAuto::tabAutoRegister(ta);
       }
       tabList->push_back(TabObject(gdi_main->getTabs().get(TSpeakerTab), "Speaker"));
       tabList->push_back(TabObject(gdi_main->getTabs().get(TClassTab), "Klasser"));
@@ -1231,7 +1241,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
       }
     case WM_USER+1:
-      MessageBox(hWnd, lang.tl(L"Kommunikationen med en SI-enhet avbrˆts.").c_str(), L"SportIdent", MB_OK);
+      MessageBox(hWnd, lang.tl(L"Kommunikationen med en SI-enhet avbr√∂ts.").c_str(), L"SportIdent", MB_OK);
       break;
 
     case WM_USER + 3:
@@ -1248,9 +1258,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_USER + 5:
       if (gdi_main)
         gdi_main->addInfoBox("ainfo", L"info:advanceinfo", 10000);
-
       break;
-    
+
+    case WM_USER + 6:
+      if (gdi_main && lParam) {
+        gdioutput* g = (gdioutput*)lParam;
+        wstring msg = g->getDelayedAlert();
+        if (!connectionAlert) {
+          connectionAlert = true;
+          gdi_main->alert(msg);
+          connectionAlert = false;
+        }
+      }
+      break;
+
     case WM_COMMAND:
       wmId    = LOWORD(wParam);
       wmEvent = HIWORD(wParam);
@@ -1273,7 +1294,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       break;
 
     case WM_CLOSE:
-      if (!gEvent || gEvent->empty() || gdi_main->ask(L"Vill du verkligen st‰nga MeOS?"))
+      if (!gEvent || gEvent->empty() || gdi_main->ask(L"Vill du verkligen st√§nga MeOS?"))
           DestroyWindow(hWnd);
       break;
 
@@ -1291,20 +1312,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
           gEvent->save();
         }
         catch (meosException &ex) {
-          MessageBox(hWnd, lang.tl(ex.wwhat()).c_str(), L"Fel n‰r t‰vlingen skulle sparas", MB_OK);
+          MessageBox(hWnd, lang.tl(ex.wwhat()).c_str(), L"Fel n√§r t√§vlingen skulle sparas", MB_OK);
         }
         catch(std::exception &ex) {
-          MessageBox(hWnd, lang.tl(ex.what()).c_str(), L"Fel n‰r t‰vlingen skulle sparas", MB_OK);
+          MessageBox(hWnd, lang.tl(ex.what()).c_str(), L"Fel n√§r t√§vlingen skulle sparas", MB_OK);
         }
 
         try {
           gEvent->saveRunnerDatabase(L"database", true);
         }
         catch (meosException &ex) {
-          MessageBox(hWnd, lang.tl(ex.wwhat()).c_str(), L"Fel n‰r lˆpardatabas skulle sparas", MB_OK);
+          MessageBox(hWnd, lang.tl(ex.wwhat()).c_str(), L"Fel n√§r l√∂pardatabas skulle sparas", MB_OK);
         }
         catch(std::exception &ex) {
-          MessageBox(hWnd, lang.tl(ex.what()).c_str(), L"Fel n‰r lˆpardatabas skulle sparas", MB_OK);
+          MessageBox(hWnd, lang.tl(ex.what()).c_str(), L"Fel n√§r l√∂pardatabas skulle sparas", MB_OK);
         }
 
         if (gEvent)
@@ -1414,9 +1435,9 @@ LRESULT CALLBACK WorkSpaceWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
   PAINTSTRUCT ps;
   HDC hdc;
 
-  LONG ix = GetWindowLong(hWnd, GWL_USERDATA);
+  LONG_PTR ix = GetWindowLongPtr(hWnd, GWLP_USERDATA);
   gdioutput *gdi = 0;
-  if (ix < LONG(gdi_extra.size()))
+  if (ix < LONG_PTR(gdi_extra.size()))
     gdi = gdi_extra[ix];
 
   if (gdi) {

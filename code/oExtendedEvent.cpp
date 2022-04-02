@@ -1,4 +1,4 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 #include "oExtendedEvent.h"
 #include "oSSSQuickStart.h"
 #include "gdioutput.h"
@@ -151,7 +151,7 @@ void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & co
   xo = xml.getObject("EntryList");
 
   if (xo) {
-    gdi.addString("", 0, "Importerar anmälningar (IOF, xml)");
+    gdi.addString("", 0, "Importerar anmÃ¤lningar (IOF, xml)");
     gdi.refreshFast();
 
     xmlList pEntries;
@@ -538,7 +538,7 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
 
   string s;
   
-  csv.outputRow(ws2s(lang.tl("Startnr;Bricka;Databas nr.;Efternamn;Förnamn;År;K;Block;ut;Start;Mål;Tid;Status;Klubb nr.;Namn;Ort;Land;Klass nr.;Kort;Lång;Num1;Num2;Num3;Text1;Text2;Text3;Adr. namn;Gata;Rad 2;Post nr.;Ort;Tel;Fax;E-post;Id/Club;Hyrd;Startavgift;Betalt;Bana nr.;Bana;km;Hm;Bana kontroller;Pl")));
+  csv.outputRow(ws2s(lang.tl("Startnr;Bricka;Databas nr.;Efternamn;FÃ¶rnamn;Ã…r;K;Block;ut;Start;MÃ¥l;Tid;Status;Klubb nr.;Namn;Ort;Land;Klass nr.;Kort;LÃ¥ng;Num1;Num2;Num3;Text1;Text2;Text3;Adr. namn;Gata;Rad 2;Post nr.;Ort;Tel;Fax;E-post;Id/Club;Hyrd;Startavgift;Betalt;Bana nr.;Bana;km;Hm;Bana kontroller;Pl")));
   
   char bf[256];
   for(it=Runners.begin(); it != Runners.end(); ++it){  

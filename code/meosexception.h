@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,17 +18,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 #include "meos_util.h"
 
 class meosException : public std::exception {
   wstring wideMessage;
-  static const char *narrow(const wstring &msg) {
-    static string nmsg(msg.begin(), msg.end());
-    return nmsg.c_str();
-  }
+  static const char *narrow(const wstring& msg);
 public:
   meosException(const wstring &wmsg) : std::exception(narrow(wmsg)), wideMessage(wmsg) {
     

@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -160,7 +160,7 @@ const wstring &oRunner::RunnerReference::formatData(const oBase *obj) const {
     if (r)
       return r->getUIName();
     else {
-      return lang.tl("Okänd");
+      return lang.tl("OkÃ¤nd");
     }
   }
   return _EmptyWString;
@@ -214,7 +214,7 @@ void oRunner::RunnerReference::fillInput(const oBase *obj, vector<pair<wstring, 
     if (rr)
       out.emplace_back(rr->getUIName(), id);
     else 
-      out.emplace_back(lang.tl("Okänd"), id);
+      out.emplace_back(lang.tl("OkÃ¤nd"), id);
   }
 }
 
@@ -272,11 +272,11 @@ oRunner::oRunner(oEvent *poe) :oAbstractRunner(poe, false)
 {
   isTemporaryObject = false;
   Id = oe->getFreeRunnerId();
-  Course = 0;
+  Course = nullptr;
   StartNo = 0;
   cardNumber = 0;
 
-  tInTeam = 0;
+  tInTeam = nullptr;
   tLeg = 0;
   tLegEquClass = 0;
   tNeedNoCard = false;
@@ -285,9 +285,9 @@ oRunner::oRunner(oEvent *poe) :oAbstractRunner(poe, false)
   correctionNeeded = false;
 
   tDuplicateLeg = 0;
-  tParentRunner = 0;
+  tParentRunner = nullptr;
 
-  Card = 0;
+  Card = nullptr;
   cPriority = 0;
 
   tCachedRunningTime = 0;
@@ -309,11 +309,11 @@ oRunner::oRunner(oEvent *poe, int id) :oAbstractRunner(poe, true)
   isTemporaryObject = false;
   Id = id;
   oe->qFreeRunnerId = max(id, oe->qFreeRunnerId);
-  Course = 0;
+  Course = nullptr;
   StartNo = 0;
   cardNumber = 0;
 
-  tInTeam = 0;
+  tInTeam = nullptr;
   tLeg = 0;
   tLegEquClass = 0;
   tNeedNoCard = false;
@@ -322,9 +322,9 @@ oRunner::oRunner(oEvent *poe, int id) :oAbstractRunner(poe, true)
   correctionNeeded = false;
 
   tDuplicateLeg = 0;
-  tParentRunner = 0;
+  tParentRunner = nullptr;
 
-  Card = 0;
+  Card = nullptr;
   cPriority = 0;
   tCachedRunningTime = 0;
   tSplitRevision = -1;
@@ -359,7 +359,7 @@ oRunner::~oRunner()
   }
 
   delete tAdaptedCourse;
-  tAdaptedCourse = 0;
+  tAdaptedCourse = nullptr;
 }
 
 bool oRunner::Write(xmlparser &xml)
@@ -1359,7 +1359,9 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
         }
       }
 
-      if (ctrl->getStatus() == oControl::StatusBad || ctrl->getStatus() == oControl::StatusOptional) {
+      if (ctrl->getStatus() == oControl::StatusBad || 
+          ctrl->getStatus() == oControl::StatusOptional ||
+          ctrl->getStatus() == oControl::StatusBadNoTiming) {
         // The control is marked "bad" but we found it anyway in the card. Mark it as used.
         if (tp_it!=Card->punches.end() && ctrl->hasNumberUnchecked(tp_it->Type)) {
           tp_it->isUsed=true; //Show that this is used when splittimes are calculated.
@@ -1380,7 +1382,7 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
               if (ctrl->Status == oControl::StatusOK) {
                 int code = tp_it->Type;
                 if (expectedPunchCount[code]>1 && punchCount[code] < expectedPunchCount[code]) {
-                  tp_it==Card->punches.end();
+                  tp_it=Card->punches.end();
                   ctrl->uncheckNumber(code);
                   break;
                 }
@@ -1497,7 +1499,7 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
 
     int point_limit = course->getMinimumRogainingPoints();
     if (point_limit>0 && tRogainingPoints<point_limit) {
-      tProblemDescription = L"X poäng fattas.#" + itow(point_limit-tRogainingPoints);
+      tProblemDescription = L"X poÃ¤ng fattas.#" + itow(point_limit-tRogainingPoints);
       OK = false;
     }
 
@@ -1551,7 +1553,7 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
   }
   else if (FinishTime<=0) {
     *refStatus=RunnerStatus(max(int(StatusDNF), int(tStatus)));
-    tProblemDescription = L"Måltid saknas.";
+    tProblemDescription = L"MÃ¥ltid saknas.";
     FinishTime=0;
   }
 
@@ -1559,7 +1561,7 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
     *refStatus = StatusMAX; //Maxtime
 
   if (!MissingPunches.empty()) {
-    tProblemDescription  = L"Stämplingar saknas: X#" + itow(MissingPunches[0]);
+    tProblemDescription  = L"StÃ¤mplingar saknas: X#" + itow(MissingPunches[0]);
     for (unsigned j = 1; j<3; j++) {
       if (MissingPunches.size()>j)
         tProblemDescription += L", " + itow(MissingPunches[j]);
@@ -1605,7 +1607,7 @@ bool oRunner::evaluateCard(bool doApply, vector<int> & MissingPunches,
       if (overTime > 0) {
         tRogainingOvertime = overTime;
         tReduction = course->calculateReduction(overTime);
-        tProblemDescription = L"Tidsavdrag: X poäng.#" + itow(tReduction);
+        tProblemDescription = L"Tidsavdrag: X poÃ¤ng.#" + itow(tReduction);
         tRogainingPoints = max(0, tRogainingPoints - tReduction);
       }
     }
@@ -1676,31 +1678,40 @@ void oRunner::doAdjustTimes(pCourse course) {
     if (!ctrl)
       continue;
 
+    pControl ctrlPrev = n > 0 ? course->Controls[n - 1] : nullptr;
+
     while (it != Card->punches.end() && !it->isUsed) {
       it->setTimeAdjust(adjustment);
       ++it;
     }
 
     int minTime = ctrl->getMinTime();
-    if (ctrl->getStatus() == oControl::StatusNoTiming) {
+    int pN = n -1;
+    
+    while (pN >= 0 && (course->Controls[pN]->getStatus() == oControl::ControlStatus::StatusBad ||
+                       course->Controls[pN]->getStatus() == oControl::ControlStatus::StatusBadNoTiming)) {
+      pN--; // Skip bad controls
+    }
+
+    if (ctrl->getStatus() == oControl::StatusNoTiming || (ctrlPrev && ctrlPrev->getStatus() == oControl::StatusBadNoTiming)) {
       int t = 0;
-      if (n>0 && splitTimes[n].time>0 && splitTimes[n-1].time>0) {
-        t = splitTimes[n].time + adjustment - splitTimes[n-1].time;
+      if (n>0 && pN>=0 && splitTimes[n].time>0 && splitTimes[pN].time>0) {
+        t = splitTimes[n].time + adjustment - splitTimes[pN].time;
       }
-      else if (n == 0 && splitTimes[n].time>0) {
+      else if (pN < 0 && splitTimes[n].time>0) {
         t = splitTimes[n].time - tStartTime;
       }
       adjustment -= t;
     }
-    else if (minTime>0) {
+    else if (minTime > 0) {
       int t = 0;
-      if (n>0 && splitTimes[n].time>0 && splitTimes[n-1].time>0) {
-        t = splitTimes[n].time + adjustment - splitTimes[n-1].time;
+      if (n > 0 && pN >= 0 && splitTimes[n].time > 0 && splitTimes[pN].time > 0) {
+        t = splitTimes[n].time + adjustment - splitTimes[pN].time;
       }
-      else if (n == 0 && splitTimes[n].time>0) {
+      else if (pN < 0 && splitTimes[n].time>0) {
         t = splitTimes[n].time - tStartTime;
       }
-      int maxadjust = max(minTime-t, 0);
+      int maxadjust = max(minTime - t, 0);
       adjustment += maxadjust;
     }
 
@@ -1862,16 +1873,10 @@ bool oRunner::storeTimesAux(pClass targetClass) {
     if (targetClass && dupLeg < targetClass->tLeaderTime.size()) {
       if (tStatus == StatusOK) {
         int rt = getRunningTime(false);
-        /*int &bt = targetClass->tLeaderTime[dupLeg].bestTimeOnLeg;
-        if (rt > 0 && (bt <= 0 || rt < bt)) {
-          bt = rt;
-          updated = true;
-        }*/
         if (targetClass->tLeaderTime[dupLeg].update(rt, oClass::LeaderInfo::Type::Leg))
           updated = true;
-
-
       }
+
       if (getStatusComputed() == StatusOK) {
         int rt = getRunningTime(true);
         if (targetClass->tLeaderTime[dupLeg].updateComputed(rt, oClass::LeaderInfo::Type::Leg))
@@ -1886,6 +1891,16 @@ bool oRunner::storeTimesAux(pClass targetClass) {
       if (targetClass->tLeaderTime[dupLeg].updateComputed(rt, oClass::LeaderInfo::Type::Total))
         updated = true;
 
+      if (getTotalStatus() == StatusOK) {
+        rt = getTotalRunningTime(getFinishTime(), false, true);
+        if (targetClass->tLeaderTime[dupLeg].update(rt, oClass::LeaderInfo::Type::TotalInput))
+          updated = true;
+
+        rt = getTotalRunningTime(getFinishTime(), true, true);
+        if (targetClass->tLeaderTime[dupLeg].updateComputed(rt, oClass::LeaderInfo::Type::TotalInput))
+          updated = true;
+      }
+
       /*int &bt = targetClass->tLeaderTime[dupLeg].totalLeaderTime;
       if (rt > 0 && (bt <= 0 || rt < bt)) {
         bt = rt;
@@ -1898,14 +1913,10 @@ bool oRunner::storeTimesAux(pClass targetClass) {
   size_t mappedLeg = targetClass->mapLeg(tLeg);
   // Best input time
   if (mappedLeg<targetClass->tLeaderTime.size()) {
-    /*int &it = targetClass->tLeaderTime[mappedLeg].inputTime;
-    if (inputTime > 0 && inputStatus == StatusOK && (it <= 0 || inputTime < it) ) {
-      it = inputTime;
-      updated = true;
-    }*/
     if (inputStatus == StatusOK) {
-      if (targetClass->tLeaderTime[mappedLeg].update(inputTime, oClass::LeaderInfo::Type::Input))
+      if (targetClass->tLeaderTime[mappedLeg].update(inputTime, oClass::LeaderInfo::Type::Input)) {
         updated = true;
+      }
     }
   }
 
@@ -2708,7 +2719,7 @@ void oAbstractRunner::setName(const wstring &n, bool manualUpdate)
 {
   wstring tn = trim(n);
   if (tn.empty())
-    throw std::exception("Tomt namn är inte tillåtet.");
+    throw std::exception("Tomt namn Ã¤r inte tillÃ¥tet.");
   if (tn != sName){
     sName.swap(tn);
     if (manualUpdate)
@@ -2720,13 +2731,27 @@ void oAbstractRunner::setName(const wstring &n, bool manualUpdate)
 void oRunner::setName(const wstring &in, bool manualUpdate)
 {
   wstring n = trim(in);
-  
-  if (n.empty())
-    throw std::exception("Tomt namn är inte tillåtet.");
+  bool wasSpace = false;
+  int kx = 0;
   for (size_t k = 0; k < n.length(); k++) {
-    if (iswspace(n[k]))
-      n[k] = ' ';
+    if (iswspace(n[k])) {
+      if (!wasSpace) {
+        n[kx++] = ' ';
+        wasSpace = true;
+      }
+    }
+    else {
+      n[kx++] = n[k];
+      wasSpace = false;
+    }
   }
+  if (wasSpace)
+    kx = kx - 1;
+  n.resize(kx);
+
+  if (n.empty())
+    throw std::exception("Tomt namn Ã¤r inte tillÃ¥tet.");
+
   if (n.length() <= 4 || n == lang.tl("N.N."))
     manualUpdate = false; // Never consider default names manual
 
@@ -2777,16 +2802,38 @@ const wstring &oRunner::getNameLastFirst() const {
 }
 
 void oRunner::getRealName(const wstring &input, wstring &output) const {
-  size_t comma = input.find_first_of(',');
+  bool wasSpace = false;
+  wstring n = input;
+  int kx = 0;
+  for (size_t k = 0; k < n.length(); k++) {
+    if (iswspace(n[k])) {
+      if (!wasSpace) {
+        n[kx++] = ' ';
+        wasSpace = true;
+      }
+    }
+    else {
+      if (n[k] == ',' && wasSpace)
+        kx--; // Ignore space before comma
+
+      n[kx++] = n[k];
+      wasSpace = false;
+    }
+  }
+  if (wasSpace)
+    kx = kx - 1;
+  n.resize(kx);
+
+  size_t comma = n.find_first_of(',');
   if (oe->getNameMode() != oEvent::NameMode::LastFirst) {
     if (comma == string::npos)
-      output = input;
+      output = n;
     else
-      output = trim(input.substr(comma + 1) + L" " + input.substr(0, comma));
+      output = trim(n.substr(comma + 1) + L" " + trim(n.substr(0, comma)));
   }
   else {
     if (comma != string::npos)
-      output = input;
+      output = n;
     else
       output = getNameLastFirst();
   }
@@ -3622,7 +3669,7 @@ void oRunner::apply(ChangeType changeType, pRunner src) {
 
         if (r && r->FinishTime > 0 && r->statusOK(false)) {
           int rt = r->getRaceRunningTime(false, tDuplicateLeg - 1);
-          int timeAfter = rt - pc->getTotalLegLeaderTime(oClass::AllowRecompute::No, r->tDuplicateLeg, false, true);
+          int timeAfter = rt - pc->getTotalLegLeaderTime(oClass::AllowRecompute::NoUseOld, r->tDuplicateLeg, false, true);
           if (rt > 0 && timeAfter >= 0)
             lastStart = pc->getStartData(tDuplicateLeg) + timeAfter;
         }
@@ -3675,7 +3722,7 @@ const shared_ptr<Table> &oRunner::getTable(oEvent *oe) {
   oe->getRunners(0, 0, runners, false);
   for (pRunner r : runners) {
     const wstring &raw = r->getDCI().getString("InputResult");
-    int ns = count(raw.begin(), raw.end(), ';');
+    int ns = (int)count(raw.begin(), raw.end(), ';');
     sn = max(sn, (ns + 1) / 3);
   }
   sn = min(10, sn);
@@ -3685,7 +3732,7 @@ const shared_ptr<Table> &oRunner::getTable(oEvent *oe) {
     auto table = make_shared<Table>(oe, 20, L"Deltagare", "runners");
 
     table->addColumn("Id", 70, true, true);
-    table->addColumn("Ändrad", 70, false);
+    table->addColumn("Ã„ndrad", 70, false);
 
     table->addColumn("Namn", 200, false);
     table->addColumn("Klass", 120, false);
@@ -3693,15 +3740,15 @@ const shared_ptr<Table> &oRunner::getTable(oEvent *oe) {
 
     table->addColumn("Klubb", 120, false);
     table->addColumn("Lag", 120, false);
-    table->addColumn("Sträcka", 70, true);
+    table->addColumn("StrÃ¤cka", 70, true);
 
-    table->addColumn("SI", 90, true, false);
+    table->addColumn("Bricka", 90, true, false);
 
     table->addColumn("Start", 70, false, true);
-    table->addColumn("Mål", 70, false, true);
+    table->addColumn("MÃ¥l", 70, false, true);
     table->addColumn("Status", 70, false);
     table->addColumn("Tid", 70, false, true);
-    table->addColumn("Poäng", 70, true, true);
+    table->addColumn("PoÃ¤ng", 70, true, true);
 
     table->addColumn("Plac.", 70, true, true);
     table->addColumn("Start nr.", 70, true, false);
@@ -3711,13 +3758,13 @@ const shared_ptr<Table> &oRunner::getTable(oEvent *oe) {
     for (unsigned k = 1; k < nStageMaxStored; k++) {
       table->addColumn(lang.tl("Tid E[stageno]") + itow(k), 70, false, true);
       table->addColumn(lang.tl("Status E[stageno]") + itow(k), 70, false, true);
-      table->addColumn(lang.tl("Poäng E[stageno]") + itow(k), 70, true);
+      table->addColumn(lang.tl("PoÃ¤ng E[stageno]") + itow(k), 70, true);
       table->addColumn(lang.tl("Plac. E[stageno]") + itow(k), 70, true);
     }
 
     table->addColumn("Tid in", 70, false, true);
     table->addColumn("Status in", 70, false, true);
-    table->addColumn("Poäng in", 70, true);
+    table->addColumn("PoÃ¤ng in", 70, true);
     table->addColumn("Placering in", 70, true);
 
     oe->setTable("runner", table);
@@ -3869,8 +3916,10 @@ pair<int, bool> oRunner::inputData(int id, const wstring &input,
     }
     break;
     case 3: {
-      spvec[4 * stage + 0] = itow(inputId);
-      output = oEvent::formatStatus(RunnerStatus(inputId), false);
+      if (inputId >= 0) {
+        spvec[4 * stage + 0] = itow(inputId);
+        output = oEvent::formatStatus(RunnerStatus(inputId), false);
+      }
     }
     break;
     case 4:
@@ -3902,7 +3951,7 @@ pair<int, bool> oRunner::inputData(int id, const wstring &input,
       break;
     case TID_RUNNER:
       if (trim(input).empty())
-        throw std::exception("Tomt namn inte tillåtet.");
+        throw std::exception("Tomt namn inte tillÃ¥tet.");
 
       if (sName != input && tRealName != input) {
         updateFromDB(input, getClubId(), getClassId(false), getCardNo(), getBirthYear(), false);
@@ -3919,7 +3968,7 @@ pair<int, bool> oRunner::inputData(int id, const wstring &input,
       evaluateCard(true, mp, 0, ChangeType::Update);
       s=getStartTime();
       if (s!=t)
-        throw std::exception("Starttiden är definerad genom klassen eller löparens startstämpling.");
+        throw std::exception("Starttiden Ã¤r definerad genom klassen eller lÃ¶parens startstÃ¤mpling.");
       synchronize(true);
       output = getStartTimeS();
       break;
@@ -3931,13 +3980,18 @@ pair<int, bool> oRunner::inputData(int id, const wstring &input,
       evaluateCard(true, mp, 0, ChangeType::Update);
       s=getFinishTime();
       if (s!=t)
-        throw std::exception("För att ändra måltiden måste löparens målstämplingstid ändras.");
+        throw std::exception("FÃ¶r att Ã¤ndra mÃ¥ltiden mÃ¥ste lÃ¶parens mÃ¥lstÃ¤mplingstid Ã¤ndras.");
       synchronize(true);
       output = getStartTimeS();
       break;
     break;
 
     case TID_COURSE:
+      if (inputId == -1) {
+        pCourse c = oe->getCourse(input);
+        if (c)
+          inputId = c->getId();
+      }
       setCourseId(inputId);
       synchronize(true);
       output = getCourseName();
@@ -3960,17 +4014,24 @@ pair<int, bool> oRunner::inputData(int id, const wstring &input,
       break;
 
     case TID_CLASSNAME:
+      if (inputId == -1) {
+        pClass c = oe->getClass(input);
+        if (c)
+          inputId = c->getId();
+      }
+
       setClassId(inputId, true);
       synchronize(true);
       output = getClass(true);
       break;
 
     case TID_STATUS: {
-      setStatus(RunnerStatus(inputId), true, ChangeType::Update);
+      if (inputId >= 0) 
+        setStatus(RunnerStatus(inputId), true, ChangeType::Update);
       int s = getStatus();
       evaluateCard(true, mp, 0, ChangeType::Update);
       if (s!=getStatus())
-        throw std::exception("Status matchar inte data i löparbrickan.");
+        throw std::exception("Status matchar inte data i lÃ¶parbrickan.");
       synchronize(true);
       output = getStatusS(false, true);
     }
@@ -3983,7 +4044,8 @@ pair<int, bool> oRunner::inputData(int id, const wstring &input,
       break;
 
     case TID_INPUTSTATUS:
-      setInputStatus(RunnerStatus(inputId));
+      if (inputId >= 0)
+        setInputStatus(RunnerStatus(inputId));
       synchronize(true);
       output = getInputStatusS();
       break;
@@ -4029,7 +4091,7 @@ void oRunner::fillInput(int id, vector< pair<wstring, size_t> > &out, size_t &se
   }
   else if (id==TID_CLUB) {
     oe->fillClubs(out);
-    out.push_back(make_pair(lang.tl(L"Klubblös"), 0));
+    out.push_back(make_pair(lang.tl(L"KlubblÃ¶s"), 0));
     selected = getClubId();
   }
   else if (id==TID_STATUS) {
@@ -4193,8 +4255,7 @@ void oRunner::getSplitTime(int courseControlId, RunnerStatus &stat, int &rt) con
   stat = StatusUnknown;
   int cardno = getCardNo();
 
-  if (courseControlId==oPunch::PunchFinish &&
-      FinishTime>0 && tStatus!=StatusUnknown) {
+  if (courseControlId==oPunch::PunchFinish && FinishTime>0) {
     stat = tStatus;
     rt = getFinishTimeAdjusted();
   }
@@ -4637,7 +4698,7 @@ static void addMissingControl(bool wideFormat, gdioutput &gdi,
     cy+=int(gdi.getLineHeight()*0.3);
 }
 
-void oRunner::printSplits(gdioutput &gdi) const {
+void oRunner::printSplits(gdioutput& gdi) const {
   bool withAnalysis = (oe->getDI().getInt("Analysis") & 1) == 0;
   bool withSpeed = (oe->getDI().getInt("Analysis") & 2) == 0;
   bool withResult = (oe->getDI().getInt("Analysis") & 4) == 0;
@@ -4669,13 +4730,13 @@ void oRunner::printSplits(gdioutput &gdi) const {
   gdi.addStringUT(bnormal, getName() + L", " + getClass(true));
   gdi.addStringUT(normal, getClub());
   gdi.dropLine(0.5);
-  gdi.addStringUT(normal, lang.tl("Start: ") + getStartTimeS() + lang.tl(", Mål: ") + getFinishTimeS());
+  gdi.addStringUT(normal, lang.tl("Start: ") + getStartTimeS() + lang.tl(", MÃ¥l: ") + getFinishTimeS());
   if (cls && cls->isRogaining()) {
-    gdi.addStringUT(bnormal, lang.tl("Poäng: ") +
-                    itow(getRogainingPoints(true, false)) + 
+    gdi.addStringUT(bnormal, lang.tl("PoÃ¤ng: ") +
+                    itow(getRogainingPoints(true, false)) +
                     +L" (" + lang.tl("Avdrag: ") + itow(getRogainingReduction(true)) + L")");
   }
-  
+
   wstring statInfo = lang.tl("Status: ") + getStatusS(true, true) + lang.tl(", Tid: ") + getRunningTimeS(true);
   if (withSpeed && pc && pc->getLength() > 0) {
     int kmt = (getRunningTime(false) * 1000) / pc->getLength();
@@ -4691,7 +4752,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
     gdi.addStringUT(fontSmall, lang.tl("Aktuell klassposition") + L" in " + getClass(false) + L": " + getPlaceS());
   
 
-  int cy = gdi.getCY()+4;
+  int cy = gdi.getCY() + 4;
   int cx = gdi.getCX();
 
   int spMax = 0;
@@ -4705,10 +4766,10 @@ void oRunner::printSplits(gdioutput &gdi) const {
   bool moreThanHour = max(totMax, getRunningTime(true)) >= 3600;
   bool moreThanHourSplit = spMax >= 3600;
 
-  const int c1=35;
-  const int c2=95 + (moreThanHourSplit ? 65 : 55);
+  const int c1 = 35;
+  const int c2 = 95 + (moreThanHourSplit ? 65 : 55);
   const int c3 = c2 + 10;
-  const int c4 = moreThanHour ? c3+153 : c3+133;
+  const int c4 = moreThanHour ? c3 + 153 : c3 + 133;
   const int c5 = withSpeed ? c4 + 80 : c4;
   const int baseCX = cx;
   const int colDeltaX = c5 + 32;
@@ -4740,12 +4801,12 @@ void oRunner::printSplits(gdioutput &gdi) const {
     bool hasRogaining = pc ? pc->hasRogaining() : false;
 
     const int cyHead = cy;
-    cy += int(gdi.getLineHeight()*0.9);
+    cy += int(gdi.getLineHeight() * 0.9);
     int xcol = 0;
     int baseY = cy;
 
     if (pc) {
-      oPunchList &p = Card->punches;
+      oPunchList& p = Card->punches;
       for (oPunchList::iterator it = p.begin(); it != p.end(); ++it) {
         if (headerPos.count(cx) == 0) {
           headerPos.insert(cx);
@@ -4782,7 +4843,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
 
           gdi.addStringUT(cy, cx + c4 + 40, fontSmall, itos(cumulativePoints));
 
-          cy += int(gdi.getLineHeight()*0.9);
+          cy += int(gdi.getLineHeight() * 0.9);
           continue;
         }
 
@@ -4802,7 +4863,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
             }
           }
 
-          gdi.addString("", cy, cx, fontSmall, "Mål");
+          gdi.addString("", cy, cx, fontSmall, "MÃ¥l");
           sp = getSplitTime(splitTimes.size(), false);
           if (sp > 0) {
             gdi.addStringUT(cy, cx + c2, fontSmall | textRight, formatTime(sp));
@@ -4889,7 +4950,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
 
         if (any) {
           if (!wideFormat) {
-            cy += int(gdi.getLineHeight()*0.9);
+            cy += int(gdi.getLineHeight() * 0.9);
           }
           else {
             gotoNextLine(gdi, xcol, cx, cy, colDeltaX, numCol, baseCX);
@@ -4930,12 +4991,12 @@ void oRunner::printSplits(gdioutput &gdi) const {
           }
 
           if (count < 3)
-            gdi.addString("", normal, "Underlag saknas för bomanalys.");
+            gdi.addString("", normal, "Underlag saknas fÃ¶r bomanalys.");
           else
             gdi.addString("", normal, "Inga bommar registrerade.");
         }
         else {
-          wstring out = lang.tl("Tidsförluster (kontroll-tid): ");
+          wstring out = lang.tl("TidsfÃ¶rluster (kontroll-tid): ");
           for (size_t k = 0; k < misses.size(); k++) {
             if (out.length() > (wideFormat ? 80u : (withSpeed ? 40u : 35u))) {
               gdi.addStringUT(normal, out);
@@ -4955,7 +5016,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
       int index = 0;
       int lastTime = 0;
 
-      for (auto &it : Card->punches) {
+      for (auto& it : Card->punches) {
         if (headerPos.count(cx) == 0) {
           headerPos.insert(cx);
           gdi.addString("", cyHead, cx, italicSmall, "Kontroll");
@@ -4965,7 +5026,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
         bool any = false;
         wstring punchTime;
         if (it.isFinish(finishType)) {
-          gdi.addString("", cy, cx, fontSmall, "Mål");
+          gdi.addString("", cy, cx, fontSmall, "MÃ¥l");
           int rt = it.Time - tStartTime;
           if (rt > 0) {
             gdi.addStringUT(cy, cx + c2, fontSmall | textRight, formatTime(rt - lastTime));
@@ -5005,7 +5066,7 @@ void oRunner::printSplits(gdioutput &gdi) const {
 
         if (any) {
           if (!wideFormat) {
-            cy += int(gdi.getLineHeight()*0.9);
+            cy += int(gdi.getLineHeight() * 0.9);
           }
           else {
             gotoNextLine(gdi, xcol, cx, cy, colDeltaX, numCol, baseCX);
@@ -5013,12 +5074,12 @@ void oRunner::printSplits(gdioutput &gdi) const {
         }
       }
     }
-    
+
     oe->calculateResults({ getClassId(true) }, oEvent::ResultType::ClassResult);
     if (hasInputData())
       oe->calculateResults({ getClassId(true) }, oEvent::ResultType::TotalResult);
     if (tInTeam)
-      oe->calculateTeamResults({ getClassId(true) }, oEvent::ResultType::ClassResult);
+      oe->calculateTeamResults(std::set<int>({ getClassId(true) }), oEvent::ResultType::ClassResult);
 
     if (withResult && statusOK(true)) {
       gdi.dropLine(0.5);
@@ -5033,20 +5094,39 @@ void oRunner::printSplits(gdioutput &gdi) const {
       wstring after = oe->formatListString(lRunnerGeneralTimeAfter, pRunner(this));
       if (!after.empty() && !(place.empty() && timestatus.empty()))
         after = L", " + after;
-      
+
       gdi.fillRight();
       gdi.pushX();
-      if (!place.empty()) 
+      if (!place.empty())
         gdi.addString("", bnormal, "Placering:");
       else
         gdi.addString("", bnormal, "Resultat:");
       gdi.fillDown();
-      gdi.addString("", normal,  place + timestatus + after);
+      gdi.addString("", normal, place + timestatus + after);
       gdi.popX();
     }
   }
 
-  gdi.dropLine();
+  gdi.dropLine(0.7);
+
+  if (getCard() && getCard()->miliVolt > 0) {
+    auto stat = getCard()->isCriticalCardVoltage();
+    wstring warning;
+    if (stat == oCard::BatteryStatus::Bad)
+      warning = lang.tl("Replace");
+    else if (stat == oCard::BatteryStatus::Warning)
+      warning = lang.tl("Low");
+    else
+     warning = lang.tl("OK");
+    gdi.fillRight();
+    gdi.pushX();
+    gdi.addString("", fontSmall, L"Batteristatus:");
+    gdi.addStringUT(boldSmall, getCard()->getCardVoltage());
+    gdi.fillDown();
+    gdi.addStringUT(fontSmall, L"(" + warning + L")");
+    gdi.dropLine(0.7);
+    gdi.popX();
+  }
 
   vector< pair<wstring, int> > lines;
   oe->getExtraLines("SPExtra", lines);
@@ -5144,7 +5224,7 @@ void oRunner::printStartInfo(gdioutput &gdi) const {
     else
       info = lang.tl("Faktureras");
     
-    gdi.addStringUT(fontSmall, lang.tl("Anmälningsavgift: ") + itow(fee)  + L" (" + info + L")");
+    gdi.addStringUT(fontSmall, lang.tl("AnmÃ¤lningsavgift: ") + itow(fee)  + L" (" + info + L")");
   }
 
   gdi.dropLine(1);
@@ -6079,6 +6159,11 @@ void oEvent::getDBRunnersInEvent(intkeymap<int, __int64> &runners) const {
     __int64 id = it->getExtIdentifier();
     if (id != 0)
       runners.insert(id, it->getId());
+    else if (it->getCardNo() != 0) {
+      // Lookup by card + constant
+      id = it->getCardNo() + cardIdConstant;
+      runners.insert(id, it->getId());
+    }
   }
 }
 
@@ -6119,13 +6204,13 @@ void oEvent::selectRunners(const wstring &classType, int lowAge,
   if (!firstDate.empty()) {
     firstD = convertDateYMS(firstDate, true);
     if (firstD <= 0)
-      throw meosException(L"Felaktigt datumformat 'X' (Använd ÅÅÅÅ-MM-DD).#" + firstDate);
+      throw meosException(L"Felaktigt datumformat 'X' (AnvÃ¤nd Ã…Ã…Ã…Ã…-MM-DD).#" + firstDate);
   }
 
   if (!lastDate.empty()) {
     lastD = convertDateYMS(lastDate, true);
     if (lastD <= 0)
-      throw meosException(L"Felaktigt datumformat 'X' (Använd ÅÅÅÅ-MM-DD).#" + lastDate);
+      throw meosException(L"Felaktigt datumformat 'X' (AnvÃ¤nd Ã…Ã…Ã…Ã…-MM-DD).#" + lastDate);
   }
 
 
@@ -6146,7 +6231,7 @@ void oEvent::selectRunners(const wstring &classType, int lowAge,
     int age = it->getBirthAge();
     if (age > 0 && (lowAge > 0 || highAge > 0)) {
       if (lowAge > highAge)
-        throw meosException("Undre åldersgränsen är högre än den övre.");
+        throw meosException("Undre Ã¥ldersgrÃ¤nsen Ã¤r hÃ¶gre Ã¤n den Ã¶vre.");
 
       if (age < lowAge || age > highAge)
         continue;
@@ -6265,8 +6350,10 @@ void oRunner::markClassChanged(int controlId) {
     oe->globalModification = true;
 }
 
-void oAbstractRunner::changedObject() {
+void oRunner::changedObject() {
   markClassChanged(-1);
+  sqlChanged = true;
+  oe->sqlRunners.changed = true;
 }
 
 int oAbstractRunner::getTimeAdjustment() const {
@@ -6486,7 +6573,7 @@ bool oAbstractRunner::isEntryTouched() const {
 void oAbstractRunner::getInputResults(vector<RunnerStatus> &st,
                                       vector<int> &times,
                                       vector<int> &points,
-                                      vector<int> &places) {
+                                      vector<int> &places) const {
   const wstring &raw = getDCI().getString("InputResult");
   vector<wstring> spvec;
   split(raw, L";", spvec);
@@ -6503,6 +6590,26 @@ void oAbstractRunner::getInputResults(vector<RunnerStatus> &st,
     places[j] = _wtoi(spvec[j * 4 + 3].c_str());
   }
 }
+
+
+RunnerStatus  oAbstractRunner::getStageResult(int stage, int &time, int &point, int &place) const {  
+  vector<RunnerStatus> st;
+  vector<int> times;
+  vector<int> points;
+  vector<int> places;
+  getInputResults(st, times, points, places);
+  if (size_t(stage) >= st.size()) {
+    time = 0;
+    point = 0;
+    place = 0;
+    return StatusNotCompetiting;
+  }
+  time = times[stage];
+  point = points[stage];
+  place = places[stage];
+  return st[stage];
+}
+
 
 // Add current result to input result. Only use when transferring to next stage
 void oAbstractRunner::addToInputResult(int thisStageNo, const oAbstractRunner *src) {
@@ -6796,7 +6903,7 @@ const pair<wstring, int> oRunner::getRaceInfo() {
       }
 
       if (ok && getRogainingReduction(true) > 0) {
-        tProblemDescription = L"Tidsavdrag: X poäng.#" + itow(getRogainingReduction(true));
+        tProblemDescription = L"Tidsavdrag: X poÃ¤ng.#" + itow(getRogainingReduction(true));
       }
 
       if (!getProblemDescription().empty()) {
@@ -6843,4 +6950,17 @@ bool oRunner::isResultUpdated(bool totalResult) const {
     return !tPlace.isOld(*oe);
   else
     return !tTotalPlace.isOld(*oe);
+}
+
+int oRunner::getStartGroup(bool useTmpStartGroup) const {
+  if (useTmpStartGroup && tmpStartGroup)
+    return tmpStartGroup;
+  int g = getDCI().getInt("StartGroup");
+  if (g == 0 && Club)
+    return Club->getStartGroup();
+  return g;
+}
+
+void oRunner::setStartGroup(int sg) {
+  getDI().setInt("StartGroup", sg);
 }

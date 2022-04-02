@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -26,7 +26,7 @@
 #include "TabAuto.h"
 #include "meos_util.h"
 #include "gdiconstants.h"
-#include "meosdb/sqltypes.h"
+#include "MeosSQL.h"
 #include <process.h>
 
 MySQLReconnect::MySQLReconnect(const wstring &errorIn) : AutoMachine("MySQL-daemon", Machines::mMySQLReconnect), error(errorIn) {
@@ -71,8 +71,8 @@ unsigned __stdcall reconnectThread(void *v) {
     mysqlConnecting=1;
     mysqlStatus=0;
   LeaveCriticalSection(&CS_MySQL);
-
-  bool res = msReConnect();
+  oEvent *oe = (oEvent *)v;
+  bool res = oe->reConnectRaw();
 
   EnterCriticalSection(&CS_MySQL);
     if (res)
@@ -86,7 +86,7 @@ unsigned __stdcall reconnectThread(void *v) {
   return 0;
 }
 
-void MySQLReconnect::settings(gdioutput &gdi, oEvent &oe, bool created) {
+void MySQLReconnect::settings(gdioutput &gdi, oEvent &oe, State state) {
 }
 
 void MySQLReconnect::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast)
@@ -100,17 +100,18 @@ void MySQLReconnect::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast)
       hThread=0;
     }
     mysqlStatus=0;
-    char bf[256];
-    if (!oe->reConnect(bf)) {
-      gdi.addInfoBox("", L"warning:dbproblem#" + gdi.widen(bf), 9000);
+    string err;
+    if (!oe->reConnect(err)) {
+      gdi.addInfoBox("", L"warning:dbproblem#" + gdi.widen(err), 9000);
       interval = 10;
     }
     else {
-      gdi.addInfoBox("", L"Återansluten mot databasen, tävlingen synkroniserad.", 10000);
+      gdi.addInfoBox("", L"Ã…teransluten mot databasen, tÃ¤vlingen synkroniserad.", 10000);
       timeReconnect = getLocalTime();
       gdi.setDBErrorState(false);
       gdi.setWindowTitle(oe->getTitleName());
       interval=0;
+      toRemove = true;
     }
   }
   else if (mysqlStatus==-1) {
@@ -122,15 +123,15 @@ void MySQLReconnect::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast)
     interval = 10;//Wait ten seconds for next attempt
 
     gdi.setDBErrorState(true);
-    char bf[256];
-    if (oe->HasDBConnection) {
-      msGetErrorState(bf);
+    string err;
+    if (oe->hasDBConnection()) {
+      oe->sqlConnection->getErrorMessage(err);
     }
     return;
   }
   else {
     mysqlConnecting = 1;
-    hThread = (HANDLE) _beginthreadex (0, 0, &reconnectThread, 0, 0, 0);
+    hThread = (HANDLE) _beginthreadex(0, 0, &reconnectThread, oe, 0, 0);
     interval = 1;
   }
 }
@@ -138,20 +139,18 @@ void MySQLReconnect::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast)
 int AutomaticCB(gdioutput *gdi, int type, void *data);
 
 void MySQLReconnect::status(gdioutput &gdi) {
-  gdi.dropLine(0.5);
-  gdi.addString("", 1, name);
-  gdi.pushX();
+  AutoMachine::status(gdi);
   if (interval>0){
     gdi.addStringUT(1, timeError + L": " + lang.tl("DATABASE ERROR")).setColor(colorDarkRed);
     gdi.fillRight();
-    gdi.addString("", 0, "Nästa försök:");
+    gdi.addString("", 0, "NÃ¤sta fÃ¶rsÃ¶k:");
     gdi.addTimer(gdi.getCY(),  gdi.getCX()+10, timerCanBeNegative, (GetTickCount()-timeout)/1000);
   }
   else {
     gdi.addStringUT(0, timeError + L": " + lang.tl("DATABASE ERROR")).setColor(colorDarkGrey);
     gdi.fillRight();
     gdi.addStringUT(0, timeReconnect + L":");
-    gdi.addString("", 1, "Återansluten mot databasen, tävlingen synkroniserad.").setColor(colorDarkGreen);
+    gdi.addString("", 1, "Ã…teransluten mot databasen, tÃ¤vlingen synkroniserad.").setColor(colorDarkGreen);
     gdi.dropLine();
     gdi.fillDown();
     gdi.popX();

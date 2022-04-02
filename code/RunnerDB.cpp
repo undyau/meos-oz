@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -604,7 +604,7 @@ void RunnerDB::setupCNHash() const
 static bool isVowel(int c) {
   return c=='a' || c=='e' || c=='i' ||
          c=='o' || c=='u' || c=='y' ||
-         c=='å' || c=='ä' || c=='ö';
+         c=='Ã¥' || c=='Ã¤' || c=='Ã¶';
 }
 
 void RunnerDB::canonizeSplitName(const wstring &name, vector<wstring> &split)
@@ -642,7 +642,7 @@ void RunnerDB::canonizeSplitName(const wstring &name, vector<wstring> &split)
       }
 
       if (outp>4 && out[outp-1]=='s')
-        out[outp-1] = 0; // Identify Linköping och Linköpings
+        out[outp-1] = 0; // Identify LinkÃ¶ping och LinkÃ¶pings
       split.push_back(out);
     }
     while(cname[k] == ' ')
@@ -872,7 +872,6 @@ void RunnerDB::loadClubs(const wstring &file)
       else if (pc != pc2)
         problems.push_back(pc->getName() + L"-" + pc2->getName());
     }
-    problems.begin();
   }
 }
 
@@ -1249,7 +1248,7 @@ void RunnerDB::releaseTables() {
 
 const shared_ptr<Table> &RunnerDB::getRunnerTB() {
   if (!runnerTable) {
-    auto table = make_shared<Table>(oe, 20, L"Löpardatabasen", "runnerdb");
+    auto table = make_shared<Table>(oe, 20, L"LÃ¶pardatabasen", "runnerdb");
 
     table->addColumn("Index", 70, true, true);
     table->addColumn("Id", 70, true, true);
@@ -1257,9 +1256,9 @@ const shared_ptr<Table> &RunnerDB::getRunnerTB() {
     table->addColumn("Klubb", 200, false);
     table->addColumn("SI", 70, true, true);
     table->addColumn("Nationalitet", 70, false, true);
-    table->addColumn("Kön", 50, false, true);
-    table->addColumn("Födelseår", 70, true, true);
-    table->addColumn("Anmäl", 120, false, true);
+    table->addColumn("KÃ¶n", 50, false, true);
+    table->addColumn("FÃ¶delseÃ¥r", 70, true, true);
+    table->addColumn("AnmÃ¤l", 120, false, true);
 
     table->setTableProp(Table::CAN_INSERT|Table::CAN_DELETE|Table::CAN_PASTE);
     table->setClearOnHide(false);
@@ -1330,11 +1329,24 @@ void RunnerDB::refreshRunnerTableData(Table &table) {
         int runnerId;
         bool found = false;
 
+        pRunner r = nullptr;
         if (rdb[k].extId != 0)
           found = runnerInEvent.lookup(rdb[k].extId, runnerId);
+        else if (rdb[k].cardNo != 0) {
+          found = runnerInEvent.lookup(rdb[k].cardNo + cardIdConstant, runnerId);
+          if (found) {
+            r = oe->getRunner(runnerId, 0);
+            const RunnerWDBEntry &rw = rwdb[k];
+            rw.initName();
+            if (!r || !r->matchName(rw.name)) {
+              found = false;
+            }
+          }
+        }
 
         if (found) {
-          pRunner r = oe->getRunner(runnerId, 0);
+          if (r == nullptr)
+            r = oe->getRunner(runnerId, 0);
           row->updateCell(cellEntryIndex, cellEdit, r ? r->getClass(true) : L"");
         }
         else if (!found && row->getCellType(cellEntryIndex) == cellEdit) {
@@ -1352,7 +1364,7 @@ const shared_ptr<Table> &RunnerDB::getClubTB() {
     auto table = make_shared<Table>(oe, 20, L"Klubbdatabasen", "clubdb");
 
     table->addColumn("Id", 70, true, true);
-    table->addColumn("Ändrad", 70, false);
+    table->addColumn("Ã„ndrad", 70, false);
 
     table->addColumn("Namn", 200, false);
     oClub::buildTableCol(oe, table.get());
@@ -1414,8 +1426,18 @@ void oDBRunnerEntry::addTableRow(Table &table) const {
   int runnerId;
   bool found = false;
 
+  pRunner cr = nullptr;
   if (rn.extId != 0)
     found = db->runnerInEvent.lookup(rn.extId, runnerId);
+  else if (rn.cardNo != 0) {
+    found = db->runnerInEvent.lookup(rn.cardNo + cardIdConstant, runnerId);
+    if (found) {
+      cr = oe->getRunner(runnerId, 0);
+      if (!cr || !cr->matchName(r.name)) {
+        found = false;
+      }
+    }
+  }
 
   if (canEdit)
     table.setTableProp(Table::CAN_DELETE|Table::CAN_INSERT|Table::CAN_PASTE);
@@ -1426,8 +1448,9 @@ void oDBRunnerEntry::addTableRow(Table &table) const {
   if (!found)
     table.set(row++, it, TID_ENTER, L"@+", false, cellAction);
   else {
-    pRunner r = oe->getRunner(runnerId, 0);
-    table.set(row++, it, TID_ENTER, r ? r->getClass(true) : L"", false, cellEdit);
+    if (cr == nullptr)
+      cr = oe->getRunner(runnerId, 0);
+    table.set(row++, it, TID_ENTER, cr ? cr->getClass(true) : L"", false, cellEdit);
   }
 }
 
@@ -1485,7 +1508,8 @@ pair<int, bool>  oDBRunnerEntry::inputData(int id, const wstring &input,
       break;
 
     case TID_CLUB:
-      rd.clubNo = inputId;
+      if (inputId != -1) 
+        rd.clubNo = inputId;
       output = input;
       break;
   }

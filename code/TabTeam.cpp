@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -891,7 +891,7 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
       if (r == 0) {
         throw meosException("Ingen deltagare vald.");
       }
-      int leg = (int)gdi.getData("Leg");
+      int leg = gdi.getDataInt("Leg");
       
       pTeam t = oe->getTeam(teamId);
       processChangeRunner(gdi, t, leg, r);
@@ -987,7 +987,7 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
   else if (type == GUI_LINK) {
     TextInfo ti = dynamic_cast<TextInfo &>(*(BaseInfo *)data);
     if (ti.id == "SelectR") {
-      int leg = (int)gdi.getData("Leg");
+      int leg = gdi.getDataInt("Leg");
       pTeam t = oe->getTeam(teamId);
       int rid = ti.getExtraInt();
       pRunner r = oe->getRunner(rid, 0);
@@ -1908,13 +1908,17 @@ void TabTeam::processChangeRunner(gdioutput &gdi, pTeam t, int leg, pRunner r) {
 void TabTeam::switchRunners(pTeam t, int leg, pRunner r, pRunner oldR) {
   vector<int> mp;
   bool removeAnnonumousTeamMember = false;
-  
+  int crsIdR = r->getCourseId();
+  int crsIdROld = oldR ? oldR->getCourseId() : 0;
+
   if (r->getTeam()) {
     pTeam otherTeam = r->getTeam();
     int otherLeg = r->getLegNumber();
     otherTeam->setRunner(otherLeg, oldR, true);
-    if (oldR)
+    if (oldR) {
+      oldR->setCourseId(crsIdR);
       oldR->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
+    }
     otherTeam->checkValdParSetup();
     otherTeam->apply(oBase::ChangeType::Update, nullptr);
     otherTeam->synchronize(true);
@@ -1927,11 +1931,13 @@ void TabTeam::switchRunners(pTeam t, int leg, pRunner r, pRunner oldR) {
     else
       oldR->setClassId(r->getClassId(false), true);
     removeAnnonumousTeamMember = oldR->isAnnonumousTeamMember();
+    oldR->setCourseId(crsIdR);
     oldR->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
     oldR->synchronize(true);
   }
 
   t->setRunner(leg, r, true);
+  r->setCourseId(crsIdROld);
   r->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
   t->checkValdParSetup();
   t->apply(oBase::ChangeType::Update, nullptr);

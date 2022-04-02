@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
 MeOS - Orienteering Software
-Copyright (C) 2009-2020 Melin Software HB
+Copyright (C) 2009-2022 Melin Software HB
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Melin Software HB - software@melin.nu - www.melin.nu
-Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -266,8 +266,8 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
     rq->answer += "</ul>\n";
 
 
-    string entryLinks = "<h2>" + ref.gdiBase().toUTF8(lang.tl(L"Direktanm‰lan", true)) + "</h2>";
-    entryLinks += "<a href=\"?enter\">"+ref.gdiBase().toUTF8(lang.tl("Anm‰l")) + "</a><br>";
+    string entryLinks = "<h2>" + ref.gdiBase().toUTF8(lang.tl(L"Direktanm√§lan", true)) + "</h2>";
+    entryLinks += "<a href=\"?enter\">"+ref.gdiBase().toUTF8(lang.tl("Anm√§l")) + "</a><br>";
     
     entryLinks += "<hr>";
 
@@ -673,6 +673,12 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
         sampleClass = tt[0];
     }
       
+    bool includePreliminary = true;
+    if (param.count("preliminary")) {
+      const string& prl = param.find("preliminary")->second;
+      includePreliminary = atoi(prl.c_str()) > 0 || _stricmp(prl.c_str(), "true") == 0;
+    }
+
     string resTag;
     if (param.count("module") > 0)
       resTag = param.find("module")->second;
@@ -831,7 +837,8 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
         r.swap(r2);
       }
 
-      GeneralResult::calculateIndividualResults(r, controlId, totalResult, inclRunnersInForest, resTag, resType, inputNumber, oe, results);
+      GeneralResult::calculateIndividualResults(r, controlId, totalResult, inclRunnersInForest, includePreliminary, 
+                                                resTag, resType, inputNumber, oe, results);
 
 
       if (resType ==  oListInfo::Classwise)
@@ -854,7 +861,7 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
       int place = -1;
       int cClass = -1;
       int counter = 0;
-      for (const auto &res : results) {
+      for (auto &res : results) {
         if (res.src->getClassId(true) != cClass) {
           counter = 0;
           place = 1;
@@ -863,6 +870,10 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
         if (++counter > limit && (place != res.place || res.status != StatusOK))
           continue;
         place = res.place;
+
+        if (!includePreliminary && res.src->getStatus() == StatusUnknown)
+          res.status = StatusUnknown;
+
         writePerson(res, reslist, true, resType == oListInfo::Coursewise, rProp);
       }
       reslist.endTag();
@@ -1339,7 +1350,7 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
 
     auto cls = oe.getClass(classId);
     if (cls == nullptr) {
-      error = L"Ok‰nd klass";
+      error = L"Ok√§nd klass";
     }
     else if (epClass != EntryPermissionClass::Any && !cls->getAllowQuickEntry()) {
       permissionDenied = true;
@@ -1347,16 +1358,16 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
     else {
       int nm = cls->getNumRemainingMaps(false);
       if (nm != numeric_limits<int>::min() && nm<=0) {
-        error = L"Klassen ‰r full";
+        error = L"Klassen √§r full";
       }
     }
 
     if (epType != EntryPermissionType::Any && extId == 0) {
-      error = L"Anm‰lan mÂste hanteras manuellt";
+      error = L"Anm√§lan m√•ste hanteras manuellt";
     }
 
     if (epType == EntryPermissionType::InDbExistingClub && clubId == 0) {
-      error = L"Anm‰lan mÂste hanteras manuellt";
+      error = L"Anm√§lan m√•ste hanteras manuellt";
     }
   
     bool noTiming = false;
@@ -1375,7 +1386,7 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
       oe.getRunnersByCardNo(cardNo, true, oEvent::CardLookupProperty::CardInUse, runners);
       for (auto r : runners) {
         if (!r->getCard()) {
-          error = L"Bricknummret ‰r upptaget (X)#" + r->getCompleteIdentification();
+          error = L"Bricknummret √§r upptaget (X)#" + r->getCompleteIdentification();
         }
       }
     }
@@ -1427,15 +1438,15 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
 vector<pair<wstring, size_t>> RestServer::getPermissionsPersons() {
   vector<pair<wstring, size_t>> res;
   res.emplace_back(lang.tl("Anyone"), size_t(EntryPermissionType::Any));
-  res.emplace_back(lang.tl("FrÂn lˆpardatabasen"), size_t(EntryPermissionType::InDbAny));
-  res.emplace_back(lang.tl("FrÂn lˆpardatabasen i befintliga klubbar"), size_t(EntryPermissionType::InDbExistingClub));
+  res.emplace_back(lang.tl("Fr√•n l√∂pardatabasen"), size_t(EntryPermissionType::InDbAny));
+  res.emplace_back(lang.tl("Fr√•n l√∂pardatabasen i befintliga klubbar"), size_t(EntryPermissionType::InDbExistingClub));
   return res;
 }
 
 vector<pair<wstring, size_t>> RestServer::getPermissionsClass() {
   vector<pair<wstring, size_t>> res;
   res.emplace_back(lang.tl("Alla"), size_t(EntryPermissionClass::Any));
-  res.emplace_back(lang.tl("Med direktanm‰lan"), size_t(EntryPermissionClass::DirectEntry));
+  res.emplace_back(lang.tl("Med direktanm√§lan"), size_t(EntryPermissionClass::DirectEntry));
   return res;
 }
 

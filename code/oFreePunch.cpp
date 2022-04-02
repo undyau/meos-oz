@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -31,7 +31,6 @@
 #include "Localizer.h"
 #include "intkeymapimpl.hpp"
 #include "socket.h"
-#include "meosdb/sqltypes.h"
 #include "gdioutput.h"
 
 bool oFreePunch::disableHashing = false;
@@ -148,13 +147,13 @@ bool oFreePunch::canRemove() const
 
 const shared_ptr<Table> &oFreePunch::getTable(oEvent *oe) {
   if (!oe->hasTable("punch")) {
-    auto table = make_shared<Table>(oe, 20, L"St‰mplingar", "punches");
+    auto table = make_shared<Table>(oe, 20, L"St√§mplingar", "punches");
     table->addColumn("Id", 70, true, true);
-    table->addColumn("ƒndrad", 150, false);
+    table->addColumn("√Ñndrad", 150, false);
     table->addColumn("Bricka", 70, true);
     table->addColumn("Kontroll", 70, true);
     table->addColumn("Tid", 70, false);
-    table->addColumn("Lˆpare", 170, false);
+    table->addColumn("L√∂pare", 170, false);
     table->addColumn("Lag", 170, false);
     table->addColumn("Klass", 170, false);
     oe->setTable("punch", table);
@@ -251,7 +250,7 @@ bool oFreePunch::setType(const wstring &t, bool databaseUpdate) {
   else {
     if (t == lang.tl("Check"))
       ttype = oPunch::PunchCheck;
-    else if (t == lang.tl("MÂl"))
+    else if (t == lang.tl("M√•l"))
       ttype = oPunch::PunchFinish;
     if (t == lang.tl("Start"))
       ttype = oPunch::PunchStart;
@@ -519,7 +518,7 @@ pFreePunch oEvent::addFreePunch(oFreePunch &fp) {
   fpz->addToEvent(this, &fp);
   oFreePunch::rehashPunches(*this, fp.CardNo, fpz);
 
-  if (!fpz->existInDB() && HasDBConnection) {
+  if (!fpz->existInDB() && hasDBConnection()) {
     fpz->changed = true;
     fpz->synchronize();
   }
@@ -537,8 +536,8 @@ void oEvent::removeFreePunch(int Id) {
         classChanged(r->Class, true);
       }
       pFreePunch fp = &*it;
-      if (HasDBConnection)
-        msRemove(fp);
+      if (hasDBConnection())
+        sqlRemove(fp);
       //punchIndex[it->itype].remove(it->CardNo);
       PunchIndexType &ix = punchIndex[it->iHashType];
       pair<PunchConstIterator, PunchConstIterator> res = ix.equal_range(it->CardNo);
@@ -719,6 +718,7 @@ void oFreePunch::changedObject() {
   pRunner r = getTiedRunner();
   if (r && tMatchControlId>0)
     r->markClassChanged(tMatchControlId);
+  oe->sqlPunches.changed = true;
 }
 
 bool oEvent::hasHiredCardData() {
@@ -753,8 +753,8 @@ void oEvent::setHiredCard(int cardNo, bool flag) {
       hiredCardHash.erase(cardNo);
       for (auto it = punches.begin(); it != punches.end();) {
         if (!it->isRemoved() && it->isHiredCard() && it->CardNo == cardNo) {
-          if (HasDBConnection)
-            msRemove(&*it);
+          if (hasDBConnection())
+            sqlRemove(&*it);
 
           auto toErase = it;
           ++it;
@@ -779,8 +779,8 @@ void oEvent::clearHiredCards() {
   vector<int> toRemove;
   for (auto it = punches.begin(); it != punches.end();) {
     if (!it->isRemoved() && it->isHiredCard()) {
-      if (HasDBConnection)
-        msRemove(&*it);
+      if (hasDBConnection())
+        sqlRemove(&*it);
 
       auto toErase = it;
       ++it;

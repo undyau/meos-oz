@@ -1,6 +1,6 @@
-/************************************************************************
+﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -568,8 +568,19 @@ bool InfoCompetitor::synchronize(bool useTotalResults, bool useCourse, oRunner &
     s = r.getTotalStatusInput();
   }
   else if (t && !isQF && r.getLegNumber() > 0) {
-    legInput = t->getLegRunningTime(r.getLegNumber() - 1, true, false) * 10;
-    s  = t->getLegStatus(r.getLegNumber() - 1, true, false);
+    int ltu = r.getLegNumber();
+    pClass cls = t->getClassRef(true);
+    if (cls) {
+      LegTypes lt = cls->getLegType(ltu);
+      while (ltu > 0 && (lt == LTParallelOptional || lt == LTParallel|| lt == LTExtra || lt == LTIgnore) ) {
+        ltu--;
+        lt = cls->getLegType(ltu);
+      }
+    }
+    if (ltu > 0) {
+      legInput = t->getLegRunningTime(ltu - 1, true, false) * 10;
+      s = t->getLegStatus(ltu - 1, true, false);
+    }
   }
 
   if (totalStatus != s) {

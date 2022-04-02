@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -103,7 +103,7 @@ int TabCompetition::newGuideCB(gdioutput &gdi, int type, void *data)
         createCompetition(gdi);
       gdi.clearPage(true);
       gdi.fillRight();
-      gdi.addString("", fontMediumPlus, "Skapar tävling...");
+      gdi.addString("", fontMediumPlus, "Skapar tÃ¤vling...");
       gdi.refresh();
       Sleep(400);
       oe->getMeOSFeatures().useAll(*oe);
@@ -129,7 +129,7 @@ int TabCompetition::newGuideCB(gdioutput &gdi, int type, void *data)
       saveMeosFeatures(gdi, true);
       gdi.clearPage(true);
       gdi.fillRight();
-      gdi.addString("", fontMediumPlus, "Skapar tävling...");
+      gdi.addString("", fontMediumPlus, "Skapar tÃ¤vling...");
       gdi.refresh();
       Sleep(400);
       oe->updateTabs(true, false);
@@ -150,7 +150,7 @@ int TabCompetition::newGuideCB(gdioutput &gdi, int type, void *data)
 
       gdi.clearPage(true);
       gdi.fillRight();
-      gdi.addString("", fontMediumPlus, "Skapar tävling...");
+      gdi.addString("", fontMediumPlus, "Skapar tÃ¤vling...");
       gdi.refresh();
       Sleep(400);
       oe->updateTabs(true, false);
@@ -174,7 +174,7 @@ int TabCompetition::newGuideCB(gdioutput &gdi, int type, void *data)
 
       gdi.clearPage(true);
       gdi.fillRight();
-      gdi.addString("", fontMediumPlus, "Skapar tävling...");
+      gdi.addString("", fontMediumPlus, "Skapar tÃ¤vling...");
       gdi.refresh();
       Sleep(400);
       oe->updateTabs(true, false);
@@ -196,7 +196,7 @@ int TabCompetition::newGuideCB(gdioutput &gdi, int type, void *data)
 
       gdi.clearPage(true);
       gdi.fillRight();
-      gdi.addString("", fontMediumPlus, "Skapar tävling...");
+      gdi.addString("", fontMediumPlus, "Skapar tÃ¤vling...");
       gdi.refresh();
       Sleep(400);
       oe->updateTabs(true, false);
@@ -221,7 +221,7 @@ int TabCompetition::newGuideCB(gdioutput &gdi, int type, void *data)
 
       gdi.clearPage(true);
       gdi.fillRight();
-      gdi.addString("", fontMediumPlus, "Skapar tävling...");
+      gdi.addString("", fontMediumPlus, "Skapar tÃ¤vling...");
       gdi.refresh();
       Sleep(400);
       oe->updateTabs(true, false);
@@ -253,7 +253,7 @@ int TabCompetition::newGuideCB(gdioutput &gdi, int type, void *data)
         long long stopT = absT + 23 * 3600;
         SYSTEMTIME start = Int64SecondToSystemTime(absT);
         SYSTEMTIME end = Int64SecondToSystemTime(stopT);
-        wstring s = L"Tävlingen måste avgöras mellan X och Y.#" + convertSystemTime(start) + L"#" + convertSystemTime(end);
+        wstring s = L"TÃ¤vlingen mÃ¥ste avgÃ¶ras mellan X och Y.#" + convertSystemTime(start) + L"#" + convertSystemTime(end);
         gdi.setTextTranslate("AllowedInterval", s, true);
       }
     }
@@ -268,7 +268,7 @@ void TabCompetition::newCompetitionGuide(gdioutput &gdi, int step) {
   if (step == 0) {
     oe->updateTabs(true, true);
     gdi.clearPage(false);
-    gdi.addString("", boldLarge, "Ny tävling");
+    gdi.addString("", boldLarge, "Ny tÃ¤vling");
     gdi.dropLine();
     gdi.setRestorePoint("newcmp");
 
@@ -281,13 +281,13 @@ void TabCompetition::newCompetitionGuide(gdioutput &gdi, int step) {
     gdi.addString("", fontMediumPlus, "Namn och tidpunkt");
 
     gdi.dropLine(0.5);
-    gdi.addInput("Name", lang.tl("Ny tävling"), 34, 0, L"Tävlingens namn:");
+    gdi.addInput("Name", lang.tl("Ny tÃ¤vling"), 34, 0, L"TÃ¤vlingens namn:");
 
     gdi.pushX();
     gdi.fillRight();
-    InputInfo &date = gdi.addInput("Date", getLocalDate(), 16, NewGuideCB, L"Datum (för första start):");
+    InputInfo &date = gdi.addInput("Date", getLocalDate(), 16, NewGuideCB, L"Datum (fÃ¶r fÃ¶rsta start):");
 
-    gdi.addInput("FirstStart", L"07:00:00", 12, NewGuideCB, L"Första tillåtna starttid:");
+    gdi.addInput("FirstStart", L"07:00:00", 12, NewGuideCB, L"FÃ¶rsta tillÃ¥tna starttid:");
 
     gdi.popX();
     gdi.fillDown();
@@ -313,7 +313,7 @@ void TabCompetition::newCompetitionGuide(gdioutput &gdi, int step) {
     gdi.addRectangle(rc, colorLightBlue, true);
 
     gdi.fillRight();
-    gdi.addButton("BasicSetup", "<< Bakåt", NewGuideCB);
+    gdi.addButton("BasicSetup", "<< BakÃ¥t", NewGuideCB);
     gdi.addButton("DoImportEntries", "Importera", NewGuideCB);
     gdi.addButton("Cancel", "Avbryt", NewGuideCB).setCancel();
 
@@ -332,20 +332,20 @@ void TabCompetition::newCompetitionGuide(gdioutput &gdi, int step) {
     gdi.dropLine(0.5);
     gdi.addString("", 10, "newcmp:featuredesc");
     gdi.dropLine();
-    gdi.addString("", 1, "Välj vilka funktioner du vill använda");
+    gdi.addString("", 1, "VÃ¤lj vilka funktioner du vill anvÃ¤nda");
     gdi.dropLine(0.5);
     gdi.fillRight();
     gdi.addString("", 1, "Individuellt").setColor(colorDarkBlue);
     gdi.popX();
     gdi.dropLine(1.2);
 
-    gdi.addButton("FIndividual", "Individuell tävling", NewGuideCB);
+    gdi.addButton("FIndividual", "Individuell tÃ¤vling", NewGuideCB);
     gdi.addButton("FForked", "Individuellt, gafflat", NewGuideCB);
 
     gdi.popX();
     gdi.dropLine(2);
 
-    gdi.addButton("FBasic", "Endast grundläggande (enklast möjligt)", NewGuideCB);
+    gdi.addButton("FBasic", "Endast grundlÃ¤ggande (enklast mÃ¶jligt)", NewGuideCB);
     gdi.addButton("FNoCourses", "Endast tidtagning (utan banor)", NewGuideCB);
 
     gdi.popX();
@@ -355,18 +355,18 @@ void TabCompetition::newCompetitionGuide(gdioutput &gdi, int step) {
     gdi.popX();
     gdi.dropLine(1.2);
 
-    gdi.addButton("FTeam", "Tävling med lag", NewGuideCB);
+    gdi.addButton("FTeam", "TÃ¤vling med lag", NewGuideCB);
     gdi.addButton("FNoCoursesRelay", "Endast tidtagning (utan banor), stafett", NewGuideCB);
 
     gdi.popX();
     gdi.dropLine(3);
     
-    gdi.addString("", 1, "Övrigt").setColor(colorDarkBlue);
+    gdi.addString("", 1, "Ã–vrigt").setColor(colorDarkBlue);
     gdi.popX();
     gdi.dropLine(1.2);
 
     gdi.addButton("FAll", "Alla funktioner", NewGuideCB);
-    gdi.addButton("FSelect", "Välj från lista...", NewGuideCB);
+    gdi.addButton("FSelect", "VÃ¤lj frÃ¥n lista...", NewGuideCB);
     gdi.addButton("Cancel", "Avbryt", NewGuideCB).setCancel();
 
     if (oe->hasTeam()) {
@@ -403,8 +403,8 @@ void TabCompetition::newCompetitionGuide(gdioutput &gdi, int step) {
     gdi.dropLine();
     gdi.setCY(gdi.getHeight());
     gdi.fillRight();
-    gdi.addButton("NoEntries", "<< Bakåt", NewGuideCB);
-    gdi.addButton("StoreFeatures", "Skapa tävlingen", NewGuideCB);
+    gdi.addButton("NoEntries", "<< BakÃ¥t", NewGuideCB);
+    gdi.addButton("StoreFeatures", "Skapa tÃ¤vlingen", NewGuideCB);
     gdi.addButton("Cancel", "Avbryt", NewGuideCB).setCancel();
 
     gdi.popX();
@@ -419,9 +419,9 @@ void TabCompetition::newCompetitionGuide(gdioutput &gdi, int step) {
 void TabCompetition::entryChoice(gdioutput &gdi) {
   gdi.fillRight();
   gdi.pushX();
-  gdi.addButton("ImportEntries", "Importera anmälda", NewGuideCB);
+  gdi.addButton("ImportEntries", "Importera anmÃ¤lda", NewGuideCB);
   //gdi.addButton("FreeEntry", "Fri inmatning av deltagare", NewGuideCB);
-  gdi.addButton("NoEntries", "Anmäl inga deltagare nu", NewGuideCB);
+  gdi.addButton("NoEntries", "AnmÃ¤l inga deltagare nu", NewGuideCB);
   gdi.addButton("Cancel", "Avbryt", NewGuideCB).setCancel();
 
   gdi.popX();

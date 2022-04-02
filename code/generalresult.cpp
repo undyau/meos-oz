@@ -1,6 +1,6 @@
-/************************************************************************
+﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 #include "stdafx.h"
@@ -38,7 +38,7 @@ GeneralResultCtr::GeneralResultCtr(const char *tagIn, const wstring &nameIn, con
   ptr = ptrIn;
 }
 
-GeneralResultCtr::GeneralResultCtr(wstring &file, const shared_ptr<DynamicResult> &ptrIn) {
+GeneralResultCtr::GeneralResultCtr(const wstring &file, const shared_ptr<DynamicResult> &ptrIn) {
   ptr = ptrIn;
   name = ptrIn->getName(false);
   tag = ptrIn->getTag();
@@ -1473,6 +1473,7 @@ void GeneralResult::calculateIndividualResults(vector<pRunner> &runners,
                                                const pair<int, int> & controlId,
                                                bool totalResults,
                                                bool inclForestRunners,
+                                               bool inclPreliminary,
                                                const string &resTag,
                                                oListInfo::ResultType resType,
                                                int inputNumber,
@@ -1491,7 +1492,7 @@ void GeneralResult::calculateIndividualResults(vector<pRunner> &runners,
         for (pRunner r : runners) {
           clsId.insert(r->getClassId(true));
         }
-        oe.calculateResults(clsId, oEvent::ResultType::ClassResult, true);
+        oe.calculateResults(clsId, oEvent::ResultType::ClassResult, inclPreliminary);
         for (pRunner r : runners) {
           ri.status = r->getStatus();
           if (ri.status == StatusUnknown) {
@@ -1520,7 +1521,7 @@ void GeneralResult::calculateIndividualResults(vector<pRunner> &runners,
         }
       }
       else {
-        oe.calculateResults(set<int>(), oEvent::ResultType::TotalResult, true);
+        oe.calculateResults(set<int>(), oEvent::ResultType::TotalResult, inclPreliminary);
         for (pRunner r : runners) {
           ri.status = r->getTotalStatus();
           if (ri.status == StatusUnknown && r->getInputStatus() == StatusOK) {

@@ -1,17 +1,8 @@
-// oRunner.h: interface for the oRunner class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#if !defined(AFX_ORUNNER_H__D3B8D6C8_C90A_4F86_B776_7D77E5C76F42__INCLUDED_)
-#define AFX_ORUNNER_H__D3B8D6C8_C90A_4F86_B776_7D77E5C76F42__INCLUDED_
-
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
+﻿#pragma once
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -57,6 +48,13 @@ vector<RunnerStatus> getAllRunnerStatus() {
            StatusDNF, StatusDQ, StatusMAX,
            StatusUnknown, StatusNotCompetiting , StatusNoTiming};
 }
+
+
+template<int dummy = 0>
+bool showResultTime(RunnerStatus st, int time) {
+  return st == StatusOK || (st == StatusOutOfCompetition && time > 0);
+}
+
 
 #include "oSpeaker.h"
 
@@ -192,8 +190,6 @@ protected:
 
   bool sqlChanged;
   bool tEntryTouched;
-
-  void changedObject();
 
   mutable pair<bool, int> tPreventRestartCache = { false, -1 };
 public:
@@ -432,8 +428,9 @@ public:
   /// Get total status for this running (including team/earlier races)
   virtual RunnerStatus getTotalStatus() const;
 
+  RunnerStatus getStageResult(int stage, int &time, int &point, int &place) const;
   // Get results from all previous stages
-  void getInputResults(vector<RunnerStatus> &st, vector<int> &times, vector<int> &points, vector<int> &places);
+  void getInputResults(vector<RunnerStatus> &st, vector<int> &times, vector<int> &points, vector<int> &places) const;
   // Add current result to input result. Only use when transferring to next stage. ThisStageNumber is zero indexed.
   void addToInputResult(int thisStageNo, const oAbstractRunner *src);
 
@@ -549,6 +546,8 @@ protected:
 
   BYTE oData[dataSize];
   BYTE oDataOld[dataSize];
+
+  void changedObject() final;
 
   bool storeTimes(); // Returns true if best times were updated
   
@@ -668,15 +667,11 @@ protected:
 public:
   static const shared_ptr<Table> &getTable(oEvent *oe);
 
-  int getStartGroup(bool useTmpStartGroup) const {
-    if (useTmpStartGroup && tmpStartGroup)
-      return tmpStartGroup;
-    return getDCI().getInt("StartGroup");
-  }
+  oRunner *getMainRunner() { return tParentRunner != nullptr ? tParentRunner : this; }
+  const oRunner* getMainRunner() const { return tParentRunner != nullptr ? tParentRunner : this; }
 
-  void setStartGroup(int sg) {
-    getDI().setInt("StartGroup", sg);
-  }
+  int getStartGroup(bool useTmpStartGroup) const;
+  void setStartGroup(int sg);
 
   // Get the leg defineing parallel results for this runner (in a team)
   int getParResultLeg() const;
@@ -967,6 +962,7 @@ public:
   
   virtual ~oRunner();
 
+  friend class oCard;
   friend class MeosSQL;
   friend class oEvent;
   friend class oTeam;
@@ -977,5 +973,3 @@ public:
   static bool sortSplit(const oRunner &a, const oRunner &b);
 
 };
-
-#endif // !defined(AFX_ORUNNER_H__D3B8D6C8_C90A_4F86_B776_7D77E5C76F42__INCLUDED_)

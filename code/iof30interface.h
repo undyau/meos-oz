@@ -1,6 +1,6 @@
-/************************************************************************
+﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -24,6 +24,7 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <tuple>
 
 class oEvent;
 class xmlobject;
@@ -141,6 +142,8 @@ class IOF30Interface {
 
   vector<FeeStatistics> feeStatistics;
 
+  map<int, vector<tuple<int, int, pCourse>>> classToBibLegCourse;
+
   static void getAgeLevels(const vector<FeeInfo> &fees, const vector<int> &ix,
                            int &normalIx, int &redIx, wstring &youthLimit, wstring &seniorLimit);
 
@@ -172,6 +175,10 @@ class IOF30Interface {
   pTeam readTeamStart(gdioutput &gdi, pClass pc, xmlobject &xTeam,
                       map<int, pair<wstring, int> > &bibPatterns,
                       const map<int, vector<LegInfo> > &teamClassConfig);
+
+
+  pRunner readPersonResult(gdioutput &gdi, pClass pc, xmlobject &xo, pTeam team,
+                          const map<int, vector<LegInfo> > &teamClassConfig);
 
   pTeam getCreateTeam(gdioutput &gdi, const xmlobject &xTeam, int expectedClassId, bool &newTeam);
 
@@ -266,7 +273,7 @@ class IOF30Interface {
   void teamCourseAssignment(gdioutput &gdi, xmlList &xAssignment,
                             const map<wstring, pCourse> &courses);
 
-  void assignTeamCourse(gdioutput &gdi, oTeam &t, xmlList &xAssignment,
+  void assignTeamCourse(gdioutput &gdi, oTeam *t, int iClass, int iBib, xmlList &xAssignment,
                         const map<wstring, pCourse> &courses);
 
   pCourse findCourse(gdioutput &gdi, const map<wstring, pCourse> &courses,
@@ -306,6 +313,8 @@ public:
                      const set<int> &stageFilter, int &entRead, int &entFail, int &entRemoved);
 
   void readStartList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
+
+  void readResultList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
 
   void readServiceRequestList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
 

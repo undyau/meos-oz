@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -218,12 +218,19 @@ int TabClass::multiCB(gdioutput &gdi, int type, void *data)
       gdi.setInputStatus("CommonStartTime", gdi.isChecked(bi.id));
     }
     else if (bi.id == "CoursePool") {
+      int nlegs = 1;
+      if (oe->getClass(ClassId))
+        nlegs = max(1u, oe->getClass(ClassId)->getNumStages());
+
       string strId = "StageCourses_label";
       gdi.setTextTranslate(strId, getCourseLabel(gdi.isChecked(bi.id)), true);
-      setLockForkingState(gdi, gdi.isChecked("CoursePool"), gdi.isChecked("LockForking"));
+      setLockForkingState(gdi, gdi.isChecked("CoursePool"), gdi.isChecked("LockForking"), nlegs);
     }
     else if (bi.id == "LockForking") {
-      setLockForkingState(gdi, gdi.isChecked("CoursePool"), gdi.isChecked(bi.id));
+      int nlegs = 1;
+      if (oe->getClass(ClassId))
+        nlegs = max(1u, oe->getClass(ClassId)->getNumStages());
+      setLockForkingState(gdi, gdi.isChecked("CoursePool"), gdi.isChecked(bi.id), nlegs);
     }
     else if (bi.id == "DefineForking") {
       if (!checkClassSelected(gdi))
@@ -303,89 +310,94 @@ int TabClass::multiCB(gdioutput &gdi, int type, void *data)
     else if (bi.id == "ShowForking") {
       if (!checkClassSelected(gdi))
         return false;
-      pClass pc=oe->getClass(ClassId);
+      pClass pc = oe->getClass(ClassId);
       if (!pc)
         throw std::exception("Klassen finns ej.");
-
-      vector< vector<int> > forks;
-      set< pair<int, int> > unfairLegs;
-      vector< vector<int> > legOrder;
-
-      pc->checkForking(legOrder, forks, unfairLegs);
 
       gdioutput *gdi_new = getExtraWindow("fork", true);
       wstring title = lang.tl(L"Forkings for X#" + pc->getName());
       if (!gdi_new)
         gdi_new = createExtraWindow("fork", title,
-                                     gdi.scaleLength(1024) );
+                                    gdi.scaleLength(1024));
       else
         gdi_new->setWindowTitle(title);
 
       gdi_new->clearPage(false);
 
-      gdi_new->addString("", fontMediumPlus, "Forkings");
 
-      for (size_t k = 0; k < forks.size(); k++) {
-        gdi_new->dropLine(0.7);
-        wstring ver = itow(k+1) + L": ";
-        for (size_t j = 0; j < legOrder[k].size(); j++) {
-          pCourse crs = oe->getCourse(legOrder[k][j]);
-          if (crs) {
-            if (j>0)
-              ver += L", ";
-            ver += crs->getName();
-          }
-        }
-        gdi_new->addStringUT(1, ver);
-        gdi_new->pushX();
-        gdi_new->fillRight();
-        for (size_t j = 0; j < forks[k].size(); j++) {
-          wstring ctrl;
-          if (forks[k][j] > 0)
-            ctrl += itow(forks[k][j]);
-          else {
-            if (j == 0)
-              ctrl += lang.tl("Start");
-            else if (j + 1 == forks[k].size())
-              ctrl += lang.tl("Mål");
-            else
-              ctrl += lang.tl("Växel");
-          }
-          int next = -100;
-          if (j + 1 < forks[k].size()) {
-            ctrl += L",";
-            next = forks[k][j+1];
-          }
-          int prev = j>0 ? forks[k][j-1] : -100;
-
-          bool warn = unfairLegs.count(make_pair(prev, forks[k][j])) != 0;// ||
-                      //unfairLegs.count(make_pair(forks[k][j], next)) != 0;
-
-          TextInfo &ti = gdi_new->addStringUT(italicText, ctrl);
-          if (warn) {
-            ti.setColor(colorRed);
-            ti.format = boldText;
-          }
-          gdi.setCX(gdi.getCX() - gdi.scaleLength(4));
-        }
-        gdi_new->popX();
-        gdi_new->fillDown();
-        gdi_new->dropLine();
+      if (pc->hasCoursePool()) {
+        gdi_new->addString("", fontMediumPlus, "Klassen använder banpool");
       }
+      else {
+        vector< vector<int> > forks;
+        set< pair<int, int> > unfairLegs;
+        vector< vector<int> > legOrder;
 
-      if (!unfairLegs.empty()) {
-        gdi_new->dropLine();
-        gdi_new->addString("", fontMediumPlus, "Unfair control legs");
-        gdi_new->dropLine(0.5);
-        for (set< pair<int, int> >::const_iterator p = unfairLegs.begin();
-             p != unfairLegs.end(); ++p) {
+        pc->checkForking(legOrder, forks, unfairLegs);
 
-          wstring f = p->first > 0 ? itow(p->first) : lang.tl("Växel");
-          wstring s = p->second > 0 ? itow(p->second) : lang.tl("Växel");
-          gdi_new->addStringUT(0, makeDash(f + L" - " + s));
+        gdi_new->addString("", fontMediumPlus, "Forkings");
+
+        for (size_t k = 0; k < forks.size(); k++) {
+          gdi_new->dropLine(0.7);
+          wstring ver = itow(k + 1) + L": ";
+          for (size_t j = 0; j < legOrder[k].size(); j++) {
+            pCourse crs = oe->getCourse(legOrder[k][j]);
+            if (crs) {
+              if (j > 0)
+                ver += L", ";
+              ver += crs->getName();
+            }
+          }
+          gdi_new->addStringUT(1, ver);
+          gdi_new->pushX();
+          gdi_new->fillRight();
+          for (size_t j = 0; j < forks[k].size(); j++) {
+            wstring ctrl;
+            if (forks[k][j] > 0)
+              ctrl += itow(forks[k][j]);
+            else {
+              if (j == 0)
+                ctrl += lang.tl("Start");
+              else if (j + 1 == forks[k].size())
+                ctrl += lang.tl("Mål");
+              else
+                ctrl += lang.tl("Växel");
+            }
+            int next = -100;
+            if (j + 1 < forks[k].size()) {
+              ctrl += L",";
+              next = forks[k][j + 1];
+            }
+            int prev = j > 0 ? forks[k][j - 1] : -100;
+
+            bool warn = unfairLegs.count(make_pair(prev, forks[k][j])) != 0;// ||
+                        //unfairLegs.count(make_pair(forks[k][j], next)) != 0;
+
+            TextInfo &ti = gdi_new->addStringUT(italicText, ctrl);
+            if (warn) {
+              ti.setColor(colorRed);
+              ti.format = boldText;
+            }
+            gdi.setCX(gdi.getCX() - gdi.scaleLength(4));
+          }
+          gdi_new->popX();
+          gdi_new->fillDown();
+          gdi_new->dropLine();
+        }
+
+        if (!unfairLegs.empty()) {
+          gdi_new->dropLine();
+          gdi_new->addString("", fontMediumPlus, "Unfair control legs");
+          gdi_new->dropLine(0.5);
+          for (set< pair<int, int> >::const_iterator p = unfairLegs.begin();
+               p != unfairLegs.end(); ++p) {
+
+            wstring f = p->first > 0 ? itow(p->first) : lang.tl("Växel");
+            wstring s = p->second > 0 ? itow(p->second) : lang.tl("Växel");
+            gdi_new->addStringUT(0, makeDash(f + L" - " + s));
+          }
         }
       }
-
       gdi_new->dropLine();
       gdi_new->addButton("CloseWindow", "Stäng", ClassesCB);
       gdi_new->refresh();
@@ -1916,7 +1928,37 @@ int TabClass::classCB(gdioutput &gdi, int type, void *data)
       gdi.refresh();
       return 0;
     }
-    else if (bi.id=="Split") {
+    else if (bi.id == "Duplicate") {
+      save(gdi, true);
+      if (!checkClassSelected(gdi))
+        return false;
+      pClass pc = oe->getClass(ClassId);
+      if (!pc)
+        throw std::exception("Class not found");
+
+      oClass copyClass(*pc);
+      copyClass.clearDuplicate();
+      wstring name = pc->getName();
+      wstring dup = lang.tl(" (kopia)");
+      size_t pos = name.find(dup);
+      wstring base;
+      if (pos > 0 && pos < string::npos) 
+        base = name.substr(0, pos);
+      else 
+        base = name;
+      
+      name = base + dup;
+      int cnt = 1;
+      while (oe->getClass(name) != nullptr)
+        name = base + dup + L" " + itow(++cnt);
+      
+      copyClass.setName(name, true);
+      pc = oe->addClass(copyClass);
+      oe->fillClasses(gdi, "Classes", oEvent::extraDrawn, oEvent::filterNone);
+      selectClass(gdi, pc->getId());
+      gdi.setInputFocus("Name", true);
+    }
+    else if (bi.id == "Split") {
       save(gdi, true);
       if (!checkClassSelected(gdi))
         return false;
@@ -2714,7 +2756,7 @@ void TabClass::selectClass(gdioutput &gdi, int cid)
 
     if (gdi.hasWidget("LockForking")) {
       gdi.check("LockForking", pc->lockedForking());
-      setLockForkingState(gdi, pc->hasCoursePool(), pc->lockedForking());
+      setLockForkingState(gdi, *pc);
     }
 
     if (gdi.hasWidget("MCourses")) {
@@ -3456,7 +3498,7 @@ bool TabClass::loadPage(gdioutput &gdi)
     func.push_back(ButtonData("Merge", "Slå ihop klasser...", false));
     func.push_back(ButtonData("Split", "Dela klassen...", false));
   }
-
+  func.emplace_back("Duplicate", "Duplicera", false);
 
   if (showAdvanced && oe->getMeOSFeatures().hasFeature(MeOSFeatures::Vacancy)) {
     vector<pRunner> rr;
@@ -4178,11 +4220,18 @@ void TabClass::selectCourses(gdioutput &gdi, int legNo) {
 void TabClass::updateFairForking(gdioutput &gdi, pClass pc) const {
   if (!gdi.hasWidget("FairForking"))
     return;
+  BaseInfo *bi = gdi.setText("FairForking", gdi.getText("FairForking"), false);
+  TextInfo &text = dynamic_cast<TextInfo &>(*bi);
+
+  if (pc->hasCoursePool()) {
+    text.setColor(colorBlack);
+    gdi.setText("FairForking", L"", true);
+    return;
+  }
+
   vector< vector<int> > forks;
   vector< vector<int> > forksC;
   set< pair<int, int> > unfairLegs;
-  BaseInfo *bi = gdi.setText("FairForking", gdi.getText("FairForking"), false);
-  TextInfo &text = dynamic_cast<TextInfo &>(*bi);
   if (pc->checkForking(forksC, forks, unfairLegs)) {
     text.setColor(colorGreen);
     gdi.setText("FairForking", lang.tl("The forking is fair."), true);
@@ -4640,10 +4689,10 @@ void TabClass::writeDrawInfo(gdioutput &gdi, const DrawInfo &drawInfoIn) {
 }
 
 void TabClass::setLockForkingState(gdioutput &gdi, const oClass &c) {
-  setLockForkingState(gdi, c.hasCoursePool(), c.lockedForking());
+  setLockForkingState(gdi, c.hasCoursePool(), c.lockedForking(), max(1u, c.getNumStages()));
 }
 
-void TabClass::setLockForkingState(gdioutput &gdi, bool poolState, bool lockState) {
+void TabClass::setLockForkingState(gdioutput &gdi, bool poolState, bool lockState, int nLegs) {
   if (gdi.hasWidget("DefineForking"))
     gdi.setInputStatus("DefineForking", !lockState && !poolState);
 
@@ -4652,7 +4701,7 @@ void TabClass::setLockForkingState(gdioutput &gdi, bool poolState, bool lockStat
 
   int legno = 0;
   while (gdi.hasWidget("@Course" + itos(legno))) {
-    gdi.setInputStatus("@Course" + itos(legno++), !lockState || poolState);
+    gdi.setInputStatus("@Course" + itos(legno++), (!lockState || poolState) && legno < nLegs);
   }
 
   for (string s : {"MCourses", "StageCourses", "MAdd", "MRemove"}) {
@@ -5045,14 +5094,15 @@ public:
       if (ii.id[0] == 'g') {
         int idNew = _wtoi(ii.text.c_str());
         if (idNew != id) {
-          if (oe.getStartGroup(idNew).first == -1) {
+          if (oe.getStartGroup(idNew).firstStart == -1) {
             auto d = oe.getStartGroup(id);
-            oe.setStartGroup(idNew, d.first, d.second);
-            oe.setStartGroup(id, -1, -1);
+            oe.setStartGroup(idNew, d.firstStart, d.lastStart, d.name);
+            oe.setStartGroup(id, -1, -1, L"");
             string rowIx = ii.id.substr(5);
             gdi.getBaseInfo("group" + rowIx).setExtra(idNew);
             gdi.getBaseInfo("first" + rowIx).setExtra(idNew);
             gdi.getBaseInfo("last" + rowIx).setExtra(idNew);
+            gdi.getBaseInfo("gname" + rowIx).setExtra(idNew);
             gdi.getBaseInfo("D" + rowIx).setExtra(idNew);
             ii.setBgColor(colorDefault);
           }
@@ -5063,13 +5113,18 @@ public:
       }
       else if (ii.id[0] == 'f') {
         auto d = oe.getStartGroup(id);
-        d.first = oe.getRelativeTime(ii.text);
-        oe.setStartGroup(id, d.first, d.second);
+        d.firstStart = oe.getRelativeTime(ii.text);
+        oe.setStartGroup(id, d.firstStart, d.lastStart, d.name);
       }
       else if (ii.id[0] == 'l') {
         auto d = oe.getStartGroup(id);
-        d.second = oe.getRelativeTime(ii.text);
-        oe.setStartGroup(id, d.first, d.second);
+        d.lastStart = oe.getRelativeTime(ii.text);
+        oe.setStartGroup(id, d.firstStart, d.lastStart, d.name);
+      }
+      else if (ii.id[0] == 'n') {
+        auto d = oe.getStartGroup(id);
+        d.name = ii.text;
+        oe.setStartGroup(id, d.firstStart, d.lastStart, d.name);
       }
     }
     else if (type == GuiEventType::GUI_BUTTON) {
@@ -5079,16 +5134,16 @@ public:
         int length = 3600;
         for (auto &g : oe.getStartGroups(false)) {
           id = max(id, g.first+1);
-          firstStart = max(firstStart, g.second.second);
-          if (g.second.first < g.second.second)
-            length = min(length, g.second.second - g.second.first);
+          firstStart = max(firstStart, g.second.lastStart);
+          if (g.second.firstStart < g.second.lastStart)
+            length = min(length, g.second.lastStart - g.second.firstStart);
         }
-        oe.setStartGroup(id, firstStart, firstStart + length);
+        oe.setStartGroup(id, firstStart, firstStart + length, L"");
         tc->loadStartGroupSettings(gdi, false);
       }
       else if (info.id[0] == 'D') {
         int id = info.getExtraInt();
-        oe.setStartGroup(id, -1, -1);
+        oe.setStartGroup(id, -1, -1, L"");
         tc->loadStartGroupSettings(gdi, false);
       }
       else if (info.id == "Save") {
@@ -5121,7 +5176,8 @@ void TabClass::loadStartGroupSettings(gdioutput &gdi, bool reload) {
   int idPos = gdi.getCX();
   int firstPos = idPos + gdi.scaleLength(120);
   int lastPos = firstPos + gdi.scaleLength(120);
-  int bPos = lastPos + gdi.scaleLength(120);
+  int namePos = lastPos + gdi.scaleLength(120);
+  int bPos = namePos + gdi.scaleLength(240);
   bool first = true;
 
   for (auto &g : sg) {
@@ -5130,13 +5186,16 @@ void TabClass::loadStartGroupSettings(gdioutput &gdi, bool reload) {
       gdi.addString("", y, idPos, 0, "Id");
       gdi.addString("", y, firstPos, 0, "Start");
       gdi.addString("", y, lastPos, 0, "Slut");
+      gdi.addString("", y, namePos, 0, "Namn");
       first = false;
     }
     int cy = gdi.getCY();
     string srow = itos(row++);
     gdi.addInput(idPos, cy, "group" + srow, itow(g.first), 8).setHandler(sgh).setExtra(g.first);
-    gdi.addInput(firstPos, cy, "first" + srow, oe->getAbsTime(g.second.first), 10).setHandler(sgh).setExtra(g.first);
-    gdi.addInput(lastPos, cy, "last" + srow, oe->getAbsTime(g.second.second), 8).setHandler(sgh).setExtra(g.first);
+    gdi.addInput(firstPos, cy, "first" + srow, oe->getAbsTime(g.second.firstStart), 10).setHandler(sgh).setExtra(g.first);
+    gdi.addInput(lastPos, cy, "last" + srow, oe->getAbsTime(g.second.lastStart), 8).setHandler(sgh).setExtra(g.first);
+    gdi.addInput(namePos, cy, "name" + srow, g.second.name, 20).setHandler(sgh).setExtra(g.first);
+
     gdi.addButton(bPos, cy, "D" + srow, L"Ta bort").setHandler(sgh).setExtra(g.first);
   }
 

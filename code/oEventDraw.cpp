@@ -1,6 +1,6 @@
-/************************************************************************
+ï»¿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
+    EksoppsvÃ¤gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -180,7 +180,7 @@ namespace {
 
     //Find the largest group
     for (size_t k = 1; k < runnerGroups.size(); k++)
-      maxGroup = max(maxGroup, runnerGroups[k].size());
+      maxGroup = max<int>(maxGroup, runnerGroups[k].size());
 
     if (handleBlanks) {
       //Give all groups same size (fill with 0)
@@ -273,7 +273,7 @@ namespace {
     if (groups.size() > 10)
       takeMaxGroupInterval = groups.size() / 4;
     else
-      takeMaxGroupInterval = max(2u, groups.size() - 2);
+      takeMaxGroupInterval = max<int>(2u, groups.size() - 2);
 
     deque<int> recentGroups;
 
@@ -864,10 +864,10 @@ void oEvent::optimizeStartOrder(vector<pair<int, wstring>> &outLines, DrawInfo &
   vector< vector<pair<int, int> > > startField(di.nFields);
   drawOptim.optimizeStartOrder(startField, di, cInfo, opt.nControls, opt.alternator);
 
-  outLines.emplace_back(0, L"Identifierar X unika inledningar på banorna.#" + itow(di.numDistinctInit));
-  outLines.emplace_back(0, L"Största gruppen med samma inledning har X platser.#" + itow(di.numRunnerSameInitMax));
-  outLines.emplace_back(0, L"Antal löpare på vanligaste banan X.#" + itow(di.numRunnerSameCourseMax));
-  outLines.emplace_back(0, L"Kortast teoretiska startdjup utan krockar är X minuter.#" + itow(di.minimalStartDepth/60));
+  outLines.emplace_back(0, L"Identifierar X unika inledningar pÃ¥ banorna.#" + itow(di.numDistinctInit));
+  outLines.emplace_back(0, L"StÃ¶rsta gruppen med samma inledning har X platser.#" + itow(di.numRunnerSameInitMax));
+  outLines.emplace_back(0, L"Antal lÃ¶pare pÃ¥ vanligaste banan X.#" + itow(di.numRunnerSameCourseMax));
+  outLines.emplace_back(0, L"Kortast teoretiska startdjup utan krockar Ã¤r X minuter.#" + itow(di.minimalStartDepth/60));
   outLines.emplace_back(0, L"");
   //Find last starter
   int last = opt.last;
@@ -1177,8 +1177,42 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
 
   map<int, GroupInfo> gInfo;
   vector<pair<int, int>> orderedStartGroups;
+
+  auto overlap = [](const StartGroupInfo &a, const StartGroupInfo &b) {
+    if (a.firstStart >= b.firstStart && a.firstStart < b.lastStart)
+      return true;
+    if (a.lastStart > b.firstStart && a.lastStart <= b.lastStart)
+      return true;
+    if (b.firstStart >= a.firstStart && b.firstStart < a.lastStart)
+      return true;
+    if (b.lastStart > a.firstStart && b.lastStart <= a.lastStart)
+      return true;
+    return false;
+  };
+
+  auto formatSG = [this](int id, const StartGroupInfo &a) {
+    wstring w = itow(id);
+    if (!a.name.empty())
+      w += L"/" + a.name;
+
+    w += L" (" + getAbsTime(a.firstStart) + makeDash(L"-") + getAbsTime(a.lastStart) + L")";
+    return w;
+  };
+
   for (auto &sg : sgMap) {
-    orderedStartGroups.emplace_back(sg.second.first, sg.first);
+    orderedStartGroups.emplace_back(sg.second.firstStart, sg.first);
+    // Check overlaps
+    for (auto &sgOther : sgMap) {
+      if (sg.first == sgOther.first)
+        continue;
+
+      if (overlap(sg.second, sgOther.second)) {
+        wstring s1 = formatSG(sg.first, sg.second), s2 = formatSG(sgOther.first, sgOther.second);
+        throw meosException(L"Startgrupperna X och Y Ã¶verlappar.#" + s1 + L"#" + s2);
+      }
+
+    }
+
   }
   // Order by start time
   sort(orderedStartGroups.begin(), orderedStartGroups.end());
@@ -1326,7 +1360,7 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
     auto &countGroupClub = countClassGroupClub[k];
     int cls = spec[k].classID;
     getRunners(cls, 0, rl, false);
-    classFractions[cls] = rl.size();
+    classFractions[cls] = (double)rl.size();
     rTot += rl.size();
     for (pRunner r : rl) {
       int gid = r->getStartGroup(true);
@@ -1502,7 +1536,7 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
     for (size_t j = 0; j < orderedStartGroups.size(); j++) {
       auto &sg = orderedStartGroups[j];
       int groupId = sg.second;
-      int firstStart = getStartGroup(groupId).first;
+      int firstStart = getStartGroup(groupId).firstStart;
 
       vector<ClassDrawSpecification> specLoc = spec;
       for (size_t k = 0; k < specLoc.size(); k++) {
@@ -1561,9 +1595,9 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
       auto &sg = orderedStartGroups[j];
       int groupId = sg.second;
       
-      int firstStart = getStartGroup(groupId).first;
+      int firstStart = getStartGroup(groupId).firstStart;
 
-      int nspos = (oe->getStartGroup(groupId).second - firstStart) / di.baseInterval;
+      int nspos = (oe->getStartGroup(groupId).lastStart - firstStart) / di.baseInterval;
       int optimalParallel = rPerGroup[groupId] / nspos;
 
       if (nParallel <= 0)
@@ -1577,8 +1611,8 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
       vector<ClassInfo> cInfo;
       vector<pair<int, wstring>> outLines;
       di.vacancyFactor = 0;
-      auto &group = sgMap.find(groupId);
-      int length = max(300, group->second.second - group->second.first);
+      auto group = sgMap.find(groupId);
+      int length = max(300, group->second.lastStart - group->second.firstStart);
       int slots = length / di.baseInterval;
       di.classes.clear();
       for (size_t k = 0; k < spec.size(); k++) {
@@ -1676,10 +1710,10 @@ void oEvent::drawList(const vector<ClassDrawSpecification> &spec,
       throw std::exception("Klass saknas");
 
     if (spec[k].vacances>0 && pc->getClassType()==oClassRelay)
-      throw std::exception("Vakanser stöds ej i stafett.");
+      throw std::exception("Vakanser stÃ¶ds ej i stafett.");
 
     if (spec[k].vacances>0 && (spec[k].leg>0 || pc->getParentClass()))
-      throw std::exception("Det går endast att sätta in vakanser på sträcka 1.");
+      throw std::exception("Det gÃ¥r endast att sÃ¤tta in vakanser pÃ¥ strÃ¤cka 1.");
 
     if (size_t(spec[k].leg) < pc->legInfo.size()) {
       pc->setStartType(spec[k].leg, STDrawn, true); //Automatically change start method
@@ -1903,7 +1937,7 @@ void oEvent::drawListClumped(int ClassID, int FirstStart, int Interval, int Vaca
     throw std::exception("Klass saknas");
 
   if (Vacances>0 && pc->getClassType()!=oClassIndividual)
-    throw std::exception("Lottningsmetoden stöds ej i den här klassen.");
+    throw std::exception("Lottningsmetoden stÃ¶ds ej i den hÃ¤r klassen.");
 
   oRunnerList::iterator it;
   int nRunners=0;
@@ -2082,7 +2116,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
     if (iFirstStart>0)
       gdi.addString("", 1, "Gemensam start");
     else {
-      gdi.addString("", 1, "Nollställer starttider");
+      gdi.addString("", 1, "NollstÃ¤ller starttider");
       iFirstStart = 0;
     }
     gdi.refreshFast();
@@ -2098,12 +2132,12 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
   }
 
   if (baseInterval<1 || baseInterval>60*60)
-    throw std::exception("Felaktigt tidsformat för intervall");
+    throw std::exception("Felaktigt tidsformat fÃ¶r intervall");
 
   int iFirstStart = getRelativeTime(firstStart);
 
   if (iFirstStart<=0)
-    throw std::exception("Felaktigt tidsformat för första start");
+    throw std::exception("Felaktigt tidsformat fÃ¶r fÃ¶rsta start");
 
   double vacancy = _wtof(vacances.c_str())/100;
 
@@ -2219,7 +2253,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
         continue;
 
       gdi.dropLine();
-      gdi.addStringUT(1, lang.tl(L"Optimerar startfördelning ") + start);
+      gdi.addStringUT(1, lang.tl(L"Optimerar startfÃ¶rdelning ") + start);
       gdi.refreshFast();
       gdi.dropLine();
       vector<ClassInfo> cInfo;
@@ -2243,7 +2277,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
         const ClassInfo &ci = cInfo[k];
 
         if (getClass(ci.classId)->getClassType() == oClassRelay) {
-          gdi.addString("", 0, L"Hoppar över stafettklass: X#" +
+          gdi.addString("", 0, L"Hoppar Ã¶ver stafettklass: X#" +
                         getClass(ci.classId)->getName()).setColor(colorRed);
           continue;
         }
@@ -2276,7 +2310,16 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
 
       if (spec.size() == 0)
         continue;
-      drawListStartGroups(spec, method, pairSize, DrawType::DrawAll);
+      try {
+        drawListStartGroups(spec, method, pairSize, DrawType::DrawAll);
+      }
+      catch (meosException &ex) {
+        gdi.addString("", 1, ex.wwhat()).setColor(colorRed);
+        // Relay classes?
+        gdi.dropLine();
+        gdi.refreshFast();
+        return;
+      }
     }
   }
 
@@ -2287,7 +2330,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
     if (it->hasFreeStart())
       continue;
 
-    gdi.addStringUT(0, lang.tl(L"Lottar efteranmälda: ") + it->getName());
+    gdi.addStringUT(0, lang.tl(L"Lottar efteranmÃ¤lda: ") + it->getName());
 
     vector<ClassDrawSpecification> spec;
     spec.emplace_back(it->getId(), leg, 0, 0, 0, vp);
@@ -2301,7 +2344,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
   gdi.dropLine();
 
   if (drawn==0)
-    gdi.addString("", 1, "Klart: inga klasser behövde lottas.").setColor(colorGreen);
+    gdi.addString("", 1, "Klart: inga klasser behÃ¶vde lottas.").setColor(colorGreen);
   else
     gdi.addString("", 1, "Klart: alla klasser lottade.").setColor(colorGreen);
   // Relay classes?

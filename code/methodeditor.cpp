@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 #include "stdafx.h"
@@ -93,8 +93,8 @@ void MethodEditor::show(gdioutput &gdi) {
   gdi.dropLine(0.5);
   gdi.fillRight();
 
-  gdi.addButton("OpenFile", "Importera frÂn fil", methodCB);
-  gdi.addButton("OpenInside", "÷ppna", methodCB);
+  gdi.addButton("OpenFile", "Importera fr√•n fil", methodCB);
+  gdi.addButton("OpenInside", "√ñppna", methodCB);
 
   if (currentResult) {
     gdi.addButton("SaveFile", "Exportera till fil...", methodCB);
@@ -105,7 +105,7 @@ void MethodEditor::show(gdioutput &gdi) {
   }
 
   gdi.addButton("NewRules", "New Result Module", methodCB);
-  gdi.addButton("Close", "St‰ng", methodCB);
+  gdi.addButton("Close", "St√§ng", methodCB);
 
 #ifdef _DEBUG
   gdi.addButton("WriteDoc", "#WriteDoc", methodCB);
@@ -146,7 +146,7 @@ void MethodEditor::show(gdioutput &gdi) {
       wstring lists = oe->getListContainer().getList(listIx.front()).getListName();
       if (listIx.size() > 1)
         lists += L", ...";
-      gdi.addString("", 0, L"Resultatmodulen anv‰nds i X.#" + lists);
+      gdi.addString("", 0, L"Resultatmodulen anv√§nds i X.#" + lists);
     }
 
     wstring desc = currentResult->getDescription();
@@ -328,7 +328,7 @@ int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
           continue;
 
         if (utag == DynamicResult::undecorateTag(mtag)) {
-          doUpdate = gdi.ask(L"Vill du uppdatera resultatlistorna i den ˆppande t‰vlingen?");
+          doUpdate = gdi.ask(L"Vill du uppdatera resultatlistorna i den √∂ppande t√§vlingen?");
           break;
         }
       }
@@ -431,13 +431,13 @@ int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
       }
       sort(lists.begin(), lists.end());
       gdi.fillRight();
-      gdi.addSelection("OpenList", 350, 400, methodCB, L"Choose result module:", L"Rader markerade med (*) kommer frÂn en lista i t‰vlingen.");
+      gdi.addSelection("OpenList", 350, 400, methodCB, L"Choose result module:", L"Rader markerade med (*) kommer fr√•n en lista i t√§vlingen.");
       gdi.addItem("OpenList", lists);
       gdi.autoGrow("OpenList");
       gdi.selectFirstItem("OpenList");
 
       gdi.dropLine();
-      gdi.addButton("DoOpen", "÷ppna", methodCB);
+      gdi.addButton("DoOpen", "√ñppna", methodCB);
       gdi.addButton("DoOpenCopy", "Open a Copy", methodCB);
     
       if (!lists.empty()) {
@@ -550,7 +550,7 @@ int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
       }
       gdi.fillDown();
       if (tr.size() + rr.size() == 0) {
-        gdi.addString("", 1, "T‰vlingen innehÂller inga resultat").setColor(colorRed);
+        gdi.addString("", 1, "T√§vlingen inneh√•ller inga resultat").setColor(colorRed);
       }
       else
         gdi.addString("", 1, "Applying rules to the current competition");
@@ -919,7 +919,7 @@ void MethodEditor::makeDirty(gdioutput &gdi, DirtyFlag inside) {
 
 bool MethodEditor::checkSave(gdioutput &gdi) {
   if (dirtyInt) {
-    gdioutput::AskAnswer answer = gdi.askCancel(L"Vill du spara ‰ndringar?");
+    gdioutput::AskAnswer answer = gdi.askCancel(L"Vill du spara √§ndringar?");
     if (answer == gdioutput::AnswerCancel)
       return false;
 
@@ -971,7 +971,7 @@ bool MethodEditor::resultIsInstalled() const {
     return false; // Used in a list in this competition
 
   //string path = getInternalPath(currentResult->getTag());
-  return fileExist(fileNameSource.c_str());
+  return fileExists(fileNameSource);
 }
 
 void MethodEditor::debug(gdioutput &gdi_in, int id, bool isTeam) {
@@ -1120,7 +1120,7 @@ void MethodEditor::debug(gdioutput &gdi_in, int id, bool isTeam) {
       currentResult->debugDumpVariables(gdi, false);
   }
 
-  gdi.addButton("CloseWindow", "St‰ng", methodCB);
+  gdi.addButton("CloseWindow", "St√§ng", methodCB);
   gdi.refresh();
 }
 

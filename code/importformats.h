@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
     Copyright (C) 2009-2019 Melin Software HB
@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv�gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -60,6 +60,8 @@ public:
   static void getOECSVLanguage(vector< pair<wstring, size_t> > &typeLanguages); 
   
   static int getDefaultCSVLanguage(oEvent &oe);
+
+  static wstring getExtension(ExportFormats fm);
 
   private:
     ImportFormatOptions option;

@@ -1,6 +1,6 @@
-/************************************************************************
+Ôªø/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2020 Melin Software HB
+    Copyright (C) 2009-2022 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     Melin Software HB - software@melin.nu - www.melin.nu
-    Eksoppsv‰gen 16, SE-75646 UPPSALA, Sweden
+    Eksoppsv√§gen 16, SE-75646 UPPSALA, Sweden
 
 ************************************************************************/
 
@@ -257,8 +257,21 @@ void TabRunner::selectRunner(gdioutput &gdi, pRunner r) {
     }
   }
   oe->fillCourses(gdi, "RCourse", true);
-  wstring crsName = r->getCourse(false) ? r->getCourse(false)->getName() + L" " : L"";
-  gdi.addItem("RCourse", crsName + lang.tl("[Klassens bana]"), 0);
+  wstring crsName;
+  if (r->getCourse(false))
+    crsName = r->getCourse(false)->getName();
+
+  wstring courseType = lang.tl(" [Klassens bana]");
+  pClass cClass = r->getClassRef(false);
+  if (cClass && (cClass->hasCoursePool() || r->getClassRef(true)->hasCoursePool())) {
+    if (!crsName.empty())
+      courseType = L", ... ";
+    courseType += L" [" + lang.tl("Banpool") + L"]";
+  }
+  else if (crsName.empty())
+    crsName += L" ";
+
+  gdi.addItem("RCourse", crsName + courseType, 0);
   gdi.selectItemByData("RCourse", r->getCourseId());
   updateNumShort(gdi, r->getCourse(false), r);
 
@@ -486,7 +499,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
   wstring name=gdi.getText("Name");
 
   if (name.empty())
-    throw std::exception("Alla deltagare mÂste ha ett namn.");
+    throw std::exception("Alla deltagare m√•ste ha ett namn.");
 
   int cardNo = gdi.getTextNo("CardNo");
 
@@ -537,7 +550,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
   if (cardNoChanged && cardNo>0) {
     pRunner warnCardDupl = warnDuplicateCard(cardNo, r);
     if (warnCardDupl) {
-      gdi.alert(L"Varning: Brickan X anv‰nds redan av Y.#" + itow(cardNo) + L"#" + warnCardDupl->getCompleteIdentification()); 
+      gdi.alert(L"Varning: Brickan X anv√§nds redan av Y.#" + itow(cardNo) + L"#" + warnCardDupl->getCompleteIdentification()); 
     }
   }
 
@@ -553,7 +566,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     bool noSetStatus = false;
     if (cardNo > 0 && r->getCard() && 
       r->getCard()->getCardNo() != cardNo && r->getCardNo() != cardNo) {
-        if (gdi.ask(L"Vill du koppla is‰r X frÂn inl‰st bricka Y?#" + r->getName() + 
+        if (gdi.ask(L"Vill du koppla is√§r X fr√•n inl√§st bricka Y?#" + r->getName() + 
                     L"#" + r->getCard()->getCardNoString())) {
         r->setStatus(StatusUnknown, true, oBase::ChangeType::Update, false);
         r->setCard(0);
@@ -565,7 +578,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     }
 
     if (cardNo > 0 && cardNo != r->getCardNo() && oe->hasNextStage()) {
-      if (gdi.ask(L"Vill du anv‰nda den nya brickan till alla etapper?")) {
+      if (gdi.ask(L"Vill du anv√§nda den nya brickan till alla etapper?")) {
         r->setTransferCardNoNextStage(true);
       }
     }
@@ -617,7 +630,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     pClass pNewCls = oe->getClass(classId);
     if (pNewCls && pNewCls->getClassType() == oClassRelay) {
       if (!r->getTeam()) {
-        gdi.alert("Fˆr att delta i en lagklass mÂste deltagaren ingÂ i ett lag.");
+        gdi.alert("F√∂r att delta i en lagklass m√•ste deltagaren ing√• i ett lag.");
         classId = 0;
       }
       else if (r->getTeam()->getClassId(true) != classId && r->getClassId(true) != classId) {
@@ -628,7 +641,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     
     bool readStatusIn = true;
     if (r->getClassId(true) != classId && r->getInputStatus() != StatusNotCompetiting && r->hasInputData()) {
-      if (gdi.ask(L"Vill du s‰tta resultatet frÂn tidigare etapper till <Deltar ej>?")) {
+      if (gdi.ask(L"Vill du s√§tta resultatet fr√•n tidigare etapper till <Deltar ej>?")) {
         r->resetInputData();
         readStatusIn = false;
       }
@@ -692,7 +705,7 @@ pRunner TabRunner::save(gdioutput &gdi, int runnerId, bool willExit) {
     }
 
     if (checkStatus && sIn != r->getStatus())
-      gdi.alert("Status matchar inte data i lˆparbrickan.");
+      gdi.alert("Status matchar inte data i l√∂parbrickan.");
 
     if (gdi.hasWidget("StatusIn") && readStatusIn) {
       r->setInputStatus(RunnerStatus(gdi.getSelectedItem("StatusIn").first));
@@ -748,7 +761,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
         gdi.selectItemByData("Runners", r->getId());
       }
       else
-        gdi.alert("Lˆparen hittades inte");
+        gdi.alert("L√∂paren hittades inte");
     }
     else if (bi.id == "ShowAll") {
       fillRunnerList(gdi);
@@ -897,7 +910,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
       showInForestList(gdi);
     }
     else if (bi.id == "RemoveVacant") {
-      if (gdi.ask(L"Vill du radera alla vakanser frÂn t‰vlingen?")) {
+      if (gdi.ask(L"Vill du radera alla vakanser fr√•n t√§vlingen?")) {
         oe->removeVacanies(0);
         gdi.disableInput(bi.id.c_str());
       }
@@ -959,7 +972,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
         wstring name = gdi.getText("Name");
         pRunner r = oe->getRunner(runnerId, 0);
         if (!name.empty() && r && r->getName() != name && r->getNameRaw() != name) {
-          if (gdi.ask(L"Vill du l‰gga till deltagaren 'X'?#" + name)) {
+          if (gdi.ask(L"Vill du l√§gga till deltagaren 'X'?#" + name)) {
             r = oe->addRunner(name, 0, 0, 0,0, false);
             runnerId = r->getId();
           }
@@ -994,9 +1007,9 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
       if (!runnerId)
         return 0;
 
-      if (gdi.ask(L"Vill du verkligen ta bort lˆparen?")) {
+      if (gdi.ask(L"Vill du verkligen ta bort l√∂paren?")) {
         if (oe->isRunnerUsed(runnerId))
-          gdi.alert("Lˆparen ingÂr i ett lag och kan inte tas bort.");
+          gdi.alert("L√∂paren ing√•r i ett lag och kan inte tas bort.");
         else {
           pRunner r = oe->getRunner(runnerId, 0);
           if (r)
@@ -1023,7 +1036,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
       pRunner r = oe->getRunner(runnerId, 0);
       r = r->getMultiRunner(0);
 
-      if (r && gdi.ask(L"Bekr‰fta att deltagaren har l‰mnat Âterbud.")) {
+      if (r && gdi.ask(L"Bekr√§fta att deltagaren har l√§mnat √•terbud.")) {
         if (r->getStartTime()>0) {
           pRunner newRunner = oe->addRunnerVacant(r->getClassId(true));
           newRunner->cloneStartTime(r);
@@ -1063,7 +1076,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
       gdi.fillDown();
       gdi.dropLine(2);
       gdi.popX();
-      gdi.addString("", 0, "V‰lj en vakant plats nedan.");
+      gdi.addString("", 0, "V√§lj en vakant plats nedan.");
 
       oe->generateVacancyList(gdi, RunnerCB);
 
@@ -1347,13 +1360,13 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
       return -1;
 
     wchar_t bf[1024];
-    swprintf_s(bf, lang.tl("Bekr‰fta att %s byter klass till %s.").c_str(),
+    swprintf_s(bf, lang.tl("Bekr√§fta att %s byter klass till %s.").c_str(),
                          r->getName().c_str(), vacancy->getClass(true).c_str());
     if (gdi.ask(wstring(L"#") + bf)) {
 
       vacancy->synchronize();
       if (!vacancy->isVacant())
-        throw meosException("Starttiden ‰r upptagen.");
+        throw meosException("Starttiden √§r upptagen.");
 
       oRunner temp(oe, 0);
       temp.setTemporary();
@@ -1372,7 +1385,7 @@ int TabRunner::runnerCB(gdioutput &gdi, int type, void *data)
       r->setStartNo(vacancy->getStartNo(), oBase::ChangeType::Update);
 
       if (oe->hasPrevStage()) {
-        if (gdi.ask(L"Vill du s‰tta resultatet frÂn tidigare etapper till <Deltar ej>?")) 
+        if (gdi.ask(L"Vill du s√§tta resultatet fr√•n tidigare etapper till <Deltar ej>?")) 
           r->resetInputData();
       }
 
@@ -1399,7 +1412,7 @@ void TabRunner::showCardsList(gdioutput &gdi)
   currentMode = 3;
   gdi.clearPage(false);
   gdi.dropLine(0.5);
-  gdi.addString("", boldLarge, "Hantera lˆparbrickor");
+  gdi.addString("", boldLarge, "Hantera l√∂parbrickor");
   gdi.addString("", 10, "help:14343");
   addToolbar(gdi);
   gdi.dropLine();
@@ -1436,12 +1449,12 @@ int TabRunner::vacancyCB(gdioutput &gdi, int type, void *data)
 
     r->synchronize();
     if (!r->isVacant())
-      throw std::exception("Starttiden ‰r upptagen.");
+      throw std::exception("Starttiden √§r upptagen.");
 
     wstring name = gdi.getText("Name");
 
     if (name.empty())
-      throw std::exception("Alla deltagare mÂste ha ett namn.");
+      throw std::exception("Alla deltagare m√•ste ha ett namn.");
 
     int cardNo = gdi.getTextNo("CardNo");
 
@@ -1502,7 +1515,7 @@ int TabRunner::vacancyCB(gdioutput &gdi, int type, void *data)
     }
 
     if (oe->hasPrevStage()) {
-      if (gdi.ask(L"Vill du s‰tta resultatet frÂn tidigare etapper till <Deltar ej>?")) 
+      if (gdi.ask(L"Vill du s√§tta resultatet fr√•n tidigare etapper till <Deltar ej>?")) 
         r->resetInputData();
     }
 
@@ -1588,10 +1601,10 @@ void TabRunner::showRunnerReport(gdioutput &gdi) {
   if (!oe->isReadOnly()) {
     if (!ownWindow) {
       gdi.addButton("Kiosk", "Resultatkiosk", RunnerCB);
-      gdi.addButton("Window", "Eget fˆnster", RunnerCB, "÷ppna i ett nytt fˆnster.");
+      gdi.addButton("Window", "Eget f√∂nster", RunnerCB, "√ñppna i ett nytt f√∂nster.");
     }
     gdi.dropLine(0.2);
-    gdi.addCheckbox("ListenReadout", "Visa senast inl‰sta deltagare", RunnerCB, listenToPunches);
+    gdi.addCheckbox("ListenReadout", "Visa senast inl√§sta deltagare", RunnerCB, listenToPunches);
   }
 
   gdi.dropLine(3);
@@ -1746,7 +1759,7 @@ void TabRunner::runnerReport(oEvent &oe, gdioutput &gdi, int id, bool compact) {
     gdi.addString("", fontMedium, L"Starttid: X  #" + r->getStartTimeCompact());
 
   if (r->getFinishTime() > 0)
-    gdi.addString("", fontMedium, L"MÂltid: X  #" + r->getFinishTimeS());
+    gdi.addString("", fontMedium, L"M√•ltid: X  #" + r->getFinishTimeS());
 
   const wstring &after = oe.formatListString(lRunnerTimeAfter, r);
   if (!after.empty()) {
@@ -1812,7 +1825,7 @@ void TabRunner::runnerReport(oEvent &oe, gdioutput &gdi, int id, bool compact) {
         if (after[k] > 0)
           split += L" (" + itow(place[k]) + L", +"  + getTimeMS(after[k]) + L")";
         else if (place[k] == 1)
-          split += lang.tl(" (str‰ckseger)");
+          split += lang.tl(" (str√§ckseger)");
         else if (place[k] > 0)
           split += L" " + itow(place[k]);
 
@@ -1943,8 +1956,8 @@ void TabRunner::showVacancyList(gdioutput &gdi, const string &method, int classI
 
     gdi.fillRight();
     gdi.pushX();
-    gdi.addButton("VacancyAdd", "Tills‰tt ytterligare vakans", VacancyCB);
-    //gdi.addButton("Cancel", "≈tergÂ", VacancyCB);
+    gdi.addButton("VacancyAdd", "Tills√§tt ytterligare vakans", VacancyCB);
+    //gdi.addButton("Cancel", "√Öterg√•", VacancyCB);
     gdi.popX();
     gdi.fillDown();
     gdi.dropLine(2);
@@ -1962,7 +1975,7 @@ void TabRunner::showVacancyList(gdioutput &gdi, const string &method, int classI
   }
   else if (method == "add") {
     gdi.dropLine(0.5);
-    gdi.addString("", boldLarge, "Tills‰tt vakans");
+    gdi.addString("", boldLarge, "Tills√§tt vakans");
     addToolbar(gdi);
 
     gdi.dropLine();
@@ -2023,13 +2036,13 @@ void TabRunner::showVacancyList(gdioutput &gdi, const string &method, int classI
     
     gdi.dropLine(2.8);
     gdi.popX();
-    gdi.addCheckbox("StartInfo", "Skriv ut startbevis", SportIdentCB, tsi.hasPrintStartInfo(), "Skriv ut startbevis fˆr deltagaren");
+    gdi.addCheckbox("StartInfo", "Skriv ut startbevis", SportIdentCB, tsi.hasPrintStartInfo(), "Skriv ut startbevis f√∂r deltagaren");
     
     if (oe->hasNextStage())
-      gdi.addCheckbox("AllStages", "Anm‰l till efterfˆljande etapper", 0, tsi.storedInfo.allStages);
+      gdi.addCheckbox("AllStages", "Anm√§l till efterf√∂ljande etapper", 0, tsi.storedInfo.allStages);
     
     gdi.dropLine(-0.2);
-    gdi.addButton("PrinterSetup", "Skrivarinst‰llningar...", VacancyCB, "Skrivarinst‰llningar fˆr str‰cktider och startbevis");
+    gdi.addButton("PrinterSetup", "Skrivarinst√§llningar...", VacancyCB, "Skrivarinst√§llningar f√∂r str√§cktider och startbevis");
     gdi.setCX(gdi.getCX() + gdi.scaleLength(40));
     gdi.addButton("CancelVacant", "Avbryt", VacancyCB);
 
@@ -2042,7 +2055,7 @@ void TabRunner::showVacancyList(gdioutput &gdi, const string &method, int classI
     gdi.pushX();
     gdi.dropLine();
 
-    gdi.addString("", fontMediumPlus, "V‰lj klass och starttid nedan");
+    gdi.addString("", fontMediumPlus, "V√§lj klass och starttid nedan");
     oe->generateVacancyList(gdi, VacancyCB);
     gdi.setInputFocus("CardNo");
   }
@@ -2073,7 +2086,7 @@ void TabRunner::showInForestList(gdioutput &gdi)
   gdi.dropLine();
   gdi.pushX();
   gdi.fillRight();
-  gdi.addButton("Import", "Importera st‰mplingar...", SportIdentCB).setExtra(1);
+  gdi.addButton("Import", "Importera st√§mplingar...", SportIdentCB).setExtra(1);
   
   if (oe->getMeOSFeatures().hasFeature(MeOSFeatures::Vacancy)) {
     vector<pRunner> rr;
@@ -2089,9 +2102,9 @@ void TabRunner::showInForestList(gdioutput &gdi)
       gdi.addButton("RemoveVacant", "Radera vakanser", RunnerCB);
     }
   }
-  gdi.addButton("SetDNS", "S‰tt ok‰nda lˆpare utan registrering till <Ej Start>", RunnerCB);
+  gdi.addButton("SetDNS", "S√§tt ok√§nda l√∂pare utan registrering till <Ej Start>", RunnerCB);
   gdi.fillDown();
-  gdi.addButton("SetUnknown", "≈terst‰ll lˆpare <Ej Start> med registrering till <Status Ok‰nd>", RunnerCB);
+  gdi.addButton("SetUnknown", "√Öterst√§ll l√∂pare <Ej Start> med registrering till <Status Ok√§nd>", RunnerCB);
   gdi.dropLine();
   gdi.popX();
 
@@ -2101,14 +2114,14 @@ void TabRunner::showInForestList(gdioutput &gdi)
   if (!unknown.empty()) {
     gdi.dropLine();
     gdi.dropLine(0.5);
-    gdi.addString("", 1, "Lˆpare, Status Ok‰nd, som saknar registrering");
+    gdi.addString("", 1, "L√∂pare, Status Ok√§nd, som saknar registrering");
     listRunners(gdi, unknown, true);
   }
   else {
     if (hasDNS) {
       BaseInfo &bi = gdi.getBaseInfo("SetDNS");
       bi.id = "UndoSetDNS";
-      gdi.setTextTranslate(bi.id, L"≈terst‰ll <Ej Start> till <Status Ok‰nd>");
+      gdi.setTextTranslate(bi.id, L"√Öterst√§ll <Ej Start> till <Status Ok√§nd>");
     }
     else {
       gdi.disableInput("SetDNS");
@@ -2117,14 +2130,14 @@ void TabRunner::showInForestList(gdioutput &gdi)
 
   if (!known.empty()) {
     gdi.dropLine();
-    gdi.addString("", 1, "Lˆpare, Status Ok‰nd, med registrering (kvar-i-skogen)");
+    gdi.addString("", 1, "L√∂pare, Status Ok√§nd, med registrering (kvar-i-skogen)");
     gdi.dropLine(0.5);
     listRunners(gdi, known, false);
   }
 
   if (!known_dns.empty()) {
     gdi.dropLine();
-    gdi.addString("", 1, "Lˆpare, Ej Start, med registrering (kvar-i-skogen!?)");
+    gdi.addString("", 1, "L√∂pare, Ej Start, med registrering (kvar-i-skogen!?)");
     gdi.dropLine(0.5);
     listRunners(gdi, known_dns, false);
   }
@@ -2148,7 +2161,7 @@ void TabRunner::listRunners(gdioutput &gdi, const vector<pRunner> &r, bool filte
     if (filterVacant && r[k]->isVacant())
       continue;
     out.clear();
-    sprintf_s(bf, "%d.", k+1);
+    sprintf_s(bf, "%d.", int(k+1));
     gdi.addStringUT(yp, xp, 0, bf);
     gdi.addStringUT(yp, xp+gdi.scaleLength(40), 0, r[k]->getNameAndRace(true), gdi.scaleLength(190));
     gdi.addStringUT(yp, xp+gdi.scaleLength(200), 0, r[k]->getClass(true), gdi.scaleLength(140));
@@ -2221,12 +2234,12 @@ void TabRunner::cellAction(gdioutput &gdi, DWORD id, oBase *obj)
       gdi.popX();
       gdi.fillRight();
       gdi.addInput("SearchText", L"", 15).setBgColor(colorLightCyan);
-      gdi.addButton("Search", "Sˆk deltagare", RunnerCB, "Sˆk pÂ namn, bricka eller startnummer.");
+      gdi.addButton("Search", "S√∂k deltagare", RunnerCB, "S√∂k p√• namn, bricka eller startnummer.");
 
       gdi.popX();
       gdi.dropLine(3);
       gdi.addButton("Pair", "Para ihop", RunnerCB).setExtra(c->getId());
-      gdi.addButton("Unpair", "S‰tt som oparad", RunnerCB).setExtra(c->getId());
+      gdi.addButton("Unpair", "S√§tt som oparad", RunnerCB).setExtra(c->getId());
       gdi.addButton("Cancel", "Avbryt", RunnerCB);
       gdi.fillDown();
       gdi.popX();
@@ -2243,7 +2256,7 @@ void disablePunchCourseAdd(gdioutput &gdi)
 }
 
 const wstring &TabRunner::getSearchString() const {
-  return lang.tl(L"Sˆk (X)#Ctrl+F");
+  return lang.tl(L"S√∂k (X)#Ctrl+F");
 }
 
 void disablePunchCourseChange(gdioutput &gdi)
@@ -2292,7 +2305,7 @@ int TabRunner::punchesCB(gdioutput &gdi, int type, void *data) {
   pRunner r = oe->getRunner(rid, 0);
 
   if (!r) {
-    gdi.alert("Deltagaren mÂste sparas innan st‰mplingar kan hanteras.");
+    gdi.alert("Deltagaren m√•ste sparas innan st√§mplingar kan hanteras.");
     return 0;
   }
   if (type == GUI_LISTBOXSELECT) {
@@ -2528,10 +2541,10 @@ bool TabRunner::loadPage(gdioutput &gdi)
   gdi.registerEvent("SearchRunnerBack", runnerSearchCB).setKeyCommand(KC_FINDBACK);
 
   gdi.addInput("SearchText", getSearchString(), 13, runnerSearchCB, L"",
-    L"Sˆk pÂ namn, bricka eller startnummer.").isEdit(false)
+    L"S√∂k p√• namn, bricka eller startnummer.").isEdit(false)
     .setBgColor(colorLightCyan).ignore(true);
   gdi.dropLine(-0.2);
-  //gdi.addButton("Search", "Sˆk", RunnerCB, "Sˆk pÂ namn, bricka eller startnummer.");
+  //gdi.addButton("Search", "S√∂k", RunnerCB, "S√∂k p√• namn, bricka eller startnummer.");
   gdi.addButton("ShowAll", "Visa alla", RunnerCB).isEdit(false);
   gdi.dropLine(2);
   gdi.popX();
@@ -2544,7 +2557,7 @@ bool TabRunner::loadPage(gdioutput &gdi)
   if (oe->getMeOSFeatures().hasFeature(MeOSFeatures::Vacancy)) {
     gdi.fillRight();
     gdi.addButton("Move", "Klassbyte", RunnerCB);
-    gdi.addButton("NoStart", "≈terbud", RunnerCB);
+    gdi.addButton("NoStart", "√Öterbud", RunnerCB);
   }
 
   gdi.newColumn();
@@ -2601,7 +2614,7 @@ bool TabRunner::loadPage(gdioutput &gdi)
   if (oe->hasMultiRunner()) {
     gdi.fillRight();
     gdi.popX();
-    gdi.addString("", 0, "V‰lj lopp:");
+    gdi.addString("", 0, "V√§lj lopp:");
     gdi.fillDown();
     gdi.dropLine(-0.2);
     gdi.addSelection("MultiR", 160, 100, RunnerCB);
@@ -2647,7 +2660,7 @@ bool TabRunner::loadPage(gdioutput &gdi)
   gdi.popX();
 
   gdi.addInput("Start", L"", 8, 0, L"Starttid:");
-  gdi.addInput("Finish", L"", 8, 0, L"MÂltid:");
+  gdi.addInput("Finish", L"", 8, 0, L"M√•ltid:");
 
   const bool timeAdjust = oe->getMeOSFeatures().hasFeature(MeOSFeatures::TimeAdjust);
   const bool pointAdjust = oe->getMeOSFeatures().hasFeature(MeOSFeatures::PointAdjust);
@@ -2656,10 +2669,10 @@ bool TabRunner::loadPage(gdioutput &gdi)
     gdi.dropLine(3);
     gdi.popX();
     if (timeAdjust) {
-      gdi.addInput("TimeAdjust", L"", 8, 0, L"Tidstill‰gg:");
+      gdi.addInput("TimeAdjust", L"", 8, 0, L"Tidstill√§gg:");
     }
     if (pointAdjust) {
-      gdi.addInput("PointAdjust", L"", 8, 0, L"Po‰ngavdrag:");
+      gdi.addInput("PointAdjust", L"", 8, 0, L"Po√§ngavdrag:");
     }
   }
   gdi.dropLine(3);
@@ -2669,7 +2682,7 @@ bool TabRunner::loadPage(gdioutput &gdi)
   gdi.disableInput("Time");
 
   if (oe->hasRogaining()) {
-    gdi.addInput("Points", L"", 5, 0, L"Po‰ng:").isEdit(false).ignore(true);
+    gdi.addInput("Points", L"", 5, 0, L"Po√§ng:").isEdit(false).ignore(true);
     gdi.disableInput("Points");
   }
 
@@ -2694,7 +2707,7 @@ bool TabRunner::loadPage(gdioutput &gdi)
     int dx = int(gdi.getLineHeight()*0.7);
     int ccx = xx + dx;
     gdi.setCX(ccx);
-    gdi.addString("", 1, "Resultat frÂn tidigare etapper");
+    gdi.addString("", 1, "Resultat fr√•n tidigare etapper");
     gdi.dropLine(0.3);
     gdi.fillRight();
  
@@ -2707,7 +2720,7 @@ bool TabRunner::loadPage(gdioutput &gdi)
     gdi.dropLine(3);
     gdi.addInput("TimeIn", L"", 5, 0, L"Tid:");
     if (oe->hasRogaining()) {
-      gdi.addInput("PointIn", L"", 5, 0, L"Po‰ng:");
+      gdi.addInput("PointIn", L"", 5, 0, L"Po√§ng:");
     }
     gdi.dropLine(3);
     RECT rc;
@@ -2725,7 +2738,7 @@ bool TabRunner::loadPage(gdioutput &gdi)
  
   gdi.fillRight();
   gdi.addButton("Save", "Spara", RunnerCB, "help:save").setDefault();
-  gdi.addButton("Undo", "≈ngra", RunnerCB);
+  gdi.addButton("Undo", "√Öngra", RunnerCB);
   gdi.dropLine(2.2);
   gdi.popX();
   gdi.addButton("Remove", "Radera", RunnerCB);
@@ -2739,12 +2752,12 @@ bool TabRunner::loadPage(gdioutput &gdi)
   gdi.setCX(hx + gdi.scaleLength(5));
 
   gdi.dropLine(2.5);
-  gdi.addListBox("Punches", 150, 300, PunchesCB, L"St‰mplingar:").ignore(true);
-  gdi.addButton("RemoveC", "Ta bort st‰mpling >>", RunnerCB);
+  gdi.addListBox("Punches", 150, 300, PunchesCB, L"St√§mplingar:").ignore(true);
+  gdi.addButton("RemoveC", "Ta bort st√§mpling >>", RunnerCB);
 
   gdi.pushX();
   gdi.fillRight();
-  gdi.addInput("PTime", L"", 8, 0, L"", L"St‰mplingstid");
+  gdi.addInput("PTime", L"", 8, 0, L"", L"St√§mplingstid");
   gdi.fillDown();
   gdi.addButton("SaveC", "Spara tid", PunchesCB);
   gdi.popX();
@@ -2756,8 +2769,8 @@ bool TabRunner::loadPage(gdioutput &gdi)
   gdi.dropLine(2.5);
   gdi.fillDown();
   gdi.addListBox("Course", 140, 300, PunchesCB, L"Banmall:").ignore(true);
-  gdi.addButton("AddC", "<< L‰gg till st‰mpling", PunchesCB);
-  gdi.addButton("AddAllC", "<< L‰gg till alla", PunchesCB);
+  gdi.addButton("AddC", "<< L√§gg till st√§mpling", PunchesCB);
+  gdi.addButton("AddAllC", "<< L√§gg till alla", PunchesCB);
   gdi.dropLine();
 
   gdi.synchronizeListScroll("Punches", "Course");
@@ -2770,15 +2783,15 @@ bool TabRunner::loadPage(gdioutput &gdi)
   gdi.dropLine(0.2);
   gdi.fillRight();
   gdi.addButton(gdi.getCX(), gdi.getCY(), gdi.scaleLength(120), "SplitPrint", 
-                "Str‰cktider", RunnerCB, "", false, false).isEdit(true).setExtra(0);
-  gdi.addButton("PrintSettings", "...", RunnerCB, "Inst‰llningar").isEdit(true).setExtra(0);
+                "Str√§cktider", RunnerCB, "", false, false).isEdit(true).setExtra(0);
+  gdi.addButton("PrintSettings", "...", RunnerCB, "Inst√§llningar").isEdit(true).setExtra(0);
   gdi.addButton("LabelPrint", "Print Etikett", RunnerCB);
 
   gdi.dropLine(2.5);
   gdi.setCX(contX);
   gdi.addButton(gdi.getCX(), gdi.getCY(), gdi.scaleLength(120), "SplitPrint", 
                 "Startbevis", RunnerCB, "", false, false).isEdit(true).setExtra(1);
-  gdi.addButton("PrintSettings", "...", RunnerCB, "Inst‰llningar").isEdit(true).setExtra(1);
+  gdi.addButton("PrintSettings", "...", RunnerCB, "Inst√§llningar").isEdit(true).setExtra(1);
   gdi.pushY();
 
   int by = gdi.getHeight();
@@ -2810,12 +2823,12 @@ void TabRunner::addToolbar(gdioutput &gdi) {
   int dx = 2;
 
   gdi.addButton(dx, 2, button_w, "FormMode",
-    "Formul‰rl‰ge", RunnerCB, "", false, true).fixedCorner();
+    "Formul√§rl√§ge", RunnerCB, "", false, true).fixedCorner();
   gdi.check("FormMode", currentMode==0);
   dx += button_w;
 
   gdi.addButton(dx, 2, button_w, "TableMode",
-            "Tabell‰ge", RunnerCB, "", false, true).fixedCorner();
+            "Tabell√§ge", RunnerCB, "", false, true).fixedCorner();
   gdi.check("TableMode", currentMode==1);
   dx += button_w;
 
@@ -2839,7 +2852,7 @@ void TabRunner::addToolbar(gdioutput &gdi) {
   }
 
   gdi.addButton(dx, 2 ,button_w, "ReportMode",
-            "Rapportl‰ge", RunnerCB, "", false, true).fixedCorner();
+            "Rapportl√§ge", RunnerCB, "", false, true).fixedCorner();
   gdi.check("ReportMode", currentMode==5);
   dx += button_w;
 
@@ -2912,7 +2925,7 @@ void TabRunner::warnDuplicateCard(gdioutput &gdi, int cno, pRunner r) {
   InputInfo &cardNo = dynamic_cast<InputInfo &>(gdi.getBaseInfo("CardNo"));
   if (warnCardDupl) {
     cardNo.setBgColor(colorLightRed);
-    gdi.updateToolTip("CardNo", L"Brickan anv‰nds av X.#" + warnCardDupl->getCompleteIdentification());
+    gdi.updateToolTip("CardNo", L"Brickan anv√§nds av X.#" + warnCardDupl->getCompleteIdentification());
     cardNo.refresh();
   }
   else {
@@ -3009,7 +3022,7 @@ void TabRunner::EconomyHandler::init(oRunner &r) {
 oRunner &TabRunner::EconomyHandler::getRunner() const {
   pRunner p = oe->getRunner(runnerId, 0);
   if (!p)
-    throw meosException("Lˆpare saknas");
+    throw meosException("L√∂pare saknas");
   return *p;
 }
 
@@ -3082,9 +3095,9 @@ void TabRunner::loadEconomy(gdioutput &gdi, oRunner &r) {
   auto h = getEconomyHandler(r);
 
   gdi.fillRight();
-  gdi.addInput("EntryDate", r.getEntryDate(true), 10, 0, L"Anm‰lningsdatum:");
+  gdi.addInput("EntryDate", r.getEntryDate(true), 10, 0, L"Anm√§lningsdatum:");
   gdi.fillDown();
-  gdi.addInput("EntryTime", formatTime(r.getDCI().getInt("EntryTime")), 10, 0, L"Anm‰lningstid:");
+  gdi.addInput("EntryTime", formatTime(r.getDCI().getInt("EntryTime")), 10, 0, L"Anm√§lningstid:");
   gdi.setInputStatus("EntryDate", r.getTeam() == 0);
   gdi.setInputStatus("EntryTime", r.getTeam() == 0);
 
@@ -3128,8 +3141,8 @@ void TabRunner::loadEconomy(gdioutput &gdi, oRunner &r) {
   gdi.disableInput("ModCls");
 
   gdi.fillRight();
-  gdi.addButton("Cancel", "≈ngra").setHandler(h);
-  gdi.addButton("Close", "St‰ng").setHandler(h);
+  gdi.addButton("Cancel", "√Öngra").setHandler(h);
+  gdi.addButton("Close", "St√§ng").setHandler(h);
   gdi.addButton("Save", "Spara").setHandler(h);
   gdi.refresh();
 }
