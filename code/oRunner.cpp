@@ -5159,19 +5159,19 @@ void oRunner::printLabel(gdioutput &gdi) const {
   int cy = gdi.getCY();
   gdi.fillDown();
 
-  gdi.addStringUT(getName().length() < 20 ? boldHuge : boldLarge, getName());
-  gdi.dropLine(getName().length() < 20 ? 0.2 : 0.4);
+  gdi.addStringUT(boldLarge, getName());
+  gdi.dropLine(0.3);
   cy = gdi.getCY();
   gdi.addStringUT(cy, cx, boldLarge, getClass(false));
   if (getStatus()==StatusOK)
       {
       if (rogaining)
-        gdi.addStringUT(cy, cx+c2, boldHuge, itos(getRogainingPoints(false, false)));    
+        gdi.addStringUT(cy, cx+c2, boldLarge, itos(getRogainingPoints(false, false)));
       else
-        gdi.addStringUT(cy, cx+c2, boldHuge, getRunningTimeS(false));
+        gdi.addStringUT(cy, cx+c2, boldLarge, getRunningTimeS(false));
       }
     else
-      gdi.addStringUT(cy, cx+c2, boldHuge,  getStatusS(true, false));
+      gdi.addStringUT(cy, cx+c2, boldLarge,  getStatusS(true, false));
   gdi.dropLine(-0.1);
   cy = gdi.getCY();
   gdi.addStringUT(cy, cx, fontMedium, getClub());
