@@ -2515,7 +2515,7 @@ const pair<wstring, int> oTeam::getRaceInfo() {
       }
       /*
       if (ok && getRogainingReduction(true) > 0) {
-        tProblemDescription = L"Tidsavdrag: X poÃ¤ng.#" + itow(getRogainingReduction(true));
+        tProblemDescription = L"Tidsavdrag: X poäng.#" + itow(getRogainingReduction(true));
       }
 
       if (!getProblemDescription().empty()) {

@@ -1,4 +1,4 @@
-﻿/* include/hpdf_config.h.in.  Generated from configure.in by autoheader.  */
+/* include/hpdf_config.h.in.  Generated from configure.in by autoheader.  */
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef LIBHPDF_HAVE_DLFCN_H

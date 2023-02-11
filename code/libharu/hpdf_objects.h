@@ -1,4 +1,4 @@
-ï»¿/*
+/*
  * << Haru Free PDF Library >> -- hpdf_objects.c
  *
  * URL: http://libharu.org
@@ -79,7 +79,7 @@ extern "C" {
  *  3       reserved
  *  4       shadow-object
  *  5-8     reserved
- *  9-32    object-idÂi0-8388607Âj
+ *  9-32    object-idi0-8388607j
  *
  *  the real Object-ID is described "obj_id & 0x00FFFFFF"
  */
