@@ -1,3 +1,7 @@
+  12 Feb 2023 3.8.1306.1
+- Crash connecting to MySQL server - wrong DLL was installed in
+  version 3.8.1306.0
+
   08 May 2022 3.8.1306.0
 - Merge with MeOS 3.8.1306
 - Shrink text on label printing

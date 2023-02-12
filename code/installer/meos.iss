@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{5A8ACFDC-9E0A-4B59-9D8F-4013251EB156}
 AppName=MEOS-OZ
-AppVersion=3.8.1306.0
+AppVersion=3.8.1306.1
 AppPublisher=undy
 AppPublisherURL=https://github.com/undyau/meos-oz
 AppSupportURL=https://github.com/undyau/meos-oz
@@ -28,14 +28,13 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\Release\meos.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "libHaru.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "libmySQL.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dll\libHaru.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dll\libmySQL.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "license.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.meos"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.brules"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.template"; DestDir: "{app}"; Flags: ignoreversion
-Source: "mysqlpp.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "thirdpartylicense.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "baseclass.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "database.wclubs"; DestDir: "{app}"; Flags: ignoreversion
