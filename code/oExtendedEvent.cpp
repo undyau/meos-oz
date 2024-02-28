@@ -184,7 +184,7 @@ wstring oExtendedEvent::GetShortSssName(wstring & className)
   // Get initials of each word if its two words long and not "Walking..."
   vector<wstring> parts;
   split(className, L" ", parts);
-  if (parts.size() > 0)
+  if (parts.size() > 1)
   {
     if (parts[0].substr(0, 2) == wstring(L"Wa"))
       return L"Wa" + parts[1].substr(0, 1);
