@@ -272,20 +272,20 @@ const std::wstring getRocDate() {
   {
     w_european_tz_data.DaylightDate.wYear = utc.wYear;
     w_european_tz_data.StandardDate.wYear = utc.wYear;
-    __int64 utc_seconds = SystemTimeToInt64Second(utc);
-    __int64 swedish_dst_start = SystemTimeToInt64Second(w_european_tz_data.DaylightDate);
-    __int64 swedish_standard_start = SystemTimeToInt64Second(w_european_tz_data.StandardDate);
-    __int64 swedish_seconds;
+    __int64 system_time = SystemTimeToInt64TenthSecond(utc);
+    __int64 swedish_dst_start = SystemTimeToInt64TenthSecond(w_european_tz_data.DaylightDate);
+    __int64 swedish_standard_start = SystemTimeToInt64TenthSecond(w_european_tz_data.StandardDate);
+    __int64 swedish_tenth_seconds;
    
-    if ((utc_seconds > swedish_dst_start - 60 * (w_european_tz_data.Bias + w_european_tz_data.DaylightBias)) &&
-      (utc_seconds < swedish_standard_start - 60 * (w_european_tz_data.Bias + w_european_tz_data.StandardBias))) {
-      swedish_seconds = utc_seconds - 60 * (w_european_tz_data.Bias + w_european_tz_data.DaylightBias);
+    if ((system_time > swedish_dst_start - 600 * (w_european_tz_data.Bias + w_european_tz_data.DaylightBias)) &&
+      (system_time < swedish_standard_start - 600 * (w_european_tz_data.Bias + w_european_tz_data.StandardBias))) {
+      swedish_tenth_seconds = system_time - 600 * (w_european_tz_data.Bias + w_european_tz_data.DaylightBias);
     }
     else {
-      swedish_seconds = utc_seconds - 60 * (w_european_tz_data.Bias + w_european_tz_data.StandardBias);
+      swedish_tenth_seconds = system_time - 600 * (w_european_tz_data.Bias + w_european_tz_data.StandardBias);
     }
 
-    Swedish_time = Int64SecondToSystemTime(swedish_seconds);
+    Swedish_time = Int64TenthSecondToSystemTime(swedish_tenth_seconds);
     reference_time = &Swedish_time;
   }
   else

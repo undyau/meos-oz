@@ -3001,7 +3001,7 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
     }
   }
 
-#ifdef 0
+if (false) { // don't use MeOS logic here, use logic above
   if (classId) {
     pc = oe.getClass(classId);
 
@@ -3013,7 +3013,7 @@ pClass IOF30Interface::readClass(const xmlobject &xclass,
   else {
     pc = oe.addClass(name);
   }
-#endif    
+}
 
 
 

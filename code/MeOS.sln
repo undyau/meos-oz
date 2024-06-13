@@ -5,6 +5,14 @@ VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MeOS", "MeOS.vcxproj", "{60BC59CB-8987-4A39-B866-403066F59B0F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{20D6387D-E4D1-4E95-AB12-78346BEE037B}"
+	ProjectSection(SolutionItems) = preProject
+		oExtendedEvent.cpp = oExtendedEvent.cpp
+		oExtendedEvent.h = oExtendedEvent.h
+		oSSSQuickStart.cpp = oSSSQuickStart.cpp
+		oSSSQuickStart.h = oSSSQuickStart.h
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
