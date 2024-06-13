@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,13 +38,7 @@
 #include <codecvt>
 
 
-#ifdef _DEBUG
-#undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
-#define new DEBUG_NEW
-#endif
-
-#include <vector>
+using namespace std;
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -56,15 +50,28 @@ extern gdioutput *gdi_main;
 static int wtoi(const wstring &sp) {
   return _wtoi(sp.c_str());
 }
-csvparser::csvparser()
-{
+csvparser::csvparser() {
   LineNumber=0;
 }
 
-csvparser::~csvparser()
-{
+class CSVLineWrapper {
+  const vector<wstring> &data;
+  int row;
+public:
+  CSVLineWrapper(int row, const vector<wstring>& data) : data(data), row(row) {
+  }
 
-}
+  const wstring& operator[](int i) const {
+    if (i < 0 || i >= data.size()) {
+      throw meosException("Invalid CSV file. Incorrect data specification on line X" + itos(row));
+    }
+    return data[i];
+  }
+
+  size_t size() const { return data.size(); }
+};
+
+csvparser::~csvparser() = default;
 
 csvparser::CSV csvparser::iscsv(const wstring &file) {
   ifstream fin(file);
@@ -127,8 +134,7 @@ RunnerStatus ConvertOEStatus(int i)
 
 //Stno;Descr;Block;nc;Start;Time;Classifier;Club no.;Cl.name;City;Nat;Cl. no.;Short;Long;Legs;Num1;Num2;Num3;Text1;Text2;Text3;Start fee;Paid;Surname;First name;YB;S;Start;Finish;Time;Classifier;Chip;Rented;Database Id;Surname;First name;YB;S;Start;Finish;Time;Classifier;Chip;Rented;Database Id;Surname;First name;YB;S;Start;Finish;Time;Classifier;Chip;Rented;Database Id;(may be more) ...
 
-bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
-{
+bool csvparser::importOS_CSV(oEvent &oe, const wstring &file) {
   enum {OSstno=0, OSdesc=1, OSstart=4, OStime=5, OSstatus=6, OSclubno=7, OSclub=9,
     OSnat=10, OSclassno=11, OSclass=12, OSlegs=14, OSfee=21, OSpaid=22};
 
@@ -138,103 +144,112 @@ bool csvparser::importOS_CSV(oEvent &event, const wstring &file)
   enum {OSRsname=0, OSRfname=1, OSRyb=2, OSRsex=3, OSRstart=4,
     OSRfinish=5, OSRstatus=7, OSRcard=8, OSRrentcard=9};
   
-  nimport=0;
-  list< vector<wstring> > allLines;
-  parse(file, allLines);
-  list< vector<wstring> >::iterator it = allLines.begin();
 
-  set<wstring> matchedClasses;
-  // Skip first line
-  while (++it != allLines.end()) {
-    //fin.getline(bf, 1024);
-    //split(bf, sp);
-    const vector<wstring> &sp = *it;
+  oe.noReevaluateOperation([&]() {
 
-    if (sp.size()>20 && sp[OSclub].size()>0)
-    {
-      nimport++;
+    nimport = 0;
+    list<vector<wstring>> allLines;
+    parse(file, allLines);
+    auto it = allLines.begin();
+    if (it == allLines.end())
+      throw meosException("Invalid CSV file");
 
-      //Create club with this club number...
-      int ClubId=wtoi(sp[OSclubno]);
-      pClub pclub=event.getClubCreate(ClubId, sp[OSclub]);
+    int line = 1;
+    set<wstring> matchedClasses;
+    // Skip first line
+    while (++it != allLines.end()) {
+      CSVLineWrapper sp(++line, *it);
 
-      if (pclub){
-        pclub->getDI().setString("Nationality", sp[OSnat]);
-        pclub->synchronize(true);
-      }
+      if (sp.size() > 20 && sp[OSclub].size() > 0)
+      {
+        nimport++;
 
-      //Create class with this class number...
-      int ClassId=wtoi(sp[OSclassno]);
-      event.getClassCreate(ClassId, sp[OSclass], matchedClasses);
+        //Create club with this club number...
+        int ClubId = wtoi(sp[OSclubno]);
+        pClub pclub = oe.getClubCreate(ClubId, sp[OSclub]);
 
-      //Club is autocreated...
-      pTeam team=event.addTeam(sp[OSclub] + L" " +  sp[OSdesc], ClubId,  ClassId);
-      team->setEntrySource(externalSourceId);
+        if (pclub) {
+          pclub->getDI().setString("Nationality", sp[OSnat]);
+          pclub->synchronize(true);
+        }
 
-      team->setStartNo(wtoi(sp[OSstno]), oBase::ChangeType::Update);
+        //Create class with this class number...
+        int ClassId = wtoi(sp[OSclassno]);
+        oe.getClassCreate(ClassId, sp[OSclass], matchedClasses);
 
-      if (sp[12].length()>0)
-        team->setStatus( ConvertOEStatus( wtoi(sp[OSstatus]) ), true, oBase::ChangeType::Update);
+        //Club is autocreated...
+        pTeam team = oe.addTeam(sp[OSclub] + L" " + sp[OSdesc], ClubId, ClassId);
+        team->setEntrySource(externalSourceId);
 
-      team->setStartTime(event.convertAbsoluteTime(sp[OSstart]), true, oBase::ChangeType::Update);
+        team->setStartNo(wtoi(sp[OSstno]), oBase::ChangeType::Update);
 
-      if (sp[OStime].length()>0)
-        team->setFinishTime( event.convertAbsoluteTime(sp[OSstart])+event.convertAbsoluteTime(sp[OStime])-event.getZeroTimeNum() );
+        if (sp[12].length() > 0)
+          team->setStatus(ConvertOEStatus(wtoi(sp[OSstatus])), true, oBase::ChangeType::Update);
 
-      if (team->getStatus()==StatusOK && team->getFinishTime()==0)
-        team->setStatus(StatusUnknown, true, oBase::ChangeType::Update);
+        team->setStartTime(oe.convertAbsoluteTime(sp[OSstart]), true, oBase::ChangeType::Update);
 
-      unsigned rindex=Offset;
+        if (sp[OStime].length() > 0)
+          team->setFinishTime(oe.convertAbsoluteTime(sp[OSstart]) + oe.convertAbsoluteTime(sp[OStime]) - oe.getZeroTimeNum());
 
-      oDataInterface teamDI=team->getDI();
+        if (team->getStatus() == StatusOK && team->getFinishTime() == 0)
+          team->setStatus(StatusUnknown, true, oBase::ChangeType::Update);
 
-      teamDI.setInt("Fee", wtoi(sp[OSfee]));
-      teamDI.setInt("Paid", wtoi(sp[OSpaid]));
-      teamDI.setString("Nationality", sp[OSnat]);
+        unsigned rindex = Offset;
 
-      //Import runners!
-      int runner=0;
-      while( (rindex+OSRrentcard)<sp.size() && sp[rindex+OSRfname].length()>0 ){
-        int year = extendYear(wtoi(sp[rindex+OSRyb]));
-        int cardNo = wtoi(sp[rindex+OSRcard]);
-        wstring sname = sp[rindex+OSRsname] + L", "  + sp[rindex+OSRfname];
-        pRunner r = event.addRunner(sname, ClubId,
-                                    ClassId, cardNo, year, false);
+        oDataInterface teamDI = team->getDI();
+
+        teamDI.setInt("Fee", wtoi(sp[OSfee]));
+        teamDI.setInt("Paid", wtoi(sp[OSpaid]));
+        teamDI.setString("Nationality", sp[OSnat]);
+
+        //Import runners!
+        int runner = 0;
+        while ((rindex + OSRrentcard) < sp.size() && sp[rindex + OSRfname].length() > 0) {
+          int cardNo = wtoi(sp[rindex + OSRcard]);
+          wstring sname = sp[rindex + OSRsname] + L", " + sp[rindex + OSRfname];
+          pRunner r = oe.addRunner(sname, ClubId,
+            ClassId, cardNo, sp[rindex + OSRyb], false);
+
+          r->setEntrySource(externalSourceId);
+          oDataInterface DI = r->getDI();
+          r->setSex(interpretSex(sp[rindex + OSRsex]));
+          DI.setString("Nationality", sp[OSnat]);
+
+          if (sp[rindex + OSRrentcard].length() > 0)
+            r->setRentalCard(true);
+
+          //r->setCardNo(atoi(sp[rindex+OSRcard]), false);
+          r->setStartTime(oe.convertAbsoluteTime(sp[rindex + OSRstart]), true, oBase::ChangeType::Update);
+          r->setFinishTime(oe.convertAbsoluteTime(sp[rindex + OSRfinish]));
+
+          if (sp[rindex + OSRstatus].length() > 0)
+            r->setStatus(ConvertOEStatus(wtoi(sp[rindex + OSRstatus])), true, oBase::ChangeType::Update, false);
+
+          if (r->getStatus() == StatusOK && r->getRunningTime(false) == 0)
+            r->setStatus(StatusUnknown, true, oBase::ChangeType::Update, false);
+
+          r->addClassDefaultFee(false);
+
+          team->setRunner(runner++, r, true);
+
+          rindex += PostSize;
+        }
+        //int nrunners=team->GetNumRunners();
+        pClass pc = oe.getClass(ClassId);
+        int teamId = team->getId();
+        if (pc && runner > (int)pc->getNumStages()) {
+          oe.setupRelay(*pc, oEvent::PRelay, runner, oe.getAbsTime(timeConstHour));
+        }
+        team = oe.getTeam(teamId);
         
-        r->setEntrySource(externalSourceId);
-        oDataInterface DI=r->getDI();
-        r->setSex(interpretSex(sp[rindex + OSRsex]));
-        DI.setString("Nationality", sp[OSnat]);
-
-        if (sp[rindex+OSRrentcard].length() > 0)
-          DI.setInt("CardFee", event.getDCI().getInt("CardFee"));
-
-        //r->setCardNo(atoi(sp[rindex+OSRcard]), false);
-        r->setStartTime(event.convertAbsoluteTime(sp[rindex+OSRstart]), true, oBase::ChangeType::Update);
-        r->setFinishTime( event.convertAbsoluteTime(sp[rindex+OSRfinish]) );
-
-        if (sp[rindex+OSRstatus].length()>0)
-          r->setStatus( ConvertOEStatus( wtoi(sp[rindex+OSRstatus]) ), true, oBase::ChangeType::Update, false);
-
-        if (r->getStatus()==StatusOK && r->getRunningTime(false)==0)
-          r->setStatus(StatusUnknown, true, oBase::ChangeType::Update, false);
-
-        r->addClassDefaultFee(false);
-
-        team->setRunner(runner++, r, true);
-
-        rindex+=PostSize;
+        if (team)
+          team->evaluate(oBase::ChangeType::Update);
       }
-      //int nrunners=team->GetNumRunners();
-      pClass pc=event.getClass(ClassId);
-
-      if (pc && runner>(int)pc->getNumStages())
-        pc->setNumStages(runner);
-
-      team->evaluate(oBase::ChangeType::Update);
     }
-  }
-  fin.close();
+    fin.close();
+  });
+
+  oe.reEvaluateAll({}, true);
 
   return true;
 }
@@ -340,15 +355,20 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       OErent=35, OEfee=36, OEpaid=37, OEcourseno=38, OEcourse=39,
       OElength=40};
 
-  list< vector<wstring> > allLines;
+  list<vector<wstring>> allLines;
   parse(file, allLines);
-  list< vector<wstring> >::iterator it = allLines.begin();
+  auto it = allLines.begin();
+  if (it == allLines.end())
+    throw meosException("Invalid CSV file");
+
+  int line = 0;
 
   set<wstring> matchedClasses;
   // Skip first line
   nimport=0;
   while (++it != allLines.end()) {
-    const vector<wstring> &sp = *it;
+    CSVLineWrapper sp(++line, *it);
+
     if (sp.size()>20) {
       nimport++;
 
@@ -455,7 +475,7 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       oDataInterface DI=pr->getDI();
 
       pr->setSex(interpretSex(sp[OEsex]));
-      DI.setInt("BirthYear", extendYear(wtoi(sp[OEbirth])));
+      pr->setBirthDate(sp[OEbirth]);
       DI.setString("Nationality", sp[OEnat]);
 
       if (sp.size()>OEbib && needBib)
@@ -463,7 +483,9 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
 
       if (sp.size()>=38) {//ECO
         DI.setInt("Fee", wtoi(sp[OEfee]));
-        DI.setInt("CardFee", wtoi(sp[OErent]));
+        if (wtoi(sp[OErent]))
+          pr->setRentalCard(true);
+
         DI.setInt("Paid", wtoi(sp[OEpaid]));
       }
 
@@ -634,10 +656,10 @@ int csvparser::split(wchar_t *line, vector<wchar_t *> &split_vector, wchar_t sep
 bool csvparser::importOCAD_CSV(oEvent &event, const wstring &file, bool addClasses) {
   list< vector<wstring> > allLines;
   parse(file, allLines);
-  list< vector<wstring> >::iterator it = allLines.begin();
-
+  auto it = allLines.begin();
+  int line = 0;
   while(it != allLines.end()) {
-    const vector<wstring> &sp = *it;
+    CSVLineWrapper sp(++line, *it);
     ++it;
 
     if (sp.size()>7) {
@@ -759,14 +781,18 @@ bool csvparser::importRAID(oEvent &event, const wstring &file)
   enum {RAIDid=0, RAIDteam=1, RAIDcity=2, RAIDedate=3, RAIDclass=4,
         RAIDclassid=5, RAIDrunner1=6, RAIDrunner2=7, RAIDcanoe=8};
 
-  list< vector<wstring> > allLines;
+  list<vector<wstring>> allLines;
   parse(file, allLines);
 
   set<wstring> matchedClasses;
-  list< vector<wstring> >::iterator it = allLines.begin();
+  list<vector<wstring>>::iterator it = allLines.begin();
+  if (it == allLines.end())
+    throw meosException("Invalid CSV file");
+
   nimport=0;
+  int line = 1;
   while (++it != allLines.end()) {
-    const vector<wstring> &sp = *it;
+    CSVLineWrapper sp(++line, *it);
 
     if (sp.size()>7) {
       nimport++;
@@ -795,10 +821,10 @@ bool csvparser::importRAID(oEvent &event, const wstring &file)
       }
 
       //Import runners!
-      pRunner r1=event.addRunner(sp[RAIDrunner1], ClubId, ClassId, 0, 0, false);
+      pRunner r1=event.addRunner(sp[RAIDrunner1], ClubId, ClassId, 0, L"", false);
       team->setRunner(0, r1, false);
 
-      pRunner r2=event.addRunner(sp[RAIDrunner2], ClubId, ClassId, 0, 0, false);
+      pRunner r2=event.addRunner(sp[RAIDrunner2], ClubId, ClassId, 0, L"", false);
       team->setRunner(1, r2, false);
 
       team->evaluate(oBase::ChangeType::Update);
@@ -809,7 +835,7 @@ bool csvparser::importRAID(oEvent &event, const wstring &file)
   return true;
 }
 
-int csvparser::selectPunchIndex(const wstring &competitionDate, const vector<wstring> &sp, 
+int csvparser::selectPunchIndex(const wstring &competitionDate, const CSVLineWrapper &sp,
                                 int &cardIndex, int &timeIndex, int &dateIndex,
                                 wstring &processedTime, wstring &processedDate) {
   int ci = -1;
@@ -867,23 +893,12 @@ int csvparser::selectPunchIndex(const wstring &competitionDate, const vector<wst
 bool csvparser::importPunches(const oEvent &oe, const wstring &file, vector<PunchInfo> &punches)
 {
   punches.clear();
-/*  fin.clear();
-  fin.open(file);
-  if (!fin.good())
-    return false;
-    */
-  list< vector<wstring> > allLines;
+  list<vector<wstring>> allLines;
   parse(file, allLines);
-  list< vector<wstring> >::iterator it = allLines.begin();
+  auto it = allLines.begin();
+  if (it == allLines.end())
+    throw meosException("Invalid CSV file");
 
-
-  //const size_t siz = 1024 * 1;
-  //char bf[siz];
-  //string bfs;
-
-  //fin.getline(bf, siz);
-  //std::getline(fin, bfs);
-  
   nimport=0;
   int cardIndex = -1;
   int timeIndex = -1;
@@ -891,34 +906,24 @@ bool csvparser::importPunches(const oEvent &oe, const wstring &file, vector<Punc
 
   wstring processedTime, processedDate;
   const wstring date = oe.getDate();
-  //vector<char *> sp;
+  int line = 0;
   while (++it != allLines.end()) {
-    const vector<wstring> &sp = *it;
-    //if (fin.fail())
-    //  throw meosException("Reading file failed.");
-
-    //fin.getline(bf, siz);
-    //std::getline(fin, bfs);
-    /*sp.clear();
-    char *bf = (char *)bfs.c_str();
-    split(bf, sp);
-    */
-
+    CSVLineWrapper sp(++line, *it);
 
     int ret = selectPunchIndex(date, sp, cardIndex, timeIndex, dateIndex,
                                processedTime, processedDate); 
     if (ret == -1)
       return false; // Invalid file
     if (ret > 0) {
-      int card = wtoi(sp[cardIndex]);
-      int time = oe.getRelativeTime(processedTime);
+      const int card = wtoi(sp[cardIndex]);
+      const int time = oe.getRelativeTime(processedTime);
 
       if (card>0) {
         PunchInfo pi;
         pi.card = card;
         pi.time = time;
-        string pd(processedDate.begin(), processedDate.end());
-        strncpy_s(pi.date, sizeof(pi.date), pd.c_str(), 26);
+        string pd = gdioutput::narrow(processedDate);
+        strncpy_s(pi.date, pd.c_str(), 26);
         pi.date[26] = 0;
         punches.push_back(pi);
         nimport++;
@@ -938,7 +943,7 @@ int analyseSITime(const wchar_t *dow, const wchar_t *time, bool &is12Hour)
   return t;
 }
 
-void csvparser::checkSIConfigHeader(const vector<wstring> &sp) {
+void csvparser::checkSIConfigHeader(const CSVLineWrapper &sp) {
   siconfigmap.clear();
   if (sp.size() < 200)
     return;
@@ -1000,7 +1005,7 @@ void csvparser::checkSIConfigHeader(const vector<wstring> &sp) {
   }
 }
 
-const wchar_t *csvparser::getSIC(SIConfigFields sic, const vector<wstring> &sp) const {
+const wchar_t *csvparser::getSIC(SIConfigFields sic, const CSVLineWrapper &sp) const {
   map<SIConfigFields, int>::const_iterator res = siconfigmap.find(sic);
   if (res == siconfigmap.end() || size_t(res->second) >= sp.size())
     return L"";
@@ -1008,7 +1013,7 @@ const wchar_t *csvparser::getSIC(SIConfigFields sic, const vector<wstring> &sp) 
   return sp[res->second].c_str();
 }
 
-bool csvparser::checkSIConfigLine(const oEvent &oe, const vector<wstring> &sp, SICard &card) {
+bool csvparser::checkSIConfigLine(const oEvent &oe, const CSVLineWrapper &sp, SICard &card) {
   if (siconfigmap.empty())
     return false;
 
@@ -1096,7 +1101,7 @@ bool csvparser::checkSIConfigLine(const oEvent &oe, const vector<wstring> &sp, S
 }
 
 
-bool csvparser::checkSimanLine(const oEvent &oe, const vector<wstring> &sp, SICard &card) {
+bool csvparser::checkSimanLine(const oEvent &oe, const CSVLineWrapper &sp, SICard &card) {
   if (sp.size() <= 11)
     return false;
 
@@ -1156,33 +1161,20 @@ bool csvparser::checkSimanLine(const oEvent &oe, const vector<wstring> &sp, SICa
 bool csvparser::importCards(const oEvent &oe, const wstring &file, vector<SICard> &cards)
 {
   cards.clear();
-  list< vector<wstring> > allLines;
+  list<vector<wstring>> allLines;
   parse(file, allLines);
-  //vector<wchar_t *> sp;
-  list< vector<wstring> >::iterator it = allLines.begin();
+  auto it = allLines.begin();
   if (it == allLines.end())
     return false;
-//  fin.clear();
-//  fin.open(file);
 
-//  if (!fin.good())
-//    return false;
-
-  //[1024*16];
-  //int s = 1024*256;
-  //vector<char> bbf(s);
-  //char *bf = &bbf[0];
-  //fin.getline(bf, s);
-  //vector<char *> sp;
-  //split(bf, sp);
-  checkSIConfigHeader(*it);
+  checkSIConfigHeader(CSVLineWrapper(1, *it));
   nimport=0;
-  
+  int line = 1;
   while (++it != allLines.end()) {
     //fin.getline(bf, s);
     //split(bf, sp);
-    const vector<wstring> &sp = *it;
-    
+    CSVLineWrapper sp(++line, *it);
+
     SICard card(ConvertedTimeStatus::Unknown);
 
     if (checkSimanLine(oe, sp, card)) {
@@ -1290,7 +1282,7 @@ void csvparser::parseUnicode(const wstring &file, list< vector<wstring> > &data)
   }
 }
 
-void csvparser::parse(const wstring &file, list< vector<wstring> > &data) {
+void csvparser::parse(const wstring &file, list<vector<wstring>> &data) {
   data.clear();
 
   fin.open(file);
@@ -1302,7 +1294,7 @@ void csvparser::parse(const wstring &file, list< vector<wstring> > &data) {
   string rbf;
 
   if (!fin.good())
-    throw meosException("Failed to read file");
+    throw meosException(L"Failed to read file, " + file);
 
   bool isUTF8 = false;
   bool firstLine = true;
