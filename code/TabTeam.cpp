@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -46,26 +46,19 @@
 
 #include "TabSI.h"
 
-TabTeam::TabTeam(oEvent *poe):TabBase(poe)
-{
+TabTeam::TabTeam(oEvent *poe):TabBase(poe) {
   clearCompetitionData();
 }
 
-TabTeam::~TabTeam(void)
-{
-}
+TabTeam::~TabTeam(void) = default;
 
-int TeamCB(gdioutput *gdi, int type, void *data)
-{
+int TeamCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
   TabTeam &tt = dynamic_cast<TabTeam &>(*gdi->getTabs().get(TTeamTab));
-
   return tt.teamCB(*gdi, type, data);
 }
 
-int teamSearchCB(gdioutput *gdi, int type, void *data)
-{
+int teamSearchCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
   TabTeam &tc = dynamic_cast<TabTeam &>(*gdi->getTabs().get(TTeamTab));
-
   return tc.searchCB(*gdi, type, data);
 }
 
@@ -134,7 +127,7 @@ int TabTeam::searchCB(gdioutput &gdi, int type, void *data) {
       if (filter.empty()) {
         vector< pair<wstring, size_t> > runners;
         runners.push_back(make_pair(lang.tl(L"Ingen matchar 'X'#" + expr), -1));
-        gdi.addItem("Teams", runners);
+        gdi.setItems("Teams", runners);
       }
       else
         gdi.filterOnData("Teams", filter);
@@ -164,7 +157,7 @@ int TabTeam::searchCB(gdioutput &gdi, int type, void *data) {
         runners.swap(runners2);
       }
 
-      gdi.addItem("Teams", runners);
+      gdi.setItems("Teams", runners);
     }
 
     if (type == GUI_TIMER)
@@ -174,9 +167,11 @@ int TabTeam::searchCB(gdioutput &gdi, int type, void *data) {
   return 0;
 }
 
-
 void TabTeam::selectTeam(gdioutput &gdi, pTeam t)
 {
+  if (gdioutput* gdi_comments = getExtraWindow("comments", false); gdi_comments)
+    gdi_comments->closeWindow();
+
   if (t){
     t->synchronize();
     t->evaluate(oBase::ChangeType::Quiet);
@@ -187,8 +182,9 @@ void TabTeam::selectTeam(gdioutput &gdi, pTeam t)
     gdi.enableInput("Save");
     gdi.enableInput("Undo");
     gdi.enableInput("Remove");
+    gdi.enableInput("EditAnnotation");
 
-    oe->fillClasses(gdi, "RClass", oEvent::extraNone, oEvent::filterOnlyMulti);
+    oe->fillClasses(gdi, "RClass", {}, oEvent::extraNone, oEvent::filterOnlyMulti);
     gdi.selectItemByData("RClass", t->getClassId(false));
     gdi.selectItemByData("Teams", t->getId());
 
@@ -209,6 +205,8 @@ void TabTeam::selectTeam(gdioutput &gdi, pTeam t)
       gdi.check("NoRestart", t->preventRestart());
     }
 
+    TabRunner::loadExtraFields(gdi, t);
+
     loadTeamMembers(gdi, 0, 0, t);
   }
   else {
@@ -218,6 +216,7 @@ void TabTeam::selectTeam(gdioutput &gdi, pTeam t)
     gdi.disableInput("Save");
     gdi.disableInput("Undo");
     gdi.disableInput("Remove");
+    gdi.disableInput("EditAnnotation");
 
     ListBoxInfo lbi;
     gdi.getSelectedItem("RClass", lbi);
@@ -274,9 +273,9 @@ void TabTeam::updateTeamStatus(gdioutput &gdi, pTeam t)
   }
 
   gdi.setText("Start", t->getStartTimeS());
-  gdi.setText("Finish",t->getFinishTimeS());
-  gdi.setText("Time", t->getRunningTimeS(true));
-  gdi.setText("TimeAdjust", getTimeMS(t->getTimeAdjustment()));
+  gdi.setText("Finish",t->getFinishTimeS(false, SubSecond::Auto));
+  gdi.setText("Time", t->getRunningTimeS(true, SubSecond::Auto));
+  gdi.setText("TimeAdjust", formatTimeMS(t->getTimeAdjustment(false), false, SubSecond::Auto));
   gdi.setText("PointAdjust", -t->getPointAdjustment());
   gdi.selectItemByData("Status", t->getStatus());
 
@@ -342,6 +341,8 @@ bool TabTeam::save(gdioutput &gdi, bool dontReloadTeams) {
     if (gdi.hasWidget("NoRestart"))
       t->preventRestart(gdi.isChecked("NoRestart"));
     
+    TabRunner::saveExtraFields(gdi, *t);
+
     t->apply(oBase::ChangeType::Quiet, nullptr);
 
     if (gdi.hasWidget("Club")) {
@@ -404,6 +405,7 @@ bool TabTeam::save(gdioutput &gdi, bool dontReloadTeams) {
     }
     
     t->setClassId(classId, true);
+    t->adjustMultiRunners();
 
     if (gdi.hasWidget("TimeAdjust")) {
       int time = convertAbsoluteTimeMS(gdi.getText("TimeAdjust"));
@@ -474,7 +476,7 @@ bool TabTeam::save(gdioutput &gdi, bool dontReloadTeams) {
               }
             }
             else 
-              r = oe->addRunner(name, t->getClubId(), t->getClassId(false), cardNo, 0, false);
+              r = oe->addRunner(name, t->getClubId(), t->getClassId(false), cardNo, L"", false);
 
             r->setName(name, true);
             r->setCardNo(cardNo, true);
@@ -525,15 +527,41 @@ bool TabTeam::save(gdioutput &gdi, bool dontReloadTeams) {
   return true;
 }
 
-int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
-{
+wstring getForking(pClass pc, int key, int maxLen) {
+  wstring crsList;
+  bool hasCrs = false;
+  for (size_t k = 0; k < pc->getNumStages(); k++) {
+    pCourse crs = pc->getCourse(k, key);
+    wstring cS;
+    if (crs != 0) {
+      cS = crs->getName();
+      hasCrs = true;
+    }
+    else
+      cS = makeDash(L"-");
+
+    if (!crsList.empty())
+      crsList += L", ";
+    crsList += cS;
+
+    if (hasCrs && crsList.length() > maxLen) {
+      return crsList;
+    }
+  }
+  if (!hasCrs)
+    crsList.clear();
+
+  return crsList;
+}
+
+int TabTeam::teamCB(gdioutput &gdi, GuiEventType type, BaseInfo* data) {
   if (type==GUI_BUTTON) {
     ButtonInfo bi=*(ButtonInfo *)data;
-
+ 
     if (bi.id=="Save") {
       return save(gdi, false);
     }
-    if (bi.id == "Cancel") {
+    else if (bi.id == "Cancel") {
        loadPage(gdi);
        return 0;
     }
@@ -555,6 +583,28 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
       pTeam t = oe->getTeam(teamId);
       selectTeam(gdi, t);
       return 0;
+    }
+    else if (bi.id == "EditAnnotation") {
+      if (!teamId)
+        return 0;
+      pTeam t = oe->getTeam(teamId);
+      if (t && getExtraWindow("comments", true) == nullptr) {
+        gdioutput* settings = createExtraWindow("comments", L"Kommentarer", gdi.scaleLength(550), gdi.scaleLength(350), true);
+        
+        class TeamComments : public TabRunner::CommentHandler {
+        public:
+          TeamComments(oTeam& t) : CommentHandler(t) {}
+          void save(gdioutput& gdi) override {
+            doSave(gdi);
+            auto t = &getRunner();
+            oe->gdiBase().restore("SelectR");
+            TabTeam::forkingKey(oe->gdiBase(), pTeam(t));
+            oe->gdiBase().refresh();
+          }
+        };
+        
+        TabRunner::loadComments(*settings, *t, make_shared<TeamComments>(*t));
+      }
     }
     else if (bi.id=="Search") {
       ListBoxInfo lbi;
@@ -659,7 +709,7 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
       bool rent = gdi.isChecked("DirRent");
 
       if (r == 0) {
-        r = oe->addRunner(name, clb ? clb->getId() : t->getClubId(), t->getClassId(false), card, 0, false);
+        r = oe->addRunner(name, clb ? clb->getId() : t->getClubId(), t->getClassId(false), card, L"", false);
       }
       if (rent)
         r->getDI().setInt("CardFee", oe->getBaseCardFee());
@@ -712,23 +762,29 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
       gdi.dropLine();
       gdi.addSelection("ForkKey", 100, 400, 0, L"Gafflingsnyckel:");
       int nf = pc->getNumForks();
-      vector< pair<wstring, size_t> > keys;
+      vector<pair<wstring, size_t>> keys;
+      keys.reserve(nf);
       for (int f = 0; f < nf; f++) {
-        keys.push_back( make_pair(itow(f+1), f));
+        keys.push_back(make_pair(itow(f+1) + L": " + getForking(pc, f+1, 30), f));
       }
       int currentKey = max(t->getStartNo()-1, 0) % nf;
-      gdi.addItem("ForkKey", keys);
+      gdi.setItems("ForkKey", keys);
+      gdi.autoGrow("ForkKey");
       gdi.selectItemByData("ForkKey", currentKey);
 
       gdi.dropLine(0.9);
-      gdi.addButton("SaveKey", "Ändra", TeamCB);
-      gdi.refreshFast();
+      gdi.addButton("SaveKey", "Ändra", TeamCB).setDefault();
+      gdi.addButton("Cancel", "Avbryt", TeamCB).setCancel();
+      gdi.popX();
+      gdi.dropLine(1);
+      renderComments(t, gdi);
+      gdi.refresh();
     }
     else if (bi.id == "SaveKey") {
       pTeam t = oe->getTeam(teamId);
       if (!t || !t->getClassRef(false))
         return 0;
-      
+      t->synchronize();
       pClass  pc = t->getClassRef(false);
       int nf = pc->getNumForks();
       ListBoxInfo lbi;
@@ -745,7 +801,13 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
             continue;
 
           int currentKey = max(newSno-1, 0) % nf;
-          if (currentKey == lbi.data) { 
+          if (currentKey == lbi.data) {
+            for (int j = 0; j < t->getNumRunners(); j++) {
+              if (t->getRunner(j)) {
+                t->getRunner(j)->setCourseId(0);
+                t->synchronize(true);
+              }
+            }
             t->setStartNo(newSno, oBase::ChangeType::Update);
             t->synchronize(true);
             t->evaluate(oBase::ChangeType::Update);
@@ -875,13 +937,15 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
         gdi.addSelection("SelectR", 250, 400, TeamCB);
         gdi.addButton("SelectRunner", "OK", TeamCB).setExtra(leg);
         gdi.fillDown();
-        gdi.addButton("Cancel", "Avbryt", TeamCB);
+        gdi.addButton("Cancel", "Avbryt", TeamCB).setCancel();
         
-        gdi.addItem("SelectR", otherR);
+        gdi.setItems("SelectR", otherR);
       }
       else { 
-        gdi.addButton("Cancel", "Avbryt", TeamCB);
+        gdi.addButton("Cancel", "Avbryt", TeamCB).setCancel();
       }
+      gdi.popX();
+      renderComments(t, gdi);
       gdi.refresh();
     }
     else if (bi.id=="SelectRunner") {
@@ -1163,6 +1227,9 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
           }
           break;
         }
+        else if (ii.id == "R" + itos(i)) {
+          enableRunner(gdi, i, !ii.text.empty());
+        }
       }
     }
   
@@ -1177,7 +1244,7 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
         ac.setAutoCompleteHandler(this);
         vector<AutoCompleteRecord> items;
         for (auto club : clubs)
-          items.emplace_back(club->getDisplayName(), club->getName(), club->getId());
+          items.emplace_back(club->getDisplayName(), -int(items.size()), club->getName(), club->getId());
 
         ac.setData(items);
         ac.show();
@@ -1191,6 +1258,9 @@ int TabTeam::teamCB(gdioutput &gdi, int type, void *data)
   else if (type==GUI_CLEAR) {
     if (teamId>0)
       save(gdi, true);
+
+    if (gdioutput* gdi_settings = getExtraWindow("comments", false); gdi_settings)
+      gdi_settings->closeWindow();
 
     return true;
   }
@@ -1228,50 +1298,56 @@ void TabTeam::loadTeamMembers(gdioutput &gdi, int ClassId, int ClubId, pTeam t)
   int yp = gdi.getCY();
   int numberPos = xp;
   xp += gdi.scaleLength(25);
-  int dx[6] = {0, 184, 220, 290, 316, 364};
-  dx[1] = gdi.getInputDimension(18).first + gdi.scaleLength(4);
-  for (int i = 2; i<6; i++)
-    dx[i] = dx[1] + gdi.scaleLength(dx[i]-188);
+  const int dxIn[6] = {0, 184, 220, 300, 326, 364};
+  int dx[6];
+  dx[0] = 0;
 
+  for (int i = 1; i < 6; i++) {
+    if (i == 1)
+      dx[i] = gdi.getInputDimension(18).first + gdi.scaleLength(4);
+    else if (i == 3)
+      dx[i] = dx[i-1] + gdi.getInputDimension(7).first + gdi.scaleLength(4);
+    else
+      dx[i] = dx[i-1] + gdi.scaleLength(dxIn[i] - dxIn[i-1]);
+  }
   gdi.addString("", yp, xp + dx[0], 0, "Namn:");
   gdi.addString("", yp, xp + dx[2], 0, "Bricka:");
-  gdi.addString("", yp, xp + dx[3], 0, "Hyrd:");
+  gdi.addString("", yp, xp + dx[3]- gdi.scaleLength(5), 0, "Hyrd:");
   gdi.addString("", yp, xp + dx[5], 0, "Status:");
   gdi.dropLine(0.5);
-
+  const int textOffY = gdi.scaleLength(4);
   for (unsigned i = 0; i < pc->getNumStages(); i++) {
     yp = gdi.getCY() - gdi.scaleLength(3);
 
     sprintf_s(bf, "R%d", i);
     gdi.pushX();
     bool hasSI = false;
-    gdi.addStringUT(yp, numberPos, 0, pc->getLegNumber(i) + L".");
+    gdi.addStringUT(yp + textOffY, numberPos, 0, pc->getLegNumber(i) + L".");
     if (pc->getLegRunner(i) == i) {
-
       gdi.addInput(xp + dx[0], yp, bf, L"", 18, TeamCB);//Name
-      gdi.addButton(xp + dx[1], yp - 2, gdi.scaleLength(28), "DR" + itos(i), "<>", TeamCB, "Knyt löpare till sträckan.", false, false); // Change
+      gdi.addButton(xp + dx[1], yp - 2, gdi.scaleLength(28), "DR" + itos(i), L"\u21C6", TeamCB, L"Knyt löpare till sträckan.", false, false); // Change
       sprintf_s(bf_si, "SI%d", i);
       hasSI = true;
-      gdi.addInput(xp + dx[2], yp, bf_si, L"", 5, TeamCB).setExtra(i); //Si
-
+      gdi.addInput(xp + dx[2], yp, bf_si, L"", 7, TeamCB).setExtra(i); //Si
       gdi.addCheckbox(xp + dx[3], yp + gdi.scaleLength(10), "RENT" + itos(i), "", 0, false); //Rentcard
     }
     else {
       gdi.addInput(xp + dx[0], yp, bf, L"", 18, 0);//Name
       gdi.disableInput(bf);
     }
-    gdi.addButton(xp + dx[4], yp - 2, gdi.scaleLength(38), "MR" + itos(i), "...", TeamCB, "Redigera deltagaren.", false, false); // Change
+    gdi.addButton(xp + dx[4], yp - 2, gdi.scaleLength(28), "MR" + itos(i), L"\u21BA", TeamCB, L"Redigera deltagaren.", false, false); // Change
 
-    gdi.addString(("STATUS" + itos(i)).c_str(), yp + gdi.scaleLength(5), xp + dx[5], 0, "#MMMMMMMMMMMMMMMM");
+    gdi.addString(("STATUS" + itos(i)).c_str(), yp + textOffY, xp + dx[5], 0, "#MMMMMMMMMMMMMMMM");
     gdi.setText("STATUS" + itos(i), L"", false);
     gdi.dropLine(0.5);
     gdi.popX();
 
     if (t) {
       pRunner r = t->getRunner(i);
+      enableRunner(gdi, i, r != nullptr);
       if (r) {
         gdi.setText(bf, r->getNameRaw())->setExtra(r->getId());
-
+        r->getPlace(true); // Ensure computed status is up-to-date
         if (hasSI) {
           int cno = r->getCardNo();
           gdi.setText(bf_si, cno > 0 ? itow(cno) : L"");
@@ -1279,59 +1355,65 @@ void TabTeam::loadTeamMembers(gdioutput &gdi, int ClassId, int ClubId, pTeam t)
           gdi.check("RENT" + itos(i), r->getDCI().getInt("CardFee") != 0);
         }
         string sid = "STATUS" + itos(i);
-        if (r->statusOK(true)) {
-          TextInfo * ti = (TextInfo *)gdi.setText(sid, L"OK, " + r->getRunningTimeS(true), false);
+        if (r->statusOK(true, true)) {
+          TextInfo * ti = (TextInfo *)gdi.setText(sid, L"OK, " + r->getRunningTimeS(true, SubSecond::Auto), false);
           if (ti)
             ti->setColor(colorGreen);
         }
-        else if (r->getStatusComputed() != StatusUnknown) {
-          TextInfo * ti = (TextInfo *)gdi.setText(sid, r->getStatusS(false, true) + L", " + r->getRunningTimeS(true), false);
+        else if (r->getStatusComputed(true) != StatusUnknown) {
+          TextInfo * ti = (TextInfo *)gdi.setText(sid, r->getStatusS(false, true) + L", " + r->getRunningTimeS(true, SubSecond::Auto), false);
           if (ti)
             ti->setColor(colorRed);
         }
       }
     }
   }
+  if (t)
+    forkingKey(gdi, t);
 
+  gdi.refresh();
+}
+
+void TabTeam::forkingKey(gdioutput& gdi, pTeam t) {
+  pClass pc = t->getClassRef(false);
+  
+  gdi.pushX();
   gdi.setRestorePoint("SelectR");
-  gdi.addString("", 1, "help:7618");
+  gdi.addString("", 0, "help:7618");
   gdi.dropLine();
   int numF = pc->getNumForks();
-  
-  if (numF>1 && t) {
-    gdi.addString ("", 1, "Gafflingsnyckel X#" + itos(1+(max(t->getStartNo()-1, 0) % numF))).setColor(colorGreen);
-    wstring crsList;
-    bool hasCrs = false;
-    for (size_t k = 0; k < pc->getNumStages(); k++) {
-      pCourse crs = pc->getCourse(k, t->getStartNo());
-      wstring cS; 
-      if (crs != 0) {
-        cS = crs->getName();
-        hasCrs = true;
-      }
-      else
-        cS = makeDash(L"-");
+
+  if (numF > 1 && t) {
+    gdi.addString("", 1, "Gafflingsnyckel X#" + itos(1 + (max(t->getStartNo() - 1, 0) % numF))).setColor(colorGreen);
+    wstring crsList = getForking(pc, t->getStartNo(), 50);
     
-      if (!crsList.empty())
-        crsList += L", ";
-      crsList += cS;
-
-      if (hasCrs && crsList.length() > 50) {
-        gdi.addStringUT(0, crsList);
-        crsList.clear();
-      }
-    }
-    if (hasCrs && !crsList.empty()) {
+    if (!crsList.empty()) {
       gdi.addStringUT(0, crsList);
-    }
-
-    if (hasCrs) {
       gdi.dropLine(0.5);
       gdi.setRestorePoint("ChangeKey");
       gdi.addButton("ChangeKey", "Ändra lagets gaffling", TeamCB);
     }
   }
-  gdi.refresh();
+
+  renderComments(t, gdi);
+}
+
+void TabTeam::renderComments(const pTeam& t, gdioutput& gdi) {
+  if (t->getNumRunners() > 5)
+    TabRunner::renderComments(gdi, *t, true, false);
+  else {
+    gdi.dropLine(1); // Leave room for the below
+    TabRunner::renderComments(gdi, *t, false, false);
+  }
+}
+
+void TabTeam::enableRunner(gdioutput& gdi, int index, bool enable) {
+  string ix = itos(index);
+  string si = ("SI" + ix);
+  bool hasSI = enable || !gdi.getText(si, true).empty();
+  gdi.setInputStatus(si.c_str(), hasSI, true);
+  gdi.setInputStatus(("RENT" + ix).c_str(), hasSI, true);
+  gdi.setInputStatus(("MR" + ix).c_str(), enable, true);
 }
 
 bool TabTeam::loadPage(gdioutput &gdi, int id) {
@@ -1403,8 +1485,7 @@ bool TabTeam::loadPage(gdioutput &gdi)
   }
 
   gdi.addSelection("RClass", 170, 300, TeamCB, L"Klass:");
-  oe->fillClasses(gdi, "RClass", oEvent::extraNone, oEvent::filterOnlyMulti);
-  gdi.addItem("RClass", lang.tl("Ny klass"), 0);
+  oe->fillClasses(gdi, "RClass", {make_pair(lang.tl("Ny klass"), 0)}, oEvent::extraNone, oEvent::filterOnlyMulti);
 
   if (oe->getMeOSFeatures().hasFeature(MeOSFeatures::Economy))
     gdi.addInput("Fee", L"", 5, 0, L"Avgift:");
@@ -1457,17 +1538,18 @@ bool TabTeam::loadPage(gdioutput &gdi)
   gdi.popX();
   gdi.selectItemByData("Status", 0);
 
-  gdi.addString("TeamInfo", 0, "").setColor(colorRed);
   gdi.dropLine(0.4);
 
   if (oe->hasAnyRestartTime()) {
     gdi.addCheckbox("NoRestart", "Förhindra omstart", 0, false, "Förhindra att laget deltar i någon omstart");
   }
-  gdi.dropLine(1.5);
+
+  gdi.addString("TeamInfo", 0, " ").setColor(colorRed);
 
   const bool multiDay = oe->hasPrevStage();
 
   if (multiDay) {
+    gdi.dropLine(1.5);
     int xx = gdi.getCX();
     int yy = gdi.getCY();
     gdi.dropLine(0.5);
@@ -1498,10 +1580,14 @@ bool TabTeam::loadPage(gdioutput &gdi)
     rc.bottom = gdi.getCY();
 
     gdi.addRectangle(rc, colorLightGreen, true, false);
-    gdi.dropLine(1.5);
     gdi.popX();
   }
   
+  TabRunner::addExtraFields(*oe, gdi, oEvent::ExtraFieldContext::Team);
+  
+  gdi.dropLine(0.5);
+  gdi.popX();
+
   gdi.fillRight();
   gdi.addButton("Save", "Spara", TeamCB, "help:save");
   gdi.disableInput("Save");
@@ -1514,6 +1600,12 @@ bool TabTeam::loadPage(gdioutput &gdi)
   gdi.disableInput("Remove");
   gdi.addButton("Add", "Nytt lag", TeamCB);
 
+  gdi.popX();
+  gdi.dropLine(2.2);
+  gdi.addButton("EditAnnotation", L"Kommentar >>", TeamCB, L"Lägg till eller redigera kommentarer om laget.");
+  gdi.dropLine(2.5);
+
+  posYForButtons = max(posYForButtons, gdi.getCY());
   gdi.setOnClearCb(TeamCB);
 
   addToolbar(gdi);
@@ -1694,7 +1786,7 @@ void TabTeam::saveTeamImport(gdioutput &gdi, bool useExisting) {
         }
       }
       else {
-        r = oe->addRunner(member.name, member.club, 0, member.cardNo, 0, false);
+        r = oe->addRunner(member.name, member.club, 0, member.cardNo, L"", false);
 
         if (r && !member.course.empty()) {
           pCourse pc = oe->getCourse(member.course);
@@ -1783,7 +1875,7 @@ void TabTeam::doAddTeamMembers(gdioutput &gdi) {
            continue;
         pRunner r = 0;
         if (withFee) {
-          r = oe->addRunner(nn, mt->getClubId(), 0, 0, 0, false);  
+          r = oe->addRunner(nn, mt->getClubId(), 0, 0, L"", false);
           r->synchronize();
           mt->setRunner(j, r, false);
           r->addClassDefaultFee(true);
@@ -1826,7 +1918,13 @@ void TabTeam::showRunners(gdioutput &gdi, const char *title,
     usedR.insert(it->second);
     
     if (!any) {
-      gdi.addString("", boldText, title);
+      gdi.dropLine(0.2);
+      int YC = gdi.getCY() + gdi.getLineHeight() / 2;
+      int CX = gdi.getCX();
+      int hy = gdi.scaleLength(2);
+      RECT rc = { CX, YC-hy, CX + gdi.getLineHeight(), YC + hy };
+      gdi.addRectangle(rc, GDICOLOR::colorMediumDarkRed, false);
+      gdi.addString("", boldText|Capitalize, title);
       gdi.dropLine(1.2);
       gdi.popX();
       any = true;
@@ -1837,7 +1935,7 @@ void TabTeam::showRunners(gdioutput &gdi, const char *title,
       gdi.popX();
     }
 
-    gdi.addString("SelectR", 0, L"#" + it->first, TeamCB).setExtra(it->second);
+    gdi.addString("SelectR", 0, L"#" + it->first, TeamCB).setColor(colorRed).setExtra(it->second);
   }
 
   if (any) {
@@ -1849,9 +1947,10 @@ void TabTeam::showRunners(gdioutput &gdi, const char *title,
 void TabTeam::processChangeRunner(gdioutput &gdi, pTeam t, int leg, pRunner r) {
   if (r && t && leg < t->getNumRunners()) {
     pRunner oldR = t->getRunner(leg);
-    gdioutput::AskAnswer ans = gdioutput::AnswerNo;
+    gdioutput::AskAnswer ans = gdioutput::AskAnswer::AnswerNo;
     if (r == oldR) {
       gdi.restore("SelectR");
+      forkingKey(gdi, t);
       return;
     }
     else if (oldR) {
@@ -1868,9 +1967,9 @@ void TabTeam::processChangeRunner(gdioutput &gdi, pTeam t, int leg, pRunner r) {
       ans = gdi.askCancel(L"Vill du att X går in i laget?#" + r->getName());
     }
 
-    if (ans == gdioutput::AnswerNo)
+    if (ans == gdioutput::AskAnswer::AnswerNo)
       return;
-    else if (ans == gdioutput::AnswerCancel) {
+    else if (ans == gdioutput::AskAnswer::AnswerCancel) {
       gdi.restore("SelectR");
       return;
     }
@@ -1921,6 +2020,7 @@ void TabTeam::switchRunners(pTeam t, int leg, pRunner r, pRunner oldR) {
     }
     otherTeam->checkValdParSetup();
     otherTeam->apply(oBase::ChangeType::Update, nullptr);
+    otherTeam->adjustMultiRunners();
     otherTeam->synchronize(true);
   }
   else if (oldR) {
@@ -1941,6 +2041,7 @@ void TabTeam::switchRunners(pTeam t, int leg, pRunner r, pRunner oldR) {
   r->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
   t->checkValdParSetup();
   t->apply(oBase::ChangeType::Update, nullptr);
+  t->adjustMultiRunners();
   t->synchronize(true);
 
   if (removeAnnonumousTeamMember)
@@ -1988,7 +2089,7 @@ bool TabTeam::warnDuplicateCard(gdioutput &gdi, string id, int cno, pRunner r) {
 }
 
 void TabTeam::handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) {
-  auto bi = gdi.setText(info.getTarget(), info.getCurrent().c_str());
+  auto bi = gdi.setText(info.getTarget().c_str(), info.getCurrent(), false, -1, false);
   if (bi) {
     int ix = info.getCurrentInt();
     bi->setExtra(ix);
@@ -1999,10 +2100,10 @@ void TabTeam::handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) {
       if (runner && gdi.hasWidget("Club") && gdi.getText("Club").empty()) {
         pClub club = db.getClub(runner->dbe().clubNo);
         if (club)
-          gdi.setText("Club", club->getName());
+          gdi.setText("Club", club->getName(), false, -1, false);
       }
       if (runner && runner->dbe().cardNo > 0 && gdi.hasWidget("DirCard") && gdi.getText("DirCard").empty()) {
-        gdi.setText("DirCard", runner->dbe().cardNo);
+        gdi.setText("DirCard", itow(runner->dbe().cardNo), false, -1, false);
       }
     }
   }

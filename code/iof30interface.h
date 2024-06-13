@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include <set>
 #include <vector>
 #include <tuple>
+#include <unordered_map>
 
 class oEvent;
 class xmlobject;
@@ -72,7 +73,11 @@ class IOF30Interface {
   bool unrollLoops;
   // Include data on stage number
   bool includeStageRaceInfo;
-  void operator=(const IOF30Interface &);
+
+  int classIdOffset = 0;
+  int courseIdOffset = 0;
+
+  const IOF30Interface &operator=(const IOF30Interface &) = delete;
 
   set<wstring> matchedClasses;
 
@@ -150,7 +155,8 @@ class IOF30Interface {
   bool matchStageFilter(const set<int> &stageFilter, const xmlList &races);
 
   set<string> idProviders;
-  string preferredIdProvider;
+  pair<string, string> preferredIdProvider;
+  vector<vector<pair<string, wstring>>> externalIdTypes;
 
   void readEvent(gdioutput &gdi, const xmlobject &xo,
                  map<int, vector<LegInfo> > &teamClassConfig);
@@ -193,6 +199,7 @@ class IOF30Interface {
 
   int parseISO8601Time(const xmlobject &xo);
   wstring getCurrentTime() const;
+  wstring formatRelTime(int rt);
 
   static void getNationality(const xmlobject &xCountry, oDataInterface &di);
 
@@ -219,6 +226,8 @@ class IOF30Interface {
 
 
   void writeTeamResult(xmlparser &xml, const oTeam &t, bool hasInputTime);
+
+  void writeTeamEntryId(const oTeam& t, xmlparser& xml);
 
   void writeResult(xmlparser &xml, const oRunner &rPerson, const oRunner &rResultCarrier,
                    bool includeCourse, bool includeRaceNumber, bool teamMember, bool hasInputTime);
@@ -249,7 +258,10 @@ class IOF30Interface {
   // Returns zero if no stage number
   int getStageNumber();
 
-  bool readXMLCompetitorDB(const xmlobject &xCompetitor);
+  bool readXMLCompetitorDB(const xmlobject &xCompetitor,
+                           bool onlyWithClub, 
+                           std::unordered_multimap<size_t, int> &duplicateCheck,
+                           int &duplicateCount);
   void writeXMLCompetitorDB(xmlparser &xml, const RunnerDB &db, const RunnerWDBEntry &rde) const;
 
   int getStartIndex(const wstring &startId);
@@ -258,7 +270,7 @@ class IOF30Interface {
   pCourse readCourse(const xmlobject &xcrs);
 
   void readCourseGroups(xmlobject xClassCourse, vector< vector<pCourse> > &crs);
-  void bindClassCourse(oClass &pc, const vector< vector<pCourse> > &crs);
+  void bindClassCourse(oClass &pc, const vector<vector<pCourse>> &crs);
 
   static wstring constructCourseName(const xmlobject &xcrs);
   static wstring constructCourseName(const wstring &family, const wstring &name);
@@ -286,13 +298,22 @@ class IOF30Interface {
   void writeFullCourse(xmlparser &xml, const oCourse &c,
                          const map<int, wstring> &ctrlId2ExportId);
 
-  void readId(const xmlobject &person, int &pid, __int64 &extId) const;
+  void readId(const xmlobject &person, int &pid, int64_t &extId, int64_t& extId2) const;
 
   set<int> readCrsIds;
 
+  bool useEventorQuirks;
+
 public:
-  IOF30Interface(oEvent *oe, bool forceSplitFee);
-  virtual ~IOF30Interface() {}
+  IOF30Interface(oEvent *oe, bool forceSplitFee, bool useEventorQuirks);
+  virtual ~IOF30Interface() = default;
+
+  void setIdOffset(int classIdOffsetIn, int courseIdOffsetIn) {
+    classIdOffset = classIdOffsetIn;
+    assert(courseIdOffsetIn == 0);
+    courseIdOffset = courseIdOffsetIn;
+  }
+
 
   static void getLocalDateTime(const wstring &datetime, wstring &dateOut, wstring &timeOut);
 
@@ -302,7 +323,7 @@ public:
                                string &dateOut, string &timeOut);
 
   void getIdTypes(vector<string> &types);
-  void setPreferredIdType(const string &type);
+  void setPreferredIdType(const pair<string, string>&type);
 
   void readEventList(gdioutput &gdi, xmlobject &xo);
 
@@ -321,7 +342,8 @@ public:
   void readClassList(gdioutput &gdi, xmlobject &xo, int &entRead, int &entFail);
 
   void prescanCompetitorList(xmlobject &xo);
-  void readCompetitorList(gdioutput &gdi, const xmlobject &xo, int &personCount);
+  void readCompetitorList(gdioutput &gdi, const xmlobject &xo,
+                          bool onlyWithClub, int &personCount, int& duplicateCount);
 
   void readClubList(gdioutput &gdi, const xmlobject &xo, int &clubCount);
 

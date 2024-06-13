@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 
 #include <ShellAPI.h>
 
-int AutomaticCB(gdioutput *gdi, int type, void *data);
+int AutomaticCB(gdioutput *gdi, GuiEventType type, BaseInfo* data);
 
 RestService::RestService() : AutoMachine("Informationsserver", Machines::mInfoService), port(-1) {
 }
@@ -88,12 +88,12 @@ void RestService::settings(gdioutput &gdi, oEvent &oe, State state) {
   gdi.pushX();
   gdi.addCheckbox("AllowEntry", "Tillåt anmälan", 0, false).setHandler(this);
   gdi.addSelection("PermissionPerson", 180, 200, 0, L"Vem får anmäla sig:");
-  gdi.addItem("PermissionPerson", RestServer::getPermissionsPersons());
+  gdi.setItems("PermissionPerson", RestServer::getPermissionsPersons());
   gdi.autoGrow("PermissionPerson");
   gdi.selectFirstItem("PermissionPerson");
   gdi.fillDown();
   gdi.addSelection("PermissionClass", 180, 200, 0, L"Till vilka klasser:");
-  gdi.addItem("PermissionClass", RestServer::getPermissionsClass());
+  gdi.setItems("PermissionClass", RestServer::getPermissionsClass());
   gdi.autoGrow("PermissionClass");
   gdi.selectFirstItem("PermissionClass");
   bool disablePermisson = true;
@@ -111,9 +111,8 @@ void RestService::settings(gdioutput &gdi, oEvent &oe, State state) {
   else {
     gdi.addString("", 0, "Server startad på X#" + itos(port));
     auto per = server->getEntryPermission();
-    if (get<RestServer::EntryPermissionType>(per) != RestServer::EntryPermissionType::None)
+    if (get<RestServer::EntryPermissionType>(per) != RestServer::EntryPermissionType::None) {
       disablePermisson = false;
-    else {
       gdi.selectItemByData("PermissionPerson", size_t(get<RestServer::EntryPermissionType>(per)));
       gdi.selectItemByData("PermissionClass", size_t(get<RestServer::EntryPermissionClass>(per)));
     }

@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -266,7 +266,7 @@ template<class T> void GeneralResult::sort(vector<T *> &rt, SortOrder so) const 
     ps = None;
 
   vector< pair<int, oAbstractRunner *> > arr(rt.size());
-  const int maxT = 3600 * 100;
+  const int maxT = timeConstHour * 100;
   for (size_t k = 0; k < rt.size(); k++) {
     arr[k].first = 0;
     if (ps == ClassWise) {
@@ -293,7 +293,7 @@ template<class T> void GeneralResult::sort(vector<T *> &rt, SortOrder so) const 
         ord = maxT - ord;
     }
     else if (so == SortByStartTime || so == ClassStartTime ||
-             so == ClassStartTimeClub) {
+             so == ClassStartTimeClub || so == ClubClassStartTime) {
       ord = tr.getStartTime();
     }
 
@@ -593,7 +593,7 @@ int TotalResultAtControl::deduceTime(oRunner &runner, int startTime) const {
 pair<int,int> TotalResultAtControl::score(oRunner &runner, RunnerStatus st, int time, int points, bool asTeamMember) const {
   if (asTeamMember)
     return make_pair(runner.getLegNumber(), 0);
-  const int TK = 3600 * 24 * 7;
+  const int TK = timeConstHour * 24 * 7;
   RunnerStatus inputStatus = StatusOK;
 
   if (runner.getTeam()) {
@@ -781,7 +781,7 @@ RunnerStatus DynamicResult::toStatus(int status) const {
 
 pair<int,int> DynamicResult::score(oTeam &team, RunnerStatus st, int time, int points) const {
   if (getMethod(MTScore)) {
-    parser.addSymbol("ComputedTime", time);
+    parser.addSymbol("ComputedTime", time / timeConstSecond);
     parser.addSymbol("ComputedStatus", st);
     parser.addSymbol("ComputedPoints", points);
     return make_pair(0, getMethod(MTScore)->evaluate(parser));
@@ -801,7 +801,7 @@ RunnerStatus DynamicResult::deduceStatus(oTeam &team) const {
 
 int DynamicResult::deduceTime(oTeam &team) const {
   if (getMethod(MDeduceTTime))
-    return getMethod(MDeduceTTime)->evaluate(parser);
+    return getMethod(MDeduceTTime)->evaluate(parser) * timeConstSecond + team.getSubSeconds();
   else if (getMethodSource(MDeduceTTime).empty())
     return GeneralResult::deduceTime(team);
   else throw meosException("Syntax error");
@@ -817,7 +817,7 @@ int DynamicResult::deducePoints(oTeam &team) const {
 
 pair<int,int> DynamicResult::score(oRunner &runner, RunnerStatus st, int time, int points, bool asTeamMember) const {
   if (getMethod(MRScore)) {
-    parser.addSymbol("ComputedTime", time);
+    parser.addSymbol("ComputedTime", time / timeConstSecond);
     parser.addSymbol("ComputedStatus", st);
     parser.addSymbol("ComputedPoints", points);
     return make_pair(0, getMethod(MRScore)->evaluate(parser));
@@ -837,7 +837,7 @@ RunnerStatus DynamicResult::deduceStatus(oRunner &runner) const {
 
 int DynamicResult::deduceTime(oRunner &runner, int startTime) const {
   if (getMethod(MDeduceRTime))
-    return getMethod(MDeduceRTime)->evaluate(parser);
+    return getMethod(MDeduceRTime)->evaluate(parser) * timeConstSecond + runner.getSubSeconds();
   else if (getMethodSource(MDeduceRTime).empty())
     return GeneralResult::deduceTime(runner, startTime);
   else throw meosException("Syntax error");
@@ -1007,6 +1007,12 @@ void DynamicResult::declareSymbols(DynamicMethods m, bool clear) const {
   parser.declareSymbol("InputNumber", "User input number", false);
   parser.declareSymbol("Shorten", "Number of shortenings", false);
 
+  parser.declareSymbol("DataA", "Extra assigned data (A)", false);
+  parser.declareSymbol("DataB", "Extra assigned data (B)", false);
+
+  parser.declareSymbol("ClassDataA", "Extra assigned class data (A)", false);
+  parser.declareSymbol("ClassDataB", "Extra assigned class data (B)", false);
+
   if (isRunner) {
     parser.declareSymbol("CardPunches", "Runner's card, punch codes", true);
     parser.declareSymbol("CardTimes", "Runner's card, punch times", true);
@@ -1039,6 +1045,9 @@ void DynamicResult::declareSymbols(DynamicMethods m, bool clear) const {
     parser.declareSymbol("RunnerCardPunches", "Punch codes for each team member", true, true);
     parser.declareSymbol("RunnerCardTimes", "Punch times for each team member", true, true);
     parser.declareSymbol("RunnerCardControls", "Matched control ids (-1 for unmatched) for each team member", true, true);
+
+    parser.declareSymbol("RunnerDataA", "Extra assigned data (A) for each team member", true);
+    parser.declareSymbol("RunnerDataB", "Extra assigned data (B) for each team member", true);
 
     parser.declareSymbol("RunnerCourse", "Runner's course", true, true);
     parser.declareSymbol("RunnerSplitTimes", "Runner's split times", true, true);
@@ -1160,27 +1169,40 @@ void DynamicResult::prepareCommon(oAbstractRunner &runner, bool classResult) con
   if (st == StatusUnknown && ft > 0)
     st = StatusOK;
   parser.addSymbol("Status", st);
-  parser.addSymbol("Start", runner.getStartTime());
-  parser.addSymbol("Finish", ft);
-  parser.addSymbol("Time", runner.getRunningTime(useComputed));
+  parser.addSymbol("Start", runner.getStartTime() / timeConstSecond);
+  parser.addSymbol("Finish", ft / timeConstSecond);
+  parser.addSymbol("Time", runner.getRunningTime(useComputed) / timeConstSecond);
   parser.addSymbol("Place", runner.getPlace(false));
   parser.addSymbol("Points", runner.getRogainingPoints(useComputed, false));
   parser.addSymbol("PointReduction", runner.getRogainingReduction(useComputed));
-  parser.addSymbol("PointOvertime", runner.getRogainingOvertime(useComputed));
+  parser.addSymbol("PointOvertime", runner.getRogainingOvertime(useComputed) / timeConstSecond);
   parser.addSymbol("PointGross", runner.getRogainingPointsGross(useComputed));
 
   parser.addSymbol("PointAdjustment", runner.getPointAdjustment());
-  parser.addSymbol("TimeAdjustment", runner.getTimeAdjustment());
+  parser.addSymbol("TimeAdjustment", runner.getTimeAdjustment(true) / timeConstSecond);
 
-  parser.addSymbol("TotalStatus", runner.getTotalStatus());
-  parser.addSymbol("TotalTime", runner.getTotalRunningTime());
+  parser.addSymbol("TotalStatus", runner.getTotalStatus(false));
+  parser.addSymbol("TotalTime", runner.getTotalRunningTime()/timeConstSecond);
   parser.addSymbol("TotalPlace", runner.getTotalPlace(false));
 
   parser.addSymbol("InputStatus", runner.getInputStatus());
-  parser.addSymbol("InputTime", runner.getInputTime());
+  parser.addSymbol("InputTime", runner.getInputTime() / timeConstSecond);
   parser.addSymbol("InputPlace", runner.getInputPlace());
   parser.addSymbol("InputPoints", runner.getInputPoints());
   parser.addSymbol("Shorten", runner.getNumShortening());
+
+  parser.addSymbol("DataA", runner.getDCI().getInt("DataA"));
+  parser.addSymbol("DataB", runner.getDCI().getInt("DataB"));
+
+  pClass cls = runner.getClassRef(true);
+  if (cls) {
+    parser.addSymbol("ClassDataA", cls->getDCI().getInt("DataA"));
+    parser.addSymbol("ClassDataB", cls->getDCI().getInt("DataB"));
+  }
+  else {
+    parser.addSymbol("ClassDataA", 0);
+    parser.addSymbol("ClassDataB", 0);
+  }
 
   vector<RunnerStatus> inst;
   vector<int> times;
@@ -1191,13 +1213,16 @@ void DynamicResult::prepareCommon(oAbstractRunner &runner, bool classResult) con
   for (RunnerStatus s : inst)
     iinst.push_back(s);
 
+  for (int &t : times)
+    t /= timeConstSecond;
+
   parser.addSymbol("StageStatus", iinst);
   parser.addSymbol("StageTime", times);
   parser.addSymbol("StagePlace", places);
   parser.addSymbol("StagePoints", points);
 
   parser.addSymbol("InputStatus", runner.getInputStatus());
-  parser.addSymbol("InputTime", runner.getInputTime());
+  parser.addSymbol("InputTime", runner.getInputTime() / timeConstSecond);
   parser.addSymbol("InputPlace", runner.getInputPlace());
   parser.addSymbol("InputPoints", runner.getInputPoints());
 
@@ -1219,20 +1244,20 @@ void DynamicResult::prepareCalculations(oTeam &team, bool classResult) const {
   GeneralResult::prepareCalculations(team, classResult);
   prepareCommon(team, classResult);
   int nr = team.getNumRunners();
-  vector<int> status(nr), time(nr), start(nr), finish(nr), points(nr);
+  vector<int> status(nr), time(nr), start(nr), finish(nr), points(nr), dataA(nr), dataB(nr);
   vector< vector<int> > runnerOutputTimes(nr);
   vector< vector<int> > runnerOutputNumbers(nr);
 
   for (int k = 0; k < nr; k++) {
     pRunner r = team.getRunner(k);
     if (r) {
-      oAbstractRunner::TempResult &res = r->getTempResult();
+      const oAbstractRunner::TempResult &res = r->getTempResult();
       status[k] = res.getStatus();
-      time[k] = res.getRunningTime();
+      time[k] = res.getRunningTime() / timeConstSecond;
       if (time[k] > 0 && status[k] == StatusUnknown)
         status[k] = StatusOK;
-      start[k] = res.getStartTime();
-      finish[k] = res.getFinishTime();
+      start[k] = res.getStartTime() / timeConstSecond;
+      finish[k] = res.getFinishTime() / timeConstSecond;
       points[k] = res.getPoints();
       if (classResult) {
         r->updateComputedResultFromTemp();
@@ -1240,6 +1265,8 @@ void DynamicResult::prepareCalculations(oTeam &team, bool classResult) const {
 
       runnerOutputTimes[k] = res.outputTimes;
       runnerOutputNumbers[k] = res.outputNumbers;
+      dataA[k] = r->getDCI().getInt("DataA");
+      dataB[k] = r->getDCI().getInt("DataB");
     }
   }
   parser.removeSymbol("CardControls");
@@ -1267,6 +1294,9 @@ void DynamicResult::prepareCalculations(oTeam &team, bool classResult) const {
   parser.addSymbol("RunnerFinish", finish);
   parser.addSymbol("RunnerPoints", points);
 
+  parser.addSymbol("RunnerDataA", dataA);
+  parser.addSymbol("RunnerDataB", dataB);
+
   parser.addSymbol("PatrolRogainingScore", team.getRogainingPatrolPoints(false));
   parser.addSymbol("PatrolRogainingReduction", team.getRogainingPatrolReduction());
   parser.addSymbol("PatrolRogainingOvertime", team.getRogainingPatrolOvertime());
@@ -1281,7 +1311,7 @@ void DynamicResult::prepareCalculations(oTeam &team, bool classResult) const {
   pClass cls = team.getClassRef(true);
   if (cls) {
     int nl = max<int>(1, cls->getNumStages() - 1);
-    parser.addSymbol("ShortestClassTime", cls->getTotalLegLeaderTime(oClass::AllowRecompute::Yes, nl, false, false));
+    parser.addSymbol("ShortestClassTime", cls->getTotalLegLeaderTime(oClass::AllowRecompute::Yes, nl, false, false) / timeConstSecond);
   }
 }
 
@@ -1303,7 +1333,7 @@ void DynamicResult::prepareCalculations(oRunner &runner, bool classResult) const
     int ip = 0;
     for (size_t k = 0; k < punches.size(); k++) {
       if (punches[k]->getTypeCode() >= 30) {
-        times[ip] = punches[k]->getAdjustedTime();
+        times[ip] = punches[k]->getAdjustedTime() / timeConstSecond;
         codes[ip] = punches[k]->getTypeCode();
         controls[ip] = punches[k]->isUsedInCourse() ? punches[k]->getControlId() : -1;
         ip++;
@@ -1345,16 +1375,16 @@ void DynamicResult::prepareCalculations(oRunner &runner, bool classResult) const
       if (ctrl->isSingleStatusOK()) {
         eCrs.push_back(ctrl->getFirstNumber());
         if (size_t(k) < sp.size()) {
-          if (sp[k].status == SplitData::OK) {
-            eAccTime.push_back(sp[k].time - start);
-            eSplitTime.push_back(sp[k].time - st);
-            st = sp[k].time;
+          if (sp[k].hasTime()) {
+            eAccTime.push_back((sp[k].getTime(false) - start) / timeConstSecond);
+            eSplitTime.push_back((sp[k].getTime(false) - st) / timeConstSecond);
+            st = sp[k].getTime(false);
           }
-          else if (sp[k].status == SplitData::NoTime) {
-            eAccTime.push_back(st - start);
+          else if (sp[k].getStatus() == SplitData::SplitStatus::NoTime) {
+            eAccTime.push_back( (st - start) / timeConstSecond);
             eSplitTime.push_back(0);
           }
-          else if (sp[k].status == SplitData::Missing) {
+          else if (sp[k].isMissing()) {
             eAccTime.push_back(0);
             eSplitTime.push_back(-1);
           }
@@ -1362,8 +1392,8 @@ void DynamicResult::prepareCalculations(oRunner &runner, bool classResult) const
       }
     }
     if (runner.getFinishTime() > 0) {
-      eAccTime.push_back(runner.getFinishTime() - start);
-      eSplitTime.push_back(runner.getFinishTime() - st);
+      eAccTime.push_back((runner.getFinishTime() - start) / timeConstSecond);
+      eSplitTime.push_back((runner.getFinishTime() - st) / timeConstSecond);
     }
     else if (!eAccTime.empty()) {
       eAccTime.push_back(0);
@@ -1394,7 +1424,7 @@ void DynamicResult::prepareCalculations(oRunner &runner, bool classResult) const
   pClass cls = runner.getClassRef(true);
   if (cls) {
     int nl = runner.getLegNumber();
-    parser.addSymbol("ShortestClassTime", cls->getBestLegTime(oClass::AllowRecompute::Yes, nl, false));
+    parser.addSymbol("ShortestClassTime", cls->getBestLegTime(oClass::AllowRecompute::Yes, nl, false) / timeConstSecond);
   }
   vector<int> delta;
   vector<int> place;
@@ -1413,7 +1443,7 @@ void DynamicResult::prepareCalculations(oRunner &runner, bool classResult) const
   parser.addSymbol("AgeLowLimit", lowAgeLimit);
   parser.addSymbol("AgeHighLimit", highAgeLimit);
 
-  parser.addSymbol("CheckTime", runner.getCheckTime());
+  parser.addSymbol("CheckTime", runner.getCheckTime() / timeConstSecond);
 }
 
 void DynamicResult::storeOutput(vector<int> &times, vector<int> &numbers) const {
@@ -1523,7 +1553,7 @@ void GeneralResult::calculateIndividualResults(vector<pRunner> &runners,
       else {
         oe.calculateResults(set<int>(), oEvent::ResultType::TotalResult, inclPreliminary);
         for (pRunner r : runners) {
-          ri.status = r->getTotalStatus();
+          ri.status = r->getTotalStatus(false);
           if (ri.status == StatusUnknown && r->getInputStatus() == StatusOK) {
             if (r->getFinishTime() == 0) {
               if (!inclForestRunners)

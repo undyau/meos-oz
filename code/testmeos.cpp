@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -123,8 +123,8 @@ void TestMeOS::run() const {
 
 void TestMeOS::runProtected(bool protect) const {
   cleanup();
-  gdi_main->setOnClearCb(0);
-  gdi_main->setPostClearCb(0);
+  gdi_main->clearOnClearCb();
+  gdi_main->clearPostClearCb();
   gdi_main->clearPage(false, false);
   gdi_main->dbRegisterSubCommand(0, "");
   subWindows.clear();
@@ -139,9 +139,10 @@ void TestMeOS::runProtected(bool protect) const {
   oe_main->setProperty("Interactive", 0);
   oe_main->backupRunnerDatabase();
   TabSI *tsi = dynamic_cast<TabSI*>(gdi_main->getTabs().get(TabType::TSITab));
-  tsi->setMode(TabSI::ModeReadOut);
+  tsi->setMode(TabSI::SIMode::ModeReadOut);
   tsi->clearQueue();
-  
+  tsi->getSI(*gdi_main).resetPunchMap();
+
   OutputDebugString((L"Running test" + gdi_main->widen(test) + L"\n").c_str());
   try {
     status = RUNNING;
@@ -149,8 +150,8 @@ void TestMeOS::runProtected(bool protect) const {
     gdi_main->clearDialogAnswers(true);
     status = PASSED;
     if (protect) {
-      gdi_main->setOnClearCb(0);
-      gdi_main->setPostClearCb(0);
+      gdi_main->clearOnClearCb();
+      gdi_main->clearPostClearCb();
       gdi_main->clearPage(false, false);
       oe_main->clear();
       showTab(TCmpTab);
@@ -405,6 +406,10 @@ void TestMeOS::setFile(const string &file) const {
   gdi_main->dbPushDialogAnswer("*" + file);
 }
 
+void TestMeOS::setFile(const wstring& file) const {
+  gdi_main->dbPushDialogAnswer("*" + gdioutput::narrow(file));
+}
+
 void TestMeOS::cleanup() const {
 }
 
@@ -421,7 +426,7 @@ int TestMeOS::getResultModuleIndex(const char *tag) const {
 
 int TestMeOS::getListIndex(const char *name) const {
   vector< pair<wstring, size_t> > lst;
-  oe_main->getListContainer().getLists(lst, false, false, false);
+  oe_main->getListContainer().getLists(lst, false, false, false, false);
   for (size_t k = 0; k < lst.size(); k++) {
     if (lst[k].first == lang.tl(name))
       return lst[k].second;

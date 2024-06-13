@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,22 +34,18 @@
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-oPunch::oPunch(oEvent *poe): oBase(poe)
-{
-  Type=0;
-  Time=0;
-  tTimeAdjust=0;
-  isUsed=false;
-  hasBeenPlayed=false;
+oPunch::oPunch(oEvent* poe) : oBase(poe) {
+  type = 0;
+  punchTime = 0;
+  isUsed = false;
+  hasBeenPlayed = false;
   tMatchControlId = -1;
   tRogainingIndex = 0;
   anyRogainingMatchControlId = -1;
   tIndex = -1;
 }
 
-oPunch::~oPunch()
-{
-}
+oPunch::~oPunch() = default;
 
 wstring oPunch::getInfo() const
 {
@@ -59,44 +55,125 @@ wstring oPunch::getInfo() const
 string oPunch::codeString() const
 {
   char bf[32];
-  sprintf_s(bf, 32, "%d-%d;", Type, Time);
+  sprintf_s(bf, 32, "%d-%d;", type, punchTime);
   return bf;
 }
 
 void oPunch::appendCodeString(string &dst) const {
-  char bf[32];
-  sprintf_s(bf, 32, "%d-%d;", Type, Time);
+  char ubf[16];
+  if (punchUnit > 0)
+    sprintf_s(ubf, "@%d", punchUnit);
+  else
+    ubf[0] = 0;
+
+  char ubo[16];
+  if (origin != 0)
+    sprintf_s(ubo, "#%d", origin);
+  else
+    ubo[0] = 0;
+
+  char bf[48];
+  if (timeConstSecond > 1 && punchTime != -1) {
+    if (punchTime >= 0)
+      sprintf_s(bf, 32, "%d-%d.%d%s%s;", type, punchTime / timeConstSecond,
+        punchTime % timeConstSecond, ubf, ubo);
+    else {
+      sprintf_s(bf, 32, "%d--%d.%d%s%s;", type, (-punchTime) / timeConstSecond, 
+        (-punchTime) % timeConstSecond, ubf, ubo);
+    }
+  }
+  else
+    sprintf_s(bf, 32, "%d-%d%s%s;", type, punchTime, ubf, ubo);
+
   dst.append(bf);
 }
 
-void oPunch::decodeString(const string &s)
-{
-  Type=atoi(s.c_str());
-  Time=atoi(s.substr(s.find_first_of('-')+1).c_str());
+void oPunch::decodeString(const char *s) {
+  const char *typeS = s;
+  while (*s >= '0' && *s <= '9') 
+    ++s;
+  
+  type = atoi(typeS);
+
+  if (*s == '-') {
+    ++s;
+    const char *timeS = s;
+    while ((*s >= '0' && *s <= '9') || *s == '-')
+      ++s;
+  
+    int t = atoi(timeS);
+    if (timeConstSecond > 1 && *s == '.') {
+      ++s;
+      int tenth = *s - '0';
+      while ((*s >= '0' && *s <= '9')) // Eat more decimal digits (unused)
+        ++s;
+
+      if (tenth > 0 && tenth < 10) {
+        if (t >= 0 && *timeS != '-')
+          punchTime = timeConstSecond * t + tenth;
+        else
+          punchTime = timeConstSecond * t - tenth;
+      }
+      else
+        punchTime = timeConstSecond * t;
+    }
+    else if (t == -1)
+      punchTime = t;
+    else
+      punchTime = timeConstSecond * t;
+  }
+  else
+    punchTime = 0;
+
+  if (*s == '@') {
+    ++s;
+    punchUnit = atoi(s);
+  }
+  else {
+    punchUnit = 0;
+  }
+
+  while (*s && *s != '#' && *s != ';') {
+    s++;
+  }
+
+  if (*s == '#') {
+    ++s;
+    origin = atoi(s);
+  }
+  else {
+    origin = 0;
+  }
 }
 
 wstring oPunch::getString() const {
   wchar_t bf[32];
 
   const wchar_t *ct;
-  wstring time(getTime());
-  ct=time.c_str();
-
+  wstring time(getTime(false, SubSecond::Auto));
+  if (!isOriginal() && origin != 0) {
+    if (time.length() == 1)
+      time = L"\u270E";
+    else
+      time = L"\u270E" + time;
+  }
+  ct = time.c_str();
+  
   wstring typeS = getType();
   const wchar_t *tp = typeS.c_str();
 
-  if (Type==oPunch::PunchStart)
+  if (type==oPunch::PunchStart)
     swprintf_s(bf, L"%s\t%s", tp, ct);
-  else if (Type==oPunch::PunchFinish)
+  else if (type==oPunch::PunchFinish)
     swprintf_s(bf, L"%s\t%s", tp, ct);
-  else if (Type==oPunch::PunchCheck)
+  else if (type==oPunch::PunchCheck)
     swprintf_s(bf, L"%s\t%s", tp, ct);
   else
   {
     if (isUsed)
-      swprintf_s(bf, L"%d\t%s", Type, ct);
+      swprintf_s(bf, L"%d\t%s", type, ct);
     else
-      swprintf_s(bf, L"  %d*\t%s", Type, ct);
+      swprintf_s(bf, L"  %d*\t%s", type, ct);
   }
 
   return bf;
@@ -104,36 +181,43 @@ wstring oPunch::getString() const {
 
 wstring oPunch::getSimpleString() const
 {
-  wstring time(getTime());
+  wstring time(getTime(false, SubSecond::Auto));
 
-  if (Type==oPunch::PunchStart)
+  if (type==oPunch::PunchStart)
     return lang.tl(L"starten (X)#" + time);
-  else if (Type==oPunch::PunchFinish)
+  else if (type==oPunch::PunchFinish)
     return lang.tl(L"målet (X)#" + time);
-  else if (Type==oPunch::PunchCheck)
+  else if (type==oPunch::PunchCheck)
     return lang.tl(L"check (X)#" + time);
   else
-    return lang.tl(L"kontroll X (Y)#" + itow(Type) + L"#" + time);
+    return lang.tl(L"kontroll X (Y)#" + itow(type) + L"#" + time);
 }
 
-wstring oPunch::getTime() const
+wstring oPunch::getTime(bool adjust, SubSecond mode) const
 {
-  if (Time>=0)
-    return oe->getAbsTime(Time+tTimeAdjust);
-  else return makeDash(L"-");
+  if (punchTime >= 0) {
+    int at = getTimeInt();
+    if (adjust)
+      at += tTimeAdjust.second;
+    if (at > 0)
+      return oe->getAbsTime(at, mode);
+  }
+  return makeDash(L"-");
 }
 
 int oPunch::getTimeInt() const {
-  return Time;
+  if (punchUnit > 0)
+    return punchTime + oe->getUnitAdjustment(oPunch::SpecialPunch(type), punchUnit);
+  return punchTime + tTimeAdjust.first; // Adjustment "wrong time" at control
 }
-
 
 int oPunch::getAdjustedTime() const
 {
-  if (Time>=0)
-    return Time+tTimeAdjust;
+  if (punchTime>=0)
+    return getTimeInt() + tTimeAdjust.second;
   else return -1;
 }
+
 void oPunch::setTime(const wstring &t)
 {
   if (convertAbsoluteTimeHMS(t, -1) <= 0) {
@@ -141,17 +225,29 @@ void oPunch::setTime(const wstring &t)
     return;
   }
  
-  int tt = oe->getRelativeTime(t)-tTimeAdjust;
+  int tt = oe->getRelativeTime(t) - tTimeAdjust.first;
   if (tt < 0)
     tt = 0;
+  else if (punchUnit > 0) {
+    tt -= oe->getUnitAdjustment(oPunch::SpecialPunch(type), punchUnit);
+  }
   setTimeInt(tt, false);
 }
 
 void oPunch::setTimeInt(int tt, bool databaseUpdate) {
-  if (tt != Time) {
-    Time = tt;
+  if (tt != punchTime) {
+    if (origin == 0)
+      origin = -1; // Manual change
+    punchTime = tt;
     if (!databaseUpdate)
       updateChanged();
+  }
+}
+
+void oPunch::setPunchUnit(int unit) {
+  if (unit != punchUnit) {
+    punchUnit = unit;
+    updateChanged();
   }
 }
 
@@ -179,7 +275,7 @@ bool oPunch::canRemove() const
 }
 
 const wstring &oPunch::getType() const {
-  return getType(Type);
+  return getType(type);
 }
 
 const wstring &oPunch::getType(int t) {
@@ -197,4 +293,41 @@ const wstring &oPunch::getType(int t) {
 
 void oPunch::changedObject() {
   // Does nothing
+}
+
+namespace {
+  constexpr uint64_t origin_key = 1300602071;
+}
+
+int oPunch::computeOrigin(int time, int code) {
+  if (time <= 0 || code <= 0)
+    return false;
+  static_assert(timeConstHour == 36000);
+  time = time % (36000 * 24 * 7);
+  code = code % 29;
+  uint64_t xcode = (time * 29 + code) * 7;
+  assert(xcode > 0 && xcode < 1300000000);
+  return (xcode*53458ul) % origin_key;
+}
+
+bool oPunch::isOriginal() const {
+  if (origin <= 0)
+    return false;
+  return computeOrigin(oe->getZeroTimeNum() + punchTime, type) == origin;
+}
+
+int oPunch::getOriginalTime() const {
+  if (origin <= 0)
+    return 0;
+
+  constexpr uint64_t inv = 91551603;
+  int xcode = int((inv * uint64_t(origin)) % origin_key);
+  if (xcode % 7 != 0)
+    return 0;
+
+  int pt = ((xcode/7)-type%29) / 29;
+
+  if (punchUnit > 0)
+    return pt + oe->getUnitAdjustment(oPunch::SpecialPunch(type), punchUnit);
+  return pt + tTimeAdjust.first; // Adjustment "wrong time" at control
 }

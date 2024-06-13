@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,13 +39,14 @@
 #include "meosexception.h"
 #include "meos_util.h"
 #include "MeosSQL.h"
+#include "generalresult.h"
+#include "metalist.h"
+#include "image.h"
 
 #include "meos.h"
 #include <cassert>
-typedef bool (__cdecl* OPENDB_FCN)(void);
-typedef int (__cdecl* SYNCHRONIZE_FCN)(oBase *obj);
 
-
+extern Image image;
 
 bool oEvent::connectToServer()
 {
@@ -72,7 +73,7 @@ void oEvent::startReconnectDaemon()
   gdibase.setWindowTitle(oe->getTitleName());
   isConnectedToServer = false;
   if (!isReadOnly()) {
-    // Do not show in kiosk-mode
+    // Do not show in read only-mode
     gdibase.delayAlert(L"warning:dbproblem#" + gdibase.widen(err));
   }
 }
@@ -378,9 +379,9 @@ bool oEvent::uploadSynchronize()
     if (it->FullPath == currentNameId && it->Server.length()>0) {
       gdioutput::AskAnswer ans = gdibase.askCancel(L"ask:overwrite_server");
 
-      if (ans == gdioutput::AnswerCancel)
+      if (ans == gdioutput::AskAnswer::AnswerCancel)
         return false;
-      else if (ans == gdioutput::AnswerNo) {
+      else if (ans == gdioutput::AskAnswer::AnswerNo) {
         int len = currentNameId.length();
         wchar_t ex[10];
         swprintf_s(ex, L"_%05XZ", (GetTickCount()/97) & 0xFFFFF);
@@ -430,6 +431,16 @@ bool oEvent::uploadSynchronize()
     string err;
     sqlConnection->getErrorMessage(err);
     gdibase.addInfoBox("", wstring(L"Kunde inte ladda upp löpardatabasen (X).#") + lang.tl(err), 5000);
+  }
+
+  set<uint64_t> img;
+  listContainer->getUsedImages(img);
+  if (!img.empty()) {
+    for (auto imgId : img) {
+      wstring fileName = image.getFileName(imgId);
+      auto rawData = image.getRawData(imgId);
+      sqlConnection->storeImage(imgId, fileName, rawData);
+    }
   }
 
   isConnectedToServer = true;
@@ -491,6 +502,16 @@ bool oEvent::readSynchronize(const CompetitionInfo &ci)
   }
 
   updateFreeId();
+
+  image.clearLoaded();
+
+  // Publish list of images (no loading)
+  vector<pair<wstring, uint64_t>> img;
+  sqlConnection->enumerateImages(img);
+  for (auto& i : img) {
+    image.addImage(i.second, i.first);
+  }
+
   isConnectedToServer = false;
 
   openRunnerDatabase(currentNameId.c_str());
@@ -609,6 +630,25 @@ bool oEvent::readSynchronize(const CompetitionInfo &ci)
   }
 
   return true;
+}
+
+void oEvent::loadImage(uint64_t id) const {
+  if (image.hasImage(id))
+    return;
+  if (sqlConnection && isConnectedToServer) {
+    wstring fn;
+    vector<uint8_t> data;
+    if (sqlConnection->getImage(id, fn, data) == OpFailStatus::opStatusOK)
+      image.provideFromMemory(id, fn, data);
+  }
+}
+
+void oEvent::saveImage(uint64_t id) const {
+  if (sqlConnection && isConnectedToServer) {
+    wstring fn = image.getFileName(id);
+    auto &data = image.getRawData(id);
+    sqlConnection->storeImage(id, fn, data);
+  }
 }
 
 bool oEvent::reConnectRaw() {
@@ -765,7 +805,7 @@ int oEvent::checkChanged(vector<wstring> &out) const
       it!=oe->punches.end(); ++it)
     if (it->isChanged()) {
       changed++;
-      swprintf_s(bf, L"Punch SI=%d, %d", it->CardNo, it->Type);
+      swprintf_s(bf, L"Punch SI=%d, %d", it->CardNo, it->type);
       out.push_back(bf);
       it->synchronize();
     }

@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -33,8 +33,7 @@ class oClass;
 typedef oEvent *pEvent;
 typedef oClass *pClass;
 
-enum EPostType
-{
+enum EPostType {
   lAlignNext,
   lNone,
   lString,
@@ -54,17 +53,24 @@ enum EPostType
   lClassAvailableMaps,
   lClassTotalMaps,
   lClassNumEntries,
+  lClassDataA,
+  lClassDataB,
+  lClassTextA,
+
   lCourseLength,
   lCourseName,
+  lCourseNumber,
   lCourseClimb,
   lCourseShortening,
   lCourseUsage,
   lCourseUsageNoVacant,
   lCourseClasses,
+  lCourseNumControls,
   lRunnerName,
   lRunnerGivenName,
   lRunnerFamilyName,
   lRunnerCompleteName,
+  lRunnerLegTeamLeaderName, // The runner on the (parallell) leg (in the team) with best result
   lPatrolNameNames, // Single runner's name or both names in a patrol
   lPatrolClubNameNames, // Single runner's club or combination of patrol clubs
   lRunnerFinish,
@@ -95,9 +101,11 @@ enum EPostType
   lRunnerStartZero,
   lRunnerClub,
   lRunnerCard,
+  lRunnerRentalCard,
   lRunnerBib,
   lRunnerStartNo,
   lRunnerRank,
+  lRunnerRankScore,
   lRunnerCourse,
   lRunnerRogainingPoint,
   lRunnerRogainingPointTotal,
@@ -121,6 +129,7 @@ enum EPostType
   lRunnerLegNumber,
 
   lRunnerBirthYear,
+  lRunnerBirthDate,
   lRunnerAge,
   lRunnerSex,
   lRunnerNationality,
@@ -132,6 +141,9 @@ enum EPostType
   lRunnerEntryDate,
   lRunnerEntryTime,
   lRunnerId,
+  lRunnerDataA,
+  lRunnerDataB,
+  lRunnerTextA,
 
   lTeamName,
   lTeamStart,
@@ -140,6 +152,9 @@ enum EPostType
   lTeamTimeStatus,
   lTeamTimeAfter,
   lTeamPlace,
+  lTeamCourseName,
+  lTeamCourseNumber,
+  lTeamLegName,
   lTeamLegTimeStatus,
   lTeamLegTimeAfter,
   lTeamRogainingPoint,
@@ -166,20 +181,33 @@ enum EPostType
   lTeamTotalTimeDiff,
   lTeamPlaceDiff,
 
+  lTeamDataA,
+  lTeamDataB,
+  lTeamTextA,
+
   lPunchNamedTime,
+  lPunchTeamTotalNamedTime,
   lPunchNamedSplit,
+  
   lPunchName,
 
   lPunchTime,
+  lPunchTeamTime,
+
   lPunchControlNumber,
   lPunchControlCode,
   lPunchLostTime,
   lPunchControlPlace,
   lPunchControlPlaceAcc,
+  lPunchControlPlaceTeamAcc,
 
   lPunchSplitTime,
   lPunchTotalTime,
   lPunchTotalTimeAfter,
+
+  lPunchTeamTotalTime,
+  lPunchTeamTotalTimeAfter,
+
   lPunchAbsTime,
   lPunchTimeSinceLast,
 
@@ -202,17 +230,22 @@ enum EPostType
   lControlRunnersLeft,
   lControlCodes,
 
+  lNumEntries,
+  lNumStarts,
+  lTotalRunLength,
+  lTotalRunTime,
+
   lRogainingPunch,
   lTotalCounter,
   lSubCounter,
   lSubSubCounter,
 
+  lImage,
   lLineBreak,
   lLastItem
 };
 
-enum EStdListType
-{
+enum EStdListType {
   EStdNone=-1,
   EStdStartList=1,
   EStdResultList,
@@ -273,6 +306,7 @@ enum EFilterList
   EFilterAPIEntry, // Entry via API
   EFilterWrongFee,
   EFilterIncludeNotParticipating,
+  EFilterModifiedCard,
   _EFilterMax
 };
 
@@ -293,19 +327,25 @@ enum gdiFonts;
 
 struct oPrintPost {
   oPrintPost();
-  oPrintPost(EPostType type_, const wstring &format_,
-             int style_, int dx_, int dy_, 
-             pair<int, bool> legIndex_=make_pair(0, true));
+  oPrintPost(EPostType type, const wstring &format,
+             int style, int dx, int dy, 
+             pair<int, bool> legIndex = make_pair(0, true));
+  oPrintPost(const wstring& image,
+             int style, int dx, int dy,
+             int width, int height);
 
   static string encodeFont(const string &face, int factor);
   static wstring encodeFont(const wstring &face, int factor);
 
   EPostType type;
+  int format;
+
   wstring text;
   wstring fontFace;
-  int resultModuleIndex;
-  int format;
-  GDICOLOR color;
+
+  int resultModuleIndex = -1;
+  GDICOLOR color = colorDefault;
+
   int dx;
   int dy;
   mutable int xlimit = 0;
@@ -316,18 +356,33 @@ struct oPrintPost {
     fontFace = encodeFont(font, factor);
     return *this;
   }
-  int fixedWidth;
+  int fixedWidth = 0;
+  int fixedHeight = 0;
   bool useStrictWidth = false; // Crop text
-  bool doMergeNext;
-  mutable const oPrintPost *mergeWithTmp; // Merge text with this output
+  bool doMergeNext = false;
+  bool imageNoUpdatePos = false;
+  mutable const oPrintPost *mergeWithTmp = nullptr; // Merge text with this output
 };
 
 class gdioutput;
+class BaseInfo;
 enum gdiFonts;
-typedef int (*GUICALLBACK)(gdioutput *gdi, int type, void *data);
 class xmlparser;
 class xmlobject;
 class MetaListContainer;
+
+struct SplitPrintListInfo {
+  bool includeSplitTimes = true;
+  bool withSpeed = true;
+  bool withResult = true;
+  bool withAnalysis = true;
+  bool withStandardHeading = true;
+  int numClassResults = 3;
+
+  void serialize(xmlparser& xml) const;
+  void deserialize(const xmlobject& xml);
+  int64_t checkSum() const;
+};
 
 struct oListParam {
   oListParam();
@@ -339,6 +394,7 @@ struct oListParam {
       a.useControlIdResultFrom == useControlIdResultFrom &&
       a.useControlIdResultTo == useControlIdResultTo &&
       a.filterMaxPer == filterMaxPer &&
+      a.alwaysInclude == alwaysInclude &&
       a.pageBreak == pageBreak &&
       a.showHeader == showHeader &&
       a.showInterTimes == showInterTimes &&
@@ -369,7 +425,12 @@ struct oListParam {
 
   int useControlIdResultTo;
   int useControlIdResultFrom;
+  
+  // Max number shown per class/class etc
   int filterMaxPer;
+  const oAbstractRunner *alwaysInclude = nullptr;
+  bool filterInclude(int count, const oAbstractRunner *r) const;
+
   bool pageBreak;
   bool showHeader = true;
   bool showInterTimes;
@@ -415,7 +476,6 @@ struct oListParam {
 
   void updateDefaultName(const wstring &pname) const {defaultName = pname;}
   void setCustomTitle(const wstring &t) {title = t;}
-  void getCustomTitle(wchar_t *t) const; // 256 size buffer required. Get title if set
   const wstring &getCustomTitle(const wstring &t) const;
   const wstring &getDefaultName() const {return defaultName;}
   void setName(const wstring &n) {name = n;}
@@ -448,6 +508,8 @@ struct oListParam {
 
   int sourceParam = -1;
 
+  bool tightBoundingBox = false;
+
 private:
    int legNumber;
 };
@@ -456,7 +518,8 @@ class oListInfo {
 public:
   enum EBaseType {EBaseTypeRunner,
                   EBaseTypeTeam,
-                  EBaseTypeClub,
+                  EBaseTypeClubRunner,
+                  EBaseTypeClubTeam,
                   EBaseTypeCoursePunches,
                   EBaseTypeAllPunches,
                   EBaseTypeNone,
@@ -468,7 +531,16 @@ public:
                   EBasedTypeLast_};
 
   bool isTeamList() const {return listType == EBaseTypeTeam;}
-  
+  bool isSplitPrintList() const { return splitPrintInfo != nullptr; }
+
+  /** Return true, if includeHeader is set, also considers the header. */
+  bool empty(bool includeHeader = true) const {
+    if (includeHeader)
+      return head.empty() && subHead.empty() && listPost.empty() && subListPost.empty();
+    else
+      return subHead.empty() && listPost.empty() && subListPost.empty();
+  }
+
   enum ResultType {
     Global,
     Classwise,
@@ -481,17 +553,19 @@ public:
     SpecificPunch,
     AnyPunch
   };
-  static bool addRunners(EBaseType t) {return t == EBaseTypeRunner || t == EBaseTypeClub;}
-  static bool addTeams(EBaseType t) {return t == EBaseTypeTeam || t == EBaseTypeClub;}
-  static bool addPatrols(EBaseType t) {return t == EBaseTypeTeam || t == EBaseTypeClub;}
+  static bool addRunners(EBaseType t) {return t == EBaseTypeRunner || t == EBaseTypeClubRunner;}
+  static bool addTeams(EBaseType t) {return t == EBaseTypeTeam || t == EBaseTypeClubRunner || t == EBaseType::EBaseTypeClubTeam;}
+  static bool addPatrols(EBaseType t) {return t == EBaseTypeTeam || t == EBaseTypeClubRunner || t == EBaseType::EBaseTypeClubTeam;}
 
   // Return true if the runner should be skipped
   bool filterRunner(const oRunner &r) const;
   bool filterRunnerResult(GeneralResult *gResult, const oRunner &r) const;
 
   GeneralResult *applyResultModule(oEvent &oe, vector<pRunner> &rlist) const;
-
   const wstring &getName() const {return Name;}
+
+  void shrinkSize();
+
 protected:
   wstring Name;
   EBaseType listType;
@@ -508,12 +582,13 @@ protected:
 
   oListParam lp;
 
-  list<oPrintPost> Head;
+  list<oPrintPost> head;
   list<oPrintPost> subHead;
   list<oPrintPost> listPost;
+  list<oPrintPost> subListPost;
+  
   vector<char> listPostFilter;
   vector<char> listPostSubFilter;
-  list<oPrintPost> subListPost;
   bool fixedType;
   
   PunchMode needPunches;
@@ -524,6 +599,9 @@ protected:
   void setupLinks() const;
 
   list<oListInfo> next;
+
+  shared_ptr<SplitPrintListInfo> splitPrintInfo;
+
 public:
   ResultType getResultType() const;
 
@@ -558,10 +636,20 @@ public:
     return supportClasses && next.empty();
   }
 
+  bool hasHead() const { return head.size() > 0; }
+  
+  const shared_ptr<SplitPrintListInfo>& getSplitPrintInfo() const {
+    return splitPrintInfo;
+  }
+
+  void setSplitPrintInfo(const shared_ptr<SplitPrintListInfo>& info) {
+    splitPrintInfo = info;
+  }
+
   EStdListType getListCode() const {return lp.listCode;}
   oPrintPost &addHead(const oPrintPost &pp) {
-    Head.push_back(pp);
-    return Head.back();
+    head.push_back(pp);
+    return head.back();
   }
   oPrintPost &addSubHead(const oPrintPost &pp) {
     subHead.push_back(pp);

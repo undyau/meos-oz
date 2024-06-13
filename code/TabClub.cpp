@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -108,14 +108,12 @@ void ageFilter(gdioutput &gdi, bool on, bool use) {
   gdi.setInputStatus("FilterAge", use);
 }
 
-int ClubsCB(gdioutput *gdi, int type, void *data)
-{
+int ClubsCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
   TabClub &tc = dynamic_cast<TabClub &>(*gdi->getTabs().get(TClubTab));
   return tc.clubCB(*gdi, type, data);
 }
 
-int TabClub::clubCB(gdioutput &gdi, int type, void *data)
-{
+int TabClub::clubCB(gdioutput &gdi, GuiEventType type, BaseInfo* data) {
   if (type==GUI_BUTTON) {
     ButtonInfo bi=*(ButtonInfo *)data;
 
@@ -351,8 +349,8 @@ int TabClub::clubCB(gdioutput &gdi, int type, void *data)
 
       gdi.fillDown();
       gdi.popX();
-
-      TabList::customTextLines(*oe, "IVExtra", gdi);
+      gdi.dropLine(2.5);
+      TabList::customTextLines(*oe, "IVExtra", true, gdi);
 
       gdi.dropLine(1);
 
@@ -364,7 +362,8 @@ int TabClub::clubCB(gdioutput &gdi, int type, void *data)
       oe->getDI().fillDataFields(gdi);
     }
     else if (bi.id == "SaveSettings") {
-      oe->getDI().saveDataFields(gdi);
+      set<string> modified;
+      oe->getDI().saveDataFields(gdi, modified);
 
       TabList::saveExtraLines(*oe, "IVExtra", gdi);
 
@@ -413,7 +412,7 @@ int TabClub::clubCB(gdioutput &gdi, int type, void *data)
       oe->fillClassTypes(types);
       oe->fillClasses(classes, oEvent::extraNone, oEvent::filterNone);
       types.insert(types.end(), classes.begin(), classes.end());
-      gdi.addItem("ClassType", types);
+      gdi.setItems("ClassType", types);
       gdi.addItem("ClassType", lang.tl("Alla typer"), -5);
 
       gdi.selectItemByData("ClassType", -5);

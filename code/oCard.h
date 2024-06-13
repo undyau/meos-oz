@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ protected:
   oPunchList punches;
   int cardNo;
   int miliVolt = 0; // Measured voltage of SIAC, if not zero.
-
+  int batteryDate = 0; // Battery replace date (for SIAC)
   unsigned int readId; //Identify a specific read-out
 
   const static int ConstructedFromPunches = 1;
@@ -62,7 +62,7 @@ protected:
   pRunner tOwner;
   oPunch *getPunch(const pPunch punch);
 
-  int getDISize() const {return -1;}
+  int getDISize() const final {return -1;}
 
   /** Get internal data buffers for DI */
   oDataContainer &getDataBuffers(pvoid &data, pvoid &olddata, pvectorstr &strData) const;
@@ -75,12 +75,17 @@ public:
 
   void setMeasuredVoltage(int miliVolt) { this->miliVolt = miliVolt; }
   wstring getCardVoltage() const;
+  static wstring getCardVoltage(int miliVolt);
+
   enum class BatteryStatus {
     OK,
     Warning,
     Bad
   };
   BatteryStatus isCriticalCardVoltage() const;
+  static BatteryStatus isCriticalCardVoltage(int miliVolt);
+
+  wstring getBatteryDate() const;
 
   static const shared_ptr<Table> &getTable(oEvent *oe);
 
@@ -120,7 +125,15 @@ public:
 
   bool fillPunches(gdioutput &gdi, const string &name, oCourse *crs);
 
-  void addPunch(int type, int time, int matchControlId);
+  enum class PunchOrigin {
+    Unknown,
+    Original,
+    Manual,
+  };
+
+  PunchOrigin isOriginalCard() const;
+
+  void addPunch(int type, int time, int matchControlId, int unit, PunchOrigin origin);
   oPunch *getPunchByType(int type) const;
 
   //Get punch by (matched) control punch id.

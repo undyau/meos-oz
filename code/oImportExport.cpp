@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -59,17 +59,13 @@ FlowOperation importFilterGUI(oEvent *oe,
                               const set<int>& stages,
                               const vector<string> &idProviders,
                               set<int> & filter,
-                              string &preferredIdProvider);
+                              pair<string, string> &preferredIdProvider);
 
-string conv_is(int i)
-{
+string conv_is(int i) {
   char bf[256];
-//  if (i==0)
-//    return "";
-  //else
-   if (_itoa_s(i, bf, 10)==0)
+  if (_itoa_s(i, bf, 10)==0)
     return bf;
-   return "";
+  return "";
 }
 
 int ConvertStatusToOE(int i)
@@ -108,7 +104,7 @@ wstring &getFirst(wstring &inout, int maxNames) {
   return inout;
 }
 
-bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includeSplits, bool byClass)
+bool oEvent::exportOECSV(const wchar_t *file, const set<int>& classes, int languageTypeIndex, bool includeSplits, bool byClass)
 {
   enum {
     OEstno = 0, OEcard = 1, OEid = 2, OEsurname = 3, OEfirstname = 4,
@@ -120,17 +116,17 @@ bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includ
 
   csvparser csv;
 
-  oClass::initClassId(*this);
+  oClass::initClassId(*this, classes);
 
   if (!csv.openOutput(file))
     return false;
 
   if (byClass) {
-    calculateResults({}, ResultType::ClassResult);
+    calculateResults(classes, ResultType::ClassResult);
     sortRunners(SortOrder::ClassResult);
   }
   else {
-    calculateResults({}, ResultType::CourseResult);
+    calculateResults(classes, ResultType::CourseResult);
     sortRunners(SortOrder::CourseResult);
   }
   oRunnerList::iterator it;
@@ -177,6 +173,11 @@ bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includ
 
   char bf[256];
   for (it = Runners.begin(); it != Runners.end(); ++it) {
+    if (it->isRemoved())
+      continue;
+    if (!classes.empty() && !classes.count(it->getClassId(true)))
+      continue;
+
     vector<string> row;
     row.resize(46);
     oDataInterface di = it->getDI();
@@ -217,14 +218,14 @@ bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includ
     
     // Excel format HH:MM:SS
     if (it->getFinishTime() > 0)
-      row[OEfinish] = gdibase.recodeToNarrow(it->getFinishTimeS());
+      row[OEfinish] = gdibase.recodeToNarrow(it->getFinishTimeS(false, SubSecond::Auto));
     
     // Excel format HH:MM:SS
     
     if (it->getRunningTime(true) > 0)
       row[OEtime] = gdibase.recodeToNarrow(formatTimeHMS(it->getRunningTime(true)));
 
-    row[OEstatus] = conv_is(ConvertStatusToOE(it->getStatusComputed()));
+    row[OEstatus] = conv_is(ConvertStatusToOE(it->getStatusComputed(true)));
     row[OEclubno] = conv_is(it->getClubId());
 
     if (it->getClubRef()) {
@@ -232,7 +233,10 @@ bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includ
       row[OEclubcity] = gdibase.recodeToNarrow(it->getClub());
     }
     row[OEnat] = gdibase.recodeToNarrow(di.getString("Nationality"));
-    row[OEclassno] = conv_is(it->getClassId(true));
+    {
+      pClass pc = it->getClassRef(true);
+      row[OEclassno] = pc ? gdibase.recodeToNarrow(pc->getExtIdentifierString()) : "0";
+    }
     row[OEclassshortname] = gdibase.recodeToNarrow(it->getClass(true));
     row[OEclassname] = gdibase.recodeToNarrow(it->getClass(true));
 
@@ -274,8 +278,8 @@ bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includ
         if (pc->getControl(k)->isRogaining(hasRogaining))
           continue;
         row.push_back(gdibase.recodeToNarrow(pc->getControl(k)->getIdS()));
-        if (unsigned(k) < sp.size() && sp[k].time > 0)
-          row.push_back(gdibase.recodeToNarrow(formatTimeHMS(sp[k].time - it->tStartTime)));
+        if (unsigned(k) < sp.size() && sp[k].getTime(false) > 0)
+          row.push_back(gdibase.recodeToNarrow(formatTimeHMS(sp[k].getTime(false) - it->tStartTime)));
         else
           row.push_back("-----");
       }
@@ -294,7 +298,7 @@ bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includ
           if (it->tStartTime > 0 && t > 0 && t > it->tStartTime)
             row.push_back(gdibase.recodeToNarrow(formatTimeHMS(t - it->tStartTime)));
           else
-            return "-----";
+            row.push_back("-----");
         }
       }
 
@@ -311,8 +315,10 @@ bool oEvent::exportOECSV(const wchar_t *file, int languageTypeIndex, bool includ
 void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file, 
                                  bool updateClass, bool removeNonexisting,
                                  const set<int> &filter,
-                                 const string &preferredIdType) {
-  vector< pair<int, int> > runnersInTeam;
+                                 int classIdOffset,
+                                 int courseIdOffset,
+                                 const pair<string, string> &preferredIdType) {
+  vector<pair<int, int>> runnersInTeam;
   for (oRunnerList::iterator it = Runners.begin(); it != Runners.end(); ++it) {
     if (!it->isRemoved() && it->tInTeam) {
       runnersInTeam.push_back(make_pair(it->getId(), it->getClassId(false)) );
@@ -332,7 +338,8 @@ void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file,
     int ent = 0, fail = 0, removed = 0;
 
     if (xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
+      reader.setIdOffset(classIdOffset, courseIdOffset);
       reader.setPreferredIdType(preferredIdType);
       reader.readEntryList(gdi, xo, removeNonexisting, filter, ent, fail, removed);
 
@@ -397,7 +404,8 @@ void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file,
     int ent = 0, fail = 0;
     
     if (xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
+      reader.setIdOffset(classIdOffset, courseIdOffset);
       reader.readStartList(gdi, xo, ent, fail);
     }
     else {
@@ -446,7 +454,8 @@ void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file,
     if (xo.getAttrib("iofVersion")) {
       gdi.addString("", 0, "Importerar resultat (IOF, xml)");
       gdi.refreshFast();
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
+      reader.setIdOffset(classIdOffset, courseIdOffset);
       reader.readResultList(gdi, xo, ent, fail);
     }
     gdi.addString("", 0, "Klart. Antal importerade: X#" + itos(ent));
@@ -468,7 +477,8 @@ void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file,
     int imp = 0, fail = 0;
 
     if (xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
+      reader.setIdOffset(classIdOffset, courseIdOffset);
       reader.readClassList(gdi, xo, imp, fail);
     }
     else {
@@ -574,7 +584,8 @@ void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file,
     int imp = 0, fail = 0;
 
     if (xo && xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
+      reader.setIdOffset(classIdOffset, courseIdOffset);
       reader.readCourseData(gdi, xo, updateClass, imp, fail);
     }
     else {
@@ -617,7 +628,7 @@ void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file,
     gdi.refreshFast();
 
     if (xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
       reader.readEventList(gdi, xo);
       gdi.addString("", 0, L"Tävlingens namn: X#" + getName());
       gdi.dropLine();
@@ -649,7 +660,7 @@ void oEvent::importXML_EntryData(gdioutput &gdi, const wstring &file,
     gdi.refreshFast();
 
     if (xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
       int imp = 0, fail = 0;
 
       reader.readServiceRequestList(gdi, xo, imp, fail);      
@@ -721,7 +732,9 @@ bool oEvent::addXMLCompetitorDB(const xmlobject &xentry, int clubId)
   person.getObjectString("sex", sex, 2);
 
   xmlobject bd = person.getObject("BirthDate");
-  int birth = bd ? bd.getObjectInt("Date") : 0;
+  wstring birth;
+  if (bd)
+    bd.getObjectString("Date", birth);
 
   xmlobject nat = person.getObject("Nationality");
 
@@ -748,7 +761,7 @@ bool oEvent::addXMLCompetitorDB(const xmlobject &xentry, int clubId)
     rde->setExtId(extId);
     rde->setName(name.c_str());
     rde->dbe().clubNo = clubId;
-    rde->dbe().birthYear = extendYear(birth);
+    rde->dbe().setBirthDate(birth);
     rde->dbe().sex = sex[0];
     memcpy(rde->dbe().national, national, 3);
   }
@@ -782,7 +795,7 @@ bool oEvent::addOECSVCompetitorDB(const vector<wstring> &row)
   else
     strcpy_s(sex, "");
 
-  int birth = _wtoi(row[OEbirth].c_str());
+  const wstring &birth = row[OEbirth];
 
   // Hack to take care of inconsistency between FFCO licensees archive (France) and event registrations from FFCO (FR)
   char national[4] = { 0,0,0,0 };
@@ -832,7 +845,7 @@ bool oEvent::addOECSVCompetitorDB(const vector<wstring> &row)
     rde->setExtId(pid);
     rde->setName(name.c_str());
     rde->dbe().clubNo = clubId;
-    rde->dbe().birthYear = extendYear(birth);
+    rde->dbe().setBirthDate(birth);
     rde->dbe().sex = sex[0];
     memcpy(rde->dbe().national, national, 3);
   }
@@ -894,7 +907,7 @@ bool oEvent::addXMLTeamEntry(const xmlobject &xentry, int clubId)
   }
 
   if (pc->getNumStages() < unsigned(maxleg)) {
-    setupRelay(*pc, PRelay, maxleg, getAbsTime(3600));
+    setupRelay(*pc, PRelay, maxleg, getAbsTime(timeConstHour));
   }
 
   for (size_t k = 0; k < teamCmp.size(); k++) {
@@ -978,8 +991,10 @@ pRunner oEvent::addXMLPerson(const xmlobject &person) {
   r->setSex(interpretSex(person.getObjectString("sex", tmp)));
   xmlobject bd=person.getObject("BirthDate");
 
-  if (bd) r->setBirthYear(extendYear(bd.getObjectInt("Date")));
-
+  if (bd) {
+    bd.getObjectString("Date", tmp);
+    r->setBirthDate(tmp);
+  }
   xmlobject nat=person.getObject("Nationality");
 
   if (nat) {
@@ -1078,7 +1093,7 @@ pRunner oEvent::addXMLEntry(const xmlobject &xentry, int clubId, bool setClass) 
         bool createTeam = false;
         pClass pc = r->Class;
         if (pc->getNumStages() <= 1) {
-          setupRelay(*pc, PPatrolOptional, 2, getAbsTime(3600));
+          setupRelay(*pc, PPatrolOptional, 2, getAbsTime(timeConstHour));
           createTeam = true;
         }
 
@@ -1245,7 +1260,8 @@ void oEvent::importOECSV_Data(const wstring &oecsvfile, bool clear) {
 }
 
 void oEvent::importXML_IOF_Data(const wstring &clubfile,
-                              const wstring &competitorfile, bool clear)
+                                const wstring &competitorfile, 
+                                bool onlyWithClub, bool clear)
 {
   if (!clubfile.empty()) {
     xmlparser xml_club;
@@ -1268,7 +1284,7 @@ void oEvent::importXML_IOF_Data(const wstring &clubfile,
     if (!xo) {
       xo = xml_club.getObject("OrganisationList");
       if (xo) {
-        IOF30Interface reader(this, false);
+        IOF30Interface reader(this, false, false);
         reader.readClubList(gdibase, xo, clubCount);
       }
     }
@@ -1304,17 +1320,18 @@ void oEvent::importXML_IOF_Data(const wstring &clubfile,
     gdibase.refresh();
 
     int personCount = 0;
+    int duplicateCount = 0;
     xmlobject xo=xml_cmp.getObject("CompetitorList");
 
     if (xo && xo.getAttrib("iofVersion")) {
-      IOF30Interface reader(this, false);
+      IOF30Interface reader(this, false, false);
 
       vector<string> idProviders;
       reader.prescanCompetitorList(xo);
       reader.getIdTypes(idProviders);
 
       if (idProviders.size() > 1) {
-        string preferredIdProvider;
+        pair<string, string> preferredIdProvider;
         set<int> dmy;
         FlowOperation op = importFilterGUI(oe, gdibase, 
                                            {}, idProviders,
@@ -1324,7 +1341,7 @@ void oEvent::importXML_IOF_Data(const wstring &clubfile,
 
         reader.setPreferredIdType(preferredIdProvider);
       }
-      reader.readCompetitorList(gdibase, xo, personCount);
+      reader.readCompetitorList(gdibase, xo, onlyWithClub, personCount, duplicateCount);
     }
     else {
       xmlList xl;
@@ -1343,6 +1360,10 @@ void oEvent::importXML_IOF_Data(const wstring &clubfile,
     }
 
     gdibase.addStringUT(0, lang.tl("Antal importerade: ") + itow(personCount));
+
+    if (duplicateCount > 0)
+      gdibase.addString("", 0, "Ignorerade X duplikat.#" + itos(duplicateCount));
+
     gdibase.refresh();
 
     setProperty("DatabaseUpdate", getRelativeDay());
@@ -1505,7 +1526,7 @@ bool oEvent::addXMLControl(const xmlobject &xcontrol, int type)
   if (type == 0) {
     int code = xcontrol.getObjectInt("ControlCode");
     if (code>=30 && code<1024) {
-      pControl pc = getControl(code, true);
+      pControl pc = getControl(code, true, false);
       pc->getDI().setInt("xpos", xp);
       pc->getDI().setInt("ypos", yp);
       pc->synchronize();
@@ -1518,10 +1539,10 @@ bool oEvent::addXMLControl(const xmlobject &xcontrol, int type)
     int num = getNumberSuffix(start);
     if (num == 0 && start.length()>0)
       num = int(start[start.length()-1])-'0';
-    pControl pc = getControl(getStartIndex(num), true);
+    pControl pc = getControl(getStartIndex(num), true, false);
     pc->setNumbers(L"");
     pc->setName(start);
-    pc->setStatus(oControl::StatusStart);
+    pc->setStatus(oControl::ControlStatus::StatusStart);
     pc->getDI().setInt("xpos", xp);
     pc->getDI().setInt("ypos", yp);
   }
@@ -1534,10 +1555,10 @@ bool oEvent::addXMLControl(const xmlobject &xcontrol, int type)
       num = int(finish[finish.length()-1])-'0';
     if (num > 0)
       finish = lang.tl("Mål ") + itow(num);
-    pControl pc = getControl(getFinishIndex(num), true);
+    pControl pc = getControl(getFinishIndex(num), true, false);
     pc->setNumbers(L"");
     pc->setName(finish);
-    pc->setStatus(oControl::StatusFinish);
+    pc->setStatus(oControl::ControlStatus::StatusFinish);
     pc->getDI().setInt("xpos", xp);
     pc->getDI().setInt("ypos", yp);
   }
@@ -1703,8 +1724,9 @@ bool oEvent::addXMLClass(const xmlobject &xclass)
   for (size_t k = 0; k<xFee.size(); k++) {
     xmlobject xamount = xFee[k].getObject("Amount");
     if (xamount) {
-      double f = atof(xamount.getRaw());
-      wstring cur = xamount.getAttrib("currency").wget();
+      const char* ptr = xamount.getRawPtr();    
+      double f = ptr ? atof(ptr) : 0.0;
+      wstring cur = xamount.getAttrib("currency").getWStr();
       if (f>0) {
         fee.push_back(oe->interpretCurrency(f, cur));
       }
@@ -2384,8 +2406,8 @@ void oEvent::exportIOFResults(xmlparser &xml, bool selfContained, const set<int>
                   continue;
                 xml.startTag("SplitTime", "sequence", itos(no++));
                 xml.write("ControlCode", pcourse->Controls[k]->getFirstNumber());
-                if (unsigned(k)<sp.size() && sp[k].time>0)
-                  xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(sp[k].time-it->tStartTime, 0));
+                if (unsigned(k)<sp.size() && sp[k].getTime(false)>0)
+                  xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(sp[k].getTime(false) -it->tStartTime, 0));
                 else
                   xml.write("Time", L"--:--:--");
 
@@ -2465,7 +2487,7 @@ void oEvent::exportIOFResults(xmlparser &xml, bool selfContained, const set<int>
         xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(it->getStartTime(), ZeroTime));
         xml.endTag();
         xml.startTag("FinishTime");
-        xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(it->getFinishTimeAdjusted(), ZeroTime));
+        xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(it->getFinishTimeAdjusted(false), ZeroTime));
         xml.endTag();
 
         xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(it->getRunningTime(true),0));
@@ -2489,8 +2511,8 @@ void oEvent::exportIOFResults(xmlparser &xml, bool selfContained, const set<int>
               continue;
             xml.startTag("SplitTime", "sequence", itos(no++));
             xml.write("ControlCode", pcourse->Controls[k]->getFirstNumber());
-            if (unsigned(k)<sp.size() && sp[k].time>0)
-              xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(sp[k].time - it->tStartTime, 0));
+            if (unsigned(k)<sp.size() && sp[k].getTime(false)>0)
+              xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(sp[k].getTime(false) - it->tStartTime, 0));
             else
               xml.write("Time", L"--:--:--");
 
@@ -2587,7 +2609,7 @@ void oEvent::exportTeamSplits(xmlparser &xml, const set<int> &classes, bool oldS
         xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(it->getStartTime(), ZeroTime));
       xml.endTag();
       xml.startTag("FinishTime");
-      xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(it->getFinishTimeAdjusted(), ZeroTime));
+      xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(it->getFinishTimeAdjusted(false), ZeroTime));
       xml.endTag();
 
       xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(it->getRunningTime(true), 0));
@@ -2612,7 +2634,7 @@ void oEvent::exportTeamSplits(xmlparser &xml, const set<int> &classes, bool oldS
               xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(r->getStartTime(), ZeroTime));
             xml.endTag();
             xml.startTag("FinishTime");
-            xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(r->getFinishTimeAdjusted(), ZeroTime));
+            xml.write("Clock", "clockFormat", hhmmss, formatTimeIOF(r->getFinishTimeAdjusted(false), ZeroTime));
             xml.endTag();
 
             xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(r->getRunningTime(true), 0));
@@ -2642,8 +2664,8 @@ void oEvent::exportTeamSplits(xmlparser &xml, const set<int> &classes, bool oldS
                   continue;
                 xml.startTag("SplitTime", "sequence", itos(no++));
                 xml.write("ControlCode", pcourse->Controls[k]->getFirstNumber());
-                if (unsigned(k)<sp.size() && sp[k].time>0)
-                  xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(sp[k].time - it->tStartTime, 0));
+                if (unsigned(k)<sp.size() && sp[k].getTime(false)>0)
+                  xml.write("Time", "timeFormat", hhmmss, formatTimeIOF(sp[k].getTime(false) - it->tStartTime, 0));
                 else
                   xml.write("Time", L"--:--:--");
 
@@ -2661,18 +2683,19 @@ void oEvent::exportTeamSplits(xmlparser &xml, const set<int> &classes, bool oldS
     xml.endTag();
     ClassStarted = false;
   }
-
 }
 
 void oEvent::exportIOFSplits(IOFVersion version, const wchar_t *file,
                              bool oldStylePatrolExport, bool useUTC,
-                             const set<int> &classes, int leg,
+                             const set<int> &classes,
+                             const pair<string, string>& preferredIdTypes, int leg,
                              bool teamsAsIndividual, bool unrollLoops,
-                             bool includeStageInfo, bool forceSplitFee) {
+                             bool includeStageInfo, bool forceSplitFee,
+                             bool useEventorQuirks) {
   xmlparser xml;
 
   xml.openOutput(file, false);
-  oClass::initClassId(*this);
+  oClass::initClassId(*this, classes);
   reEvaluateAll(classes, true);
   if (version != IOF20)
     calculateResults(classes, ResultType::ClassCourseResult);
@@ -2687,7 +2710,8 @@ void oEvent::exportIOFSplits(IOFVersion version, const wchar_t *file,
   if (version == IOF20)
     exportIOFResults(xml, true, classes, leg, oldStylePatrolExport);
   else {
-    IOF30Interface writer(this, forceSplitFee);
+    IOF30Interface writer(this, forceSplitFee, useEventorQuirks);
+    writer.setPreferredIdType(preferredIdTypes);
     writer.writeResultList(xml, classes, leg, useUTC, 
                            teamsAsIndividual, unrollLoops, includeStageInfo);
   }
@@ -2696,17 +2720,22 @@ void oEvent::exportIOFSplits(IOFVersion version, const wchar_t *file,
 }
 
 void oEvent::exportIOFStartlist(IOFVersion version, const wchar_t *file, bool useUTC,
-                                const set<int> &classes, bool teamsAsIndividual,
-                                bool includeStageInfo, bool forceSplitFee) {
+                                const set<int> &classes, 
+                                const pair<string, string>& preferredIdTypes,
+                                bool teamsAsIndividual,
+                                bool includeStageInfo, 
+                                bool forceSplitFee,
+                                bool useEventorQuirks) {
   xmlparser xml;
   
-  oClass::initClassId(*this);
+  oClass::initClassId(*this, classes);
   xml.openOutput(file, false);
 
   if (version == IOF20)
     exportIOFStartlist(xml);
   else {
-    IOF30Interface writer(this, forceSplitFee);
+    IOF30Interface writer(this, forceSplitFee, useEventorQuirks);
+    writer.setPreferredIdType(preferredIdTypes);
     writer.writeStartList(xml, classes, useUTC, teamsAsIndividual, includeStageInfo);
   }
   xml.closeOut();

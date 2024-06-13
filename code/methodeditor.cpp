@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -56,7 +56,7 @@ void MethodEditor::setCurrentResult(DynamicResult *lst, const wstring &fileSrc) 
   fileNameSource = fileSrc;
 }
 
-int methodCB(gdioutput *gdi, int type, void *data) {
+int methodCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
   void *clz = gdi->getData("MethodEditorClz");
   MethodEditor *le = (MethodEditor *)clz;
   BaseInfo *bi = (BaseInfo *)data;
@@ -233,7 +233,7 @@ void makeScore(wstring &str, const pair<int, int> &score) {
   str = itow(v);
 }
 
-int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
+int MethodEditor::methodCb(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
   if (type == GUI_BUTTON) {
     ButtonInfo bi = dynamic_cast<ButtonInfo &>(data);
 
@@ -432,7 +432,7 @@ int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
       sort(lists.begin(), lists.end());
       gdi.fillRight();
       gdi.addSelection("OpenList", 350, 400, methodCB, L"Choose result module:", L"Rader markerade med (*) kommer från en lista i tävlingen.");
-      gdi.addItem("OpenList", lists);
+      gdi.setItems("OpenList", lists);
       gdi.autoGrow("OpenList");
       gdi.selectFirstItem("OpenList");
 
@@ -563,14 +563,14 @@ int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
         w[i] = gdi.scaleLength(w[i]);
 
       set<wstring> errors;
-      currentResult->prepareCalculations(*oe, false, {}, rr, tr, inputNumber);
+      currentResult->prepareCalculations(*oe, true, {}, rr, tr, inputNumber);
 
       for (size_t k = 0; k < rr.size(); k++) {
         int txp = xp;
         int wi = 0;
         gdi.addStringUT(yp, txp, 0, rr[k]->getCompleteIdentification(), w[wi]-diff);
         txp += w[wi++];
-        currentResult->prepareCalculations(*rr[k], false);
+        currentResult->prepareCalculations(*rr[k], true);
         int rt = 0, pt = 0;
         RunnerStatus st = StatusUnknown;
         
@@ -674,7 +674,7 @@ int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
         int wi = 0;
         gdi.addStringUT(yp, txp, 0, tr[k]->getName(), w[wi]-diff);
         txp += w[wi++];
-        currentResult->prepareCalculations(*tr[k], false);
+        currentResult->prepareCalculations(*tr[k], true);
         int rt = 0, pt = 0;
         RunnerStatus st = StatusUnknown;
         {
@@ -802,7 +802,7 @@ int MethodEditor::methodCb(gdioutput &gdi, int type, BaseInfo &data) {
       currentResult->declareSymbols(m, true);
       vector< pair<wstring, size_t> > symb;
       currentResult->getSymbols(symb);
-      gdi.addItem("Symbols", symb);
+      gdi.setItems("Symbols", symb);
     }
     else if (lbi.id == "Symbols") {
       wstring name, desc;
@@ -920,10 +920,10 @@ void MethodEditor::makeDirty(gdioutput &gdi, DirtyFlag inside) {
 bool MethodEditor::checkSave(gdioutput &gdi) {
   if (dirtyInt) {
     gdioutput::AskAnswer answer = gdi.askCancel(L"Vill du spara ändringar?");
-    if (answer == gdioutput::AnswerCancel)
+    if (answer == gdioutput::AskAnswer::AnswerCancel)
       return false;
 
-    if (answer == gdioutput::AnswerYes) {
+    if (answer == gdioutput::AskAnswer::AnswerYes) {
       gdi.sendCtrlMessage("SaveInside");
     }
     makeDirty(gdi, ClearDirty);
@@ -1004,11 +1004,11 @@ void MethodEditor::debug(gdioutput &gdi_in, int id, bool isTeam) {
   if (isTeam)
     oe->getTeams(art->getClassId(true), tt, false);
 
-  currentResult->prepareCalculations(*oe, false, {art->getClassId(true)}, rr, tt, inputNumber);
+  currentResult->prepareCalculations(*oe, true, {art->getClassId(true)}, rr, tt, inputNumber);
   gdi_new->addString("", fontMediumPlus, "Debug Output");
   if (!isTeam) {
     oRunner &r = *pRunner(art);
-    currentResult->prepareCalculations(r, false);
+    currentResult->prepareCalculations(r, true);
     int rt = 0, pt = 0;
     RunnerStatus st = StatusUnknown;
     gdi.dropLine();
@@ -1065,7 +1065,7 @@ void MethodEditor::debug(gdioutput &gdi_in, int id, bool isTeam) {
   }
   else {
     oTeam &t = *pTeam(art);
-    currentResult->prepareCalculations(t, false);
+    currentResult->prepareCalculations(t, true);
     int rt = 0, pt = 0;
     RunnerStatus st = StatusUnknown;
     gdi.dropLine();

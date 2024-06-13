@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -53,9 +53,6 @@ TabCourse::TabCourse(oEvent *poe):TabBase(poe)
 TabCourse::~TabCourse(void)
 {
 }
-
-void LoadCoursePage(gdioutput &gdi);
-void LoadClassPage(gdioutput &gdi);
 
 void TabCourse::selectCourse(gdioutput &gdi, pCourse pc)
 {
@@ -179,9 +176,13 @@ void TabCourse::selectCourse(gdioutput &gdi, pCourse pc)
     if (cc) {
       gdi.selectItemByData("CommonControl", cc);
     }
-
-    fillOtherCourses(gdi, *pc, cc != 0);
     auto sh = pc->getShorterVersion();
+
+    if (sh.first)
+      fillOtherCourses(gdi, *pc, cc != 0);
+    else
+      gdi.selectItemByData("ShortCourse", -1);
+
     gdi.check("Shorten", sh.first);
     gdi.setInputStatus("ShortCourse", sh.first);
     gdi.selectItemByData("ShortCourse", sh.second ? sh.second->getId() : 0);
@@ -216,7 +217,7 @@ void TabCourse::selectCourse(gdioutput &gdi, pCourse pc)
   gdi.setInputStatus("DrawCourse", pc != 0, true);  
 }
 
-int CourseCB(gdioutput *gdi, int type, void *data) {
+int CourseCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
   TabCourse &tc = dynamic_cast<TabCourse &>(*gdi->getTabs().get(TCourseTab));
   return tc.courseCB(*gdi, type, data);
 }
@@ -307,7 +308,7 @@ void TabCourse::save(gdioutput &gdi, int canSwitchViewMode) {
 
   pc->synchronize();//Update SQL
 
-  oe->fillCourses(gdi, "Courses");
+  oe->fillCourses(gdi, "Courses", {}, false);
   oe->reEvaluateCourse(pc->getId(), true);
 
   if (canSwitchViewMode != 2 && changedCourse && pc->getLegLengths().size() > 2) {
@@ -331,8 +332,7 @@ void TabCourse::save(gdioutput &gdi, int canSwitchViewMode) {
     selectCourse(gdi, pc);
 }
 
-int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
-{
+int TabCourse::courseCB(gdioutput &gdi, GuiEventType type, BaseInfo* data) {
   if (type==GUI_BUTTON) {
     ButtonInfo bi=*(ButtonInfo *)data;
 
@@ -448,9 +448,13 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       bool w = gdi.isChecked(bi.id);
       gdi.setInputStatus("ShortCourse", w);
       if (w) {
+        pCourse pc = oe->getCourse(courseId);
+        if (pc) {
+          fillOtherCourses(gdi, *pc, gdi.isChecked("WithLoops"));
+        }
         ListBoxInfo clb;
-        if (!gdi.getSelectedItem("ShortCoursse", clb) || clb.data <= 0)
-          gdi.selectFirstItem("CommonControl");
+        if (!gdi.getSelectedItem("ShortCourse", clb) || clb.data <= 0)
+          gdi.selectFirstItem("ShortCourse");
       }
     }
     else if (bi.id == "ExportCourses") {
@@ -459,12 +463,35 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       ext.push_back(make_pair(L"IOF CourseData, version 3.0 (xml)", L"*.xml"));
       wstring save = gdi.browseForSave(ext, L"xml", FilterIndex);
       if (save.length()>0) {
-        IOF30Interface iof30(oe, false);
+        IOF30Interface iof30(oe, false, false);
         xmlparser xml;
         xml.openOutput(save.c_str(), false);
         iof30.writeCourses(xml);
         xml.closeOut();
       }
+    }
+    else if (bi.id == "DeleteAll") {
+      if (!gdi.ask(L"Vill du ta bort alla banor från tävlingen?"))
+        return 0;
+      // Clear all course references
+      vector<pRunner> rr;
+      oe->getRunners(0, 0, rr);
+      for (pRunner r : rr) {
+        r->setCourseId(0);
+      }
+      vector<pClass> cc;
+      oe->getClasses(cc, true);
+      for (pClass c : cc) {
+        c->setCourse(nullptr);
+        for (int i = 0; i < c->getNumStages(); i++)
+          c->clearStageCourses(i);
+      }
+      vector<pCourse> crs;
+      oe->getCourses(crs);
+      for (pCourse c : crs) {
+        oe->removeCourse(c->getId());
+      }
+      loadPage(gdi);
     }
     else if (bi.id=="ImportCourses") {
       setupCourseImport(gdi, CourseCB);
@@ -477,15 +504,19 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       gdi.disableInput("Cancel");
       gdi.disableInput("BrowseCourse");
       gdi.disableInput("AddClasses");
+      gdi.disableInput("CreateClasses");
 
       try {
-        TabCourse::runCourseImport(gdi, filename, oe, gdi.isChecked("AddClasses"));
+        TabCourse::runCourseImport(gdi, filename, oe,
+          gdi.isChecked("AddClasses"),
+          gdi.isChecked("CreateClasses"));
       }
-      catch (std::exception &) {
+      catch (const std::exception &) {
         gdi.enableInput("DoImportCourse");
         gdi.enableInput("Cancel");
         gdi.enableInput("BrowseCourse");
         gdi.enableInput("AddClasses");
+        gdi.enableInput("CreateClasses");
         throw;
       }
       gdi.addButton("Cancel", "OK", CourseCB);
@@ -525,8 +556,8 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       gdi.pushX();
 
       gdi.fillRight();
-      int firstStart = 3600;
-      int interval = 2*60;
+      int firstStart = timeConstHour;
+      int interval = 2*timeConstMinute;
       int vac = 1;
       gdi.addInput("FirstStart", oe->getAbsTime(firstStart), 10, 0, L"Första start:");
       gdi.addInput("Interval", formatTime(interval), 10, 0, L"Startintervall (min):");
@@ -586,7 +617,7 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       for (size_t k=0; k<courseDrawClasses.size(); k++)
         par.selection.insert(courseDrawClasses[k].classID);
 
-      oe->generateListInfo(par, info);
+      oe->generateListInfo(gdi, par, info);
       oe->generateList(gdi, false, info, true);
       gdi.refresh();
     }
@@ -617,7 +648,7 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       }
       pCourse pc = oe->addCourse(oe->getAutoCourseName());
       pc->synchronize();
-      oe->fillCourses(gdi, "Courses");
+      oe->fillCourses(gdi, "Courses", {}, false);
       selectCourse(gdi, pc);
       gdi.setInputFocus("Name", true);
       addedCourse = true;
@@ -632,7 +663,7 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       else
         oe->removeCourse(cid);
 
-      oe->fillCourses(gdi, "Courses");
+      oe->fillCourses(gdi, "Courses", {}, false);
 
       selectCourse(gdi, 0);
     }
@@ -640,7 +671,7 @@ int TabCourse::courseCB(gdioutput &gdi, int type, void *data)
       refreshCourse(gdi.getText("Controls"), gdi);
     }
     else if (bi.id=="Cancel"){
-      LoadPage("Banor");
+      loadPage(gdi);
     }
   }
   else if (type==GUI_LISTBOX){
@@ -753,7 +784,7 @@ bool TabCourse::loadPage(gdioutput &gdi) {
   gdi.addListBox("Courses", 250, 360, CourseCB, L"Banor (antal kontroller)").isEdit(false).ignore(true);
   gdi.setTabStops("Courses", 240);
 
-  oe->fillCourses(gdi, "Courses");
+  oe->fillCourses(gdi, "Courses", {}, false);
 
   gdi.dropLine(0.7);
   gdi.pushX();
@@ -769,6 +800,8 @@ bool TabCourse::loadPage(gdioutput &gdi) {
     gdi.addButton("DrawCourse", "Lotta starttider..", CourseCB);
     gdi.disableInput("DrawCourse");
   }
+  gdi.addButton("DeleteAll", "Radera alla...", CourseCB);
+
   gdi.newColumn();
   gdi.fillDown();
 
@@ -891,14 +924,14 @@ bool TabCourse::loadPage(gdioutput &gdi) {
 }
 
 void TabCourse::runCourseImport(gdioutput& gdi, const wstring &filename,
-                                oEvent *oe, bool addClasses) {
+                                oEvent *oe, bool addToClasses, bool createClasses) {
   if (csvparser::iscsv(filename)  != csvparser::CSV::NoCSV) {
     gdi.fillRight();
     gdi.pushX();
     gdi.addString("", 0, "Importerar OCAD csv-fil...");
     gdi.refreshFast();
     csvparser csv;
-    if (csv.importOCAD_CSV(*oe, filename, addClasses)) {
+    if (csv.importOCAD_CSV(*oe, filename, addToClasses)) {
       gdi.addString("", 1, "Klart.").setColor(colorGreen);
     }
     else gdi.addString("", 0, "Operationen misslyckades.").setColor(colorRed);
@@ -906,12 +939,73 @@ void TabCourse::runCourseImport(gdioutput& gdi, const wstring &filename,
     gdi.dropLine(2.5);
     gdi.fillDown();
   }
+  else if (filename.find(L".txt") != wstring::npos || filename.find(L".TXT") != wstring::npos) {
+    std::ifstream fin(filename);
+
+    if (!fin.good())
+      throw meosException(L"Cannot read " + filename);
+
+    char bf[2048];
+    vector<string> sw;
+    int importedC = oe->getNumCourses() + 1;
+    int line = 0;
+    while (fin.good()) {
+      fin.getline(bf, 2048);
+      if (strlen(bf) < 2)
+        continue;
+
+      if (0 == line && uint8_t(bf[0]) == 0xEF && uint8_t(bf[1]) == 0xBB && uint8_t(bf[2]) == 0xBF) {
+        split(bf + 3, "\t;,", sw);
+        if (sw.size() == 1)
+          split(bf + 3, " ", sw);
+      }
+      else {
+        split(bf, "\t;,", sw);
+        if (sw.size() == 1)
+          split(bf, " ", sw);
+      }
+      line++;
+
+      if (sw.size() <= 1)
+        continue;
+
+      wstring name;
+      int first = 0;
+      if (atoi(sw[0].c_str()) < 30 && trim(sw[0]).length() > 2) {
+        name = gdioutput::fromUTF8(trim(sw[0]));
+        first = 1;
+      }
+      if (name.empty())
+        name = lang.tl("Bana X#" + itos(importedC++));
+
+      string cs;
+      for (int i = first; i < sw.size(); i++) {
+        if (trim(sw[i]).empty())
+          continue;
+        int c = atoi(sw[i].c_str());
+        if (c >= 30 && c < 1000)
+          cs += itos(c) + " ";
+        else {
+          throw meosException("Kan inte tolka 'X' som en bana#" + string(bf));
+        }
+      }
+
+      pCourse pc = oe->addCourse(name);
+      pc->importControls(cs, true, false);
+      pc->synchronize();
+    }
+
+    fin.close();
+  }
   else {
     set<int> noFilter;
-    string noType;
-    oe->importXML_EntryData(gdi, filename.c_str(), addClasses, false, noFilter, noType);
+    pair<string, string> noType;
+    int classIdOffset = 0;
+    int courseIdOffset = 0;
+    oe->importXML_EntryData(gdi, filename.c_str(), addToClasses, false, 
+                             noFilter, classIdOffset, courseIdOffset, noType);
   }
-  if (addClasses) {
+  if (addToClasses) {
     // There is specific course-class matching inside the import of each format,
     // that uses additional information. Here we try to match based on a generic approach.
     vector<pClass> cls;
@@ -1012,6 +1106,34 @@ void TabCourse::runCourseImport(gdioutput& gdi, const wstring &filename,
     gdi.dropLine();
   }
 
+  if (createClasses) {
+    vector<pClass> cls;
+    vector<pCourse> crs;
+    oe->getClasses(cls, false);
+    oe->getCourses(crs);
+    unordered_set<int> usedCourseId;
+    vector<pCourse> usedCrs;
+    for (size_t k = 0; k < cls.size(); k++) {
+      cls[k]->getCourses(-1, usedCrs);
+      for (pCourse pc : usedCrs)
+        usedCourseId.insert(pc->getId());
+    }
+
+    set<wstring> usedNames;
+    for (pCourse pc : crs) {
+      if (usedCourseId.count(pc->getId()))
+        continue;
+
+      pClass matchCls = oe->getClassCreate(-1, pc->getName(), usedNames);
+      if (!matchCls || matchCls->getCourse(false)) {
+        oe->addClass(pc->getName() + lang.tl(" Bana"), pc->getId());
+      }
+      else {
+        matchCls->setCourse(pc);
+      }
+    }
+  }
+  
   gdi.addButton(gdi.getWidth()+20, 45,  gdi.scaleLength(baseButtonWidth),
                 "Print", "Skriv ut...", CourseCB,
                 "Skriv ut listan.", true, false);
@@ -1043,6 +1165,7 @@ void TabCourse::setupCourseImport(gdioutput& gdi, GUICALLBACK cb) {
 
   gdi.fillDown();
   gdi.addCheckbox("AddClasses", "Lägg till klasser", 0, true);
+  gdi.addCheckbox("CreateClasses", "Skapa en klass för varje bana", 0, false);
 
   gdi.dropLine();
   gdi.fillRight();
@@ -1060,9 +1183,9 @@ void TabCourse::fillCourseControls(gdioutput &gdi, const wstring &ctrl) {
   vector< pair<wstring, size_t> > item;
   map<int, int> used;
   for (size_t k = 0; k < nr.size(); k++) {
-    pControl pc = oe->getControl(nr[k], false);
+    pControl pc = oe->getControl(nr[k], false, false);
     if (pc) {
-      if (pc->getStatus() == oControl::StatusOK)
+      if (pc->getStatus() == oControl::ControlStatus::StatusOK)
         ++used[pc->getFirstNumber()];
     }
     else
@@ -1080,12 +1203,12 @@ void TabCourse::fillCourseControls(gdioutput &gdi, const wstring &ctrl) {
   }
 
   gdi.clearList("CommonControl");
-  gdi.addItem("CommonControl", item);
+  gdi.setItems("CommonControl", item);
 }
 
 void TabCourse::fillOtherCourses(gdioutput &gdi, oCourse &crs, bool withLoops) {
   vector< pair<wstring, size_t> > ac;
-  oe->fillCourses(ac, true);
+  oe->getCourses(ac, L"", true);
   set<int> skipped;
   skipped.insert(crs.getId());
   pCourse longer = crs.getLongerVersion();
@@ -1104,8 +1227,7 @@ void TabCourse::fillOtherCourses(gdioutput &gdi, oCourse &crs, bool withLoops) {
       out.push_back(ac[k]);
   }
 
-  gdi.clearList("ShortCourse");
-  gdi.addItem("ShortCourse", out);
+  gdi.setItems("ShortCourse", out);
 }
 
 void TabCourse::saveLegLengths(gdioutput &gdi) {
@@ -1223,7 +1345,7 @@ wstring TabCourse::encodeCourse(const wstring &in, bool rogaining, bool firstSta
 }
 
 const wstring &TabCourse::formatControl(int id, wstring &bf) const {
-  pControl ctrl = oe->getControl(id, false);
+  pControl ctrl = oe->getControl(id, false, true);
   if (ctrl) {
     bf = ctrl->getString();
     return bf;
@@ -1231,3 +1353,4 @@ const wstring &TabCourse::formatControl(int id, wstring &bf) const {
   else
     return itow(id);
 }
+

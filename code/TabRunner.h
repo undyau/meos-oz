@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,8 +23,11 @@
 #include "tabbase.h"
 #include "Printer.h"
 #include "autocompletehandler.h"
+#include <deque>
 
 class Table;
+struct AutoCompleteRecord;
+class RankScoreFormatter;
 
 class TabRunner :
   public TabBase, AutoCompleteHandler
@@ -42,29 +45,40 @@ private:
 
   void selectRunner(gdioutput &gdi, pRunner r);
 
+  void updateCardStatus(const pCard& pc, gdioutput& gdi);
+  void updatePunchStatus(const pPunch& punch, InputInfo* bb, gdioutput& gdi);
+
+  int numReportRow = 1;
+  int numReportColumn = 1;
+  bool hideReportControls = false;
+  bool showReportHeader = true;
+  void addToReport(int cardNo, bool punchForShowReport);
+  void addToReport(int id);
+  
+  string computeKeyForReport();
+  
   wstring lastSearchExpr;
   unordered_set<int> lastFilter;
   DWORD timeToFill;
   int inputId;
-  int searchCB(gdioutput &gdi, int type, void *data);
 
-  int runnerCB(gdioutput &gdi, int type, void *data);
-  int punchesCB(gdioutput &gdi, int type, void *data);
-  int vacancyCB(gdioutput &gdi, int type, void *data);
+  int searchCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
+  int runnerCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
+  int punchesCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
+  int vacancyCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
 
   int currentMode;
   pRunner save(gdioutput &gdi, int runnerId, bool dontReloadRunners);
   void listRunners(gdioutput &gdi, const vector<pRunner> &r, bool filterVacant) const;
 
   void fillRunnerList(gdioutput &gdi);
-
   int cardModeStartY;
   int lastRace;
   wstring lastFee;
   int runnerId;
   bool ownWindow;
   bool listenToPunches;
-  vector< pair<int, bool> > runnersToReport;
+  deque<pair<int, bool>> runnersToReport;
 
   vector<pRunner> unknown_dns;
   vector<pRunner> known_dns;
@@ -75,9 +89,23 @@ private:
 
   PrinterObject splitPrinter;
   PrinterObject labelPrinter;
+  static shared_ptr<RankScoreFormatter> rankFormatter;
 
   void showRunnerReport(gdioutput &gdi);
-  static void runnerReport(oEvent &oe, gdioutput &gdi, int id, bool compactReport);
+
+  
+  static void runnerReport(oEvent &oe, gdioutput &gdi, 
+                           int id, bool compactReport, 
+                           int maxWidth, 
+                           RECT& rc);
+
+  static void teamReport(oEvent& oe, gdioutput& gdi,
+                         const oTeam *team,
+                         bool onlySelectedRunner,
+                         const deque<pair<int, bool>> &runners,
+                         int maxWidth,
+                         RECT &rc);
+
 
   void showVacancyList(gdioutput &gdi, const string &method="", int classId=0);
   void showCardsList(gdioutput &gdi);
@@ -94,24 +122,47 @@ private:
   static void updateStatus(gdioutput &gdi, pRunner r);
   static void autoGrowCourse(gdioutput &gdi);
 
-  void loadEconomy(gdioutput &gdi, oRunner &r);
-
+  void loadEconomy(gdioutput &gdi, oRunner &r, gdioutput *gdiMain, TabRunner *mainTab);
+  
   class EconomyHandler : public GuiHandler {
     int runnerId;
     oEvent *oe;
+    gdioutput* gdiMain;
+    TabRunner* mainTab;
     oRunner &getRunner() const;
+    void updateColor(gdioutput& gdi);
+    void init(oRunner& r);
   public:
-    void init(oRunner &r);
+    EconomyHandler(oRunner& r, gdioutput* gdiMain, TabRunner* mainTab) :
+       gdiMain(gdiMain), mainTab(mainTab) { init(r); }
     void handle(gdioutput &gdi, BaseInfo &info, GuiEventType type);
     void save(gdioutput &gdi);
   };
-
-  shared_ptr<EconomyHandler> ecoHandler;
-  EconomyHandler *getEconomyHandler(oRunner &r);
+  
+  void getAutoCompleteUnpairedCards(gdioutput &gdi, const wstring& w, vector<AutoCompleteRecord>& records);
 
 protected:
   void clearCompetitionData();
 public:
+
+  class CommentHandler : public GuiHandler {
+    int runnerId;
+    bool isTeam = false;
+  protected:
+    oAbstractRunner& getRunner() const;
+    oEvent* oe;
+    void doSave(gdioutput& gdi);
+  public:
+    CommentHandler(oAbstractRunner& r) : oe(r.getEvent()) {
+      runnerId = r.getId(); isTeam = r.isTeam();
+    }
+    void handle(gdioutput& gdi, BaseInfo& info, GuiEventType type);
+    virtual void save(gdioutput& gdi);
+  };
+
+  static void renderComments(gdioutput& gdi, oAbstractRunner& r, bool newColumn, bool refresh);
+  static void loadComments(gdioutput& gdi, oAbstractRunner& r, const shared_ptr<CommentHandler> &handler);
+
   static pClub extractClub(oEvent *oe, gdioutput &gdi);
 
   void handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) override;
@@ -124,13 +175,21 @@ public:
   bool loadPage(gdioutput &gdi);
   bool loadPage(gdioutput &gdi, int runnerId);
 
-  static void generateRunnerReport(oEvent &oe, gdioutput &gdi,  vector<pair<int, bool>> &runnersToReport);
+  static int addExtraFields(const oEvent &oe, gdioutput& gdi, oEvent::ExtraFieldContext context);
+  static void saveExtraFields(gdioutput& gdi, oBase &r);
+  static void loadExtraFields(gdioutput& gdi, const oBase* r);
+
+  static void generateRunnerReport(oEvent &oe, 
+    gdioutput &gdi, 
+    int numX, int numY,
+    bool onlySelectedRunner,
+    const deque<pair<int, bool>> &runnersToReport);
 
   TabRunner(oEvent *oe);
   ~TabRunner(void);
 
-  friend int runnerSearchCB(gdioutput *gdi, int type, void *data);
-  friend int RunnerCB(gdioutput *gdi, int type, void *data);
-  friend int PunchesCB(gdioutput *gdi, int type, void *data);
-  friend int VacancyCB(gdioutput *gdi, int type, void *data);
+  friend int runnerSearchCB(gdioutput *gdi, GuiEventType type, BaseInfo *data);
+  friend int RunnerCB(gdioutput *gdi, GuiEventType type, BaseInfo *data);
+  friend int PunchesCB(gdioutput *gdi, GuiEventType type, BaseInfo *data);
+  friend int VacancyCB(gdioutput *gdi, GuiEventType type, BaseInfo *data);
 };

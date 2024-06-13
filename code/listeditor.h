@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,6 +43,7 @@ private:
   MetaList *currentList;
   void setCurrentList(MetaList *lst);
   int currentIndex;
+  int currentRunnerId = 0;
   wstring savedFileName;
   bool dirtyExt;
   bool dirtyInt;
@@ -50,16 +51,26 @@ private:
   const wchar_t *getIndexDescription(EPostType type);
   wstring lastShownExampleText;
   void showLine(gdioutput &gdi, const vector<MetaListPost> &line, int ix) const;
-  int editList(gdioutput &gdi, int type, BaseInfo &data);
+  int editList(gdioutput &gdi, GuiEventType type, BaseInfo &data);
   void updateType(int iType, gdioutput &gdi);
 
   bool saveListPost(gdioutput &gdi, MetaListPost &mlp);
+  bool saveImage(gdioutput& gdi, MetaListPost& mlp);
+
+  static int selectImage(gdioutput& gdi, uint64_t imgId);
+
+  void updateImageStatus(gdioutput& gdi, int data);
 
   ButtonInfo &addButton(gdioutput &gdi, const MetaListPost &mlp, int x, int y,
                        int lineIx, int ix) const;
 
+
+  void ListEditor::editDlgStart(gdioutput& gdi, int id, const char* title, int& x1, int& y1, int& boxY);
+
   void editListPost(gdioutput &gdi, const MetaListPost &mlp, int id);
-  
+  void editImage(gdioutput& gdi, const MetaListPost& mlp, int id);
+  void previewImage(gdioutput &gdi, int data) const;
+
   void showExample(gdioutput &gdi, EPostType type = EPostType::lLastItem);
 
   void showExample(gdioutput &gdi, const MetaListPost &mlp);
@@ -68,10 +79,14 @@ private:
 
   void editListProp(gdioutput &gdi, bool newList);
 
+  void statusSplitPrint(gdioutput& gdi, bool status);
+
+  void splitPrintList(gdioutput& gdi);
+
   enum DirtyFlag {MakeDirty, ClearDirty, NoTouch};
 
-  /// Check (and autosave) if there are unsaved changes in a dialog box
-  void checkUnsaved(gdioutput &gdi);
+  /// Check (and autosave) if there are unsaved changes in a dialog box. Return force flag
+  bool checkUnsaved(gdioutput &gdi);
 
   /// Check and ask if there are changes to save
   bool checkSave(gdioutput &gdi);
@@ -91,16 +106,17 @@ private:
 
   bool legStageTypeIndex(gdioutput &gdi, EPostType type, int leg);
 
+  void renderListPreview(gdioutput& gdi);
 
 public:
   ListEditor(oEvent *oe);
   virtual ~ListEditor();
 
-  void load(const MetaListContainer &mlc, int index);
+  int load(const MetaListContainer &mlc, int index, bool autoSaveCopy);
   void show(TabBase *dst, gdioutput &gdi);
   bool isShown(TabBase *tab) const { return origin == tab; }
   MetaList *getCurrentList() const {return currentList;};
   void handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) final;
 
-  friend int editListCB(gdioutput*, int, void *);
+  friend int editListCB(gdioutput*, GuiEventType type, BaseInfo* data);
 };

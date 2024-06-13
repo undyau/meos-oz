@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -96,16 +96,16 @@ void oClub::set(const xmlobject &xo)
       Id=it->getInt();
     }
     else if (it->is("Name")){
-      internalSetName(it->getw());
+      internalSetName(it->getWStr());
     }
     else if (it->is("oData")){
       getDI().set(*it);
     }
     else if (it->is("Updated")){
-      Modified.setStamp(it->getRaw());
+      Modified.setStamp(it->getRawStr());
     }
     else if (it->is("AltName")) {
-      altNames.push_back(it->getw());
+      altNames.push_back(it->getWStr());
     }
   }
 }
@@ -154,15 +154,14 @@ oDataContainer &oClub::getDataBuffers(pvoid &data, pvoid &olddata, pvectorstr &s
   return *oe->oClubData;
 }
 
-pClub oEvent::getClub(int Id) const
-{
-  if (Id<=0)
-    return 0;
+pClub oEvent::getClub(int Id) const {
+  if (Id <= 0)
+    return nullptr;
 
   pClub value;
   if (clubIdIndex.lookup(Id, value))
     return value;
-  return 0;
+  return nullptr;
 }
 
 pClub oEvent::getClub(const wstring &pname) const
@@ -264,7 +263,7 @@ void oEvent::fillClubs(gdioutput &gdi, const string &id)
 {
   vector< pair<wstring, size_t> > d;
   oe->fillClubs(d);
-  gdi.addItem(id, d);
+  gdi.setItems(id, d);
 }
 
 
@@ -509,19 +508,19 @@ void oClub::addRunnerInvoiceLine(const pRunner r, bool inTeam,
       if (type == oClassIndividRelay || type == oClassRelay) {
         int leg = r->getLegNumber();
         if (t->getLegStatus(leg, true, false) == StatusOK)
-          ts =  t->getLegPlaceS(leg, false)+ L" (" + r->getRunningTimeS(true) + L")";
+          ts =  t->getLegPlaceS(leg, false)+ L" (" + r->getRunningTimeS(true, SubSecond::Auto) + L")";
         else
-          ts =  t->getLegStatusS(leg, true, false)+ L" (" + r->getRunningTimeS(true) +L")";
+          ts =  t->getLegStatusS(leg, true, false)+ L" (" + r->getRunningTimeS(true, SubSecond::Auto) +L")";
       }
       else
-        ts =  r->getPrintPlaceS(true)+ L" (" + r->getRunningTimeS(true) + L")";
+        ts =  r->getPrintPlaceS(true)+ L" (" + r->getRunningTimeS(true, SubSecond::Auto) + L")";
     }
     else
       ts =  r->getStatusS(true, true);
   }
   else {
     if (r->getTotalStatus()==StatusOK) {
-      ts =  r->getPrintTotalPlaceS(true) + L" (" + r->getTotalRunningTimeS() + L")";
+      ts =  r->getPrintTotalPlaceS(true) + L" (" + r->getTotalRunningTimeS(SubSecond::Auto) + L")";
     }
     else if (r->getTotalStatus()!=StatusNotCompetiting)
       ts =  r->getStatusS(true, true);
@@ -531,7 +530,7 @@ void oClub::addRunnerInvoiceLine(const pRunner r, bool inTeam,
   }
 
   int fee = r->getDCI().getInt("Fee");
-  int card = r->getDCI().getInt("CardFee");
+  int card = r->getRentalCardFee(false);
   int paid = r->getDCI().getInt("Paid");
   int pm = r->getPaymentMode();
   
@@ -580,7 +579,7 @@ void oClub::addTeamInvoiceLine(const pTeam t, const map<int, wstring> &definedPa
     ts = L"-";
   else  {
     if (t->getStatus()==StatusOK) {
-      ts =  t->getPrintPlaceS(true) + L" (" + t->getRunningTimeS(true) + L")";
+      ts =  t->getPrintPlaceS(true) + L" (" + t->getRunningTimeS(true, SubSecond::Auto) + L")";
     }
     else
       ts =  t->getStatusS(true, true);
@@ -751,11 +750,11 @@ void oClub::generateInvoice(gdioutput &gdi, int &toPay, int &hasPaid,
   for (map<int,int>::iterator it = data.paidPerMode.begin(); it != data.paidPerMode.end(); ++it) {
     paidPerMode[it->first] += it->second;
   }
-  gdi.addString("", yp, xs, boldText, L"Att betala: X#" + oe->formatCurrency(toPay));
+  gdi.addString("", yp, xs, fontMediumPlus, L"Att betala: X#" + oe->formatCurrency(toPay));
 
   gdi.updatePos(gdi.scaleLength(710),0,0,0);
 
-  yp+=lh*2;
+  yp+=int(lh*2.5);
 
   gdi.addStringUT(yp, xs, normalText, lang.tl(L"Vänligen betala senast ") 
                  + pdate + lang.tl(L" till ") + account + L".");
@@ -832,7 +831,7 @@ void oEvent::printInvoices(gdioutput &gdi, InvoicePrintType type,
     path.push_back('\\');
 
   if (toFile) {
-    ofstream fout;
+    std::ofstream fout;
 
     if (type == IPTElectronincHTML)
       fout.open((path + L"invoices.txt").c_str());
@@ -862,7 +861,7 @@ void oEvent::printInvoices(gdioutput &gdi, InvoicePrintType type,
         if (type == IPTElectronincHTML && pay > 0) {
           fout << it->getId() << ";" << gdi.toUTF8(it->getName()) << ";" <<
             nr << ";" << gdi.toUTF8(filename) << ";" << gdi.toUTF8(email) << ";"
-                << gdi.toUTF8(formatCurrency(pay))  <<endl;
+                << gdi.toUTF8(formatCurrency(pay))  << std::endl;
         }
 
         if (type == IPTAllPDF) {
@@ -1016,9 +1015,7 @@ void oEvent::setupClubInfoData() {
       bool skip = r.Class && r.Class->getClassStatus() == oClass::ClassStatus::InvalidRefund;
 
       if (!skip) {
-        int cardFee = di.getInt("CardFee");
-        if (cardFee < 0)
-          cardFee = 0;
+        int cardFee = r.getRentalCardFee(false);
         fee[id] += di.getInt("Fee") + cardFee;
       }
       paid[id] += di.getInt("Paid");

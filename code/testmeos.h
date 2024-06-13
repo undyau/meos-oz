@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -128,6 +128,7 @@ public:
 
   void setAnswer(const char *ans) const;
   void setFile(const string &file) const;
+  void setFile(const wstring& file) const;
 
   void checkString(const char *str, int count = 1) const;
   void checkStringRes(const char *str, int count = 1) const;

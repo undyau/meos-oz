@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -70,8 +70,8 @@ bool oTeam::write(xmlparser &xml)
   xml.write("StartNo", StartNo);
   xml.write("Updated", getStamp());
   xml.write("Name", sName);
-  xml.write("Start", startTime);
-  xml.write("Finish", FinishTime);
+  xml.writeTime("Start", startTime);
+  xml.writeTime("Finish", FinishTime);
   xml.write("Status", status);
   xml.write("Runners", getRunners());
 
@@ -81,9 +81,8 @@ bool oTeam::write(xmlparser &xml)
   xml.write("InputPoint", inputPoints);
   if (inputStatus != StatusOK)
     xml.write("InputStatus", itos(inputStatus)); //Force write of 0
-  xml.write("InputTime", inputTime);
+  xml.writeTime("InputTime", inputTime);
   xml.write("InputPlace", inputPlace);
-
 
   getDI().write(xml);
   xml.endTag();
@@ -102,16 +101,16 @@ void oTeam::set(const xmlobject &xo)
       Id=it->getInt();
     }
     else if (it->is("Name")){
-      sName=it->getw();
+      sName=it->getWStr();
     }
     else if (it->is("StartNo")){
       StartNo=it->getInt();
     }
     else if (it->is("Start")){
-      tStartTime = startTime = it->getInt();
+      tStartTime = startTime = it->getRelativeTime();
     }
     else if (it->is("Finish")){
-      FinishTime=it->getInt();
+      FinishTime=it->getRelativeTime();
     }
     else if (it->is("Status")) {
       unsigned rawStatus = it->getInt();
@@ -125,11 +124,11 @@ void oTeam::set(const xmlobject &xo)
     }
     else if (it->is("Runners")){
       vector<int> r;
-      decodeRunners(it->getRaw(), r);
+      decodeRunners(it->getRawStr(), r);
       importRunners(r);
     }
     else if (it->is("InputTime")) {
-      inputTime = it->getInt();
+      inputTime = it->getRelativeTime();
     }
     else if (it->is("InputStatus")) {
       unsigned rawStatus = it->getInt();
@@ -142,7 +141,7 @@ void oTeam::set(const xmlobject &xo)
       inputPlace = it->getInt();
     }
     else if (it->is("Updated")){
-      Modified.setStamp(it->getRaw());
+      Modified.setStamp(it->getRawStr());
     }
     else if (it->is("oData")) {
       getDI().set(*it);
@@ -328,13 +327,13 @@ void oTeam::setRunnerInternal(int k, pRunner r)
   updateChanged();
 }
 
-wstring oTeam::getLegFinishTimeS(int leg) const
+wstring oTeam::getLegFinishTimeS(int leg, SubSecond mode) const
 {
   if (leg==-1)
     leg=Runners.size()-1;
 
   if (unsigned(leg)<Runners.size() && Runners[leg])
-    return Runners[leg]->getFinishTimeS();
+    return Runners[leg]->getFinishTimeS(true, mode);
   else return L"-";
 }
 
@@ -391,7 +390,7 @@ int oTeam::getLegFinishTime(int leg) const
         while (size_t(ileg) < Class->getNumStages()) {
           int ift = 0;
           if (Runners[ileg]) {
-            ift = Runners[ileg]->getFinishTimeAdjusted();
+            ift = Runners[ileg]->getFinishTimeAdjusted(true);
           }
 
           if (ift > 0) {
@@ -416,7 +415,7 @@ int oTeam::getLegFinishTime(int leg) const
         while (size_t(ileg) < Class->getNumStages()) {
           int ift = 0;
           if (Runners[ileg]) {
-            ift = Runners[ileg]->getFinishTimeAdjusted();
+            ift = Runners[ileg]->getFinishTimeAdjusted(true);
           }
 
           if (ift > 0) {
@@ -437,6 +436,17 @@ int oTeam::getLegFinishTime(int leg) const
   else return 0;
 }
 
+int oTeam::getTotalRunningTimeAtLegStart(int leg, bool multidayTotal) const {
+  int off = multidayTotal ? max(0, getInputTime()) : 0;
+  if (!Class || leg == 0)
+    return off;
+  int pleg = Class->getPreceedingLeg(leg);
+  if (pleg < 0)
+    return off;
+
+  return getLegRunningTime(pleg, false, multidayTotal);
+}
+
 int oTeam::getRunningTime(bool computedTime) const {
   return getLegRunningTime(-1, computedTime, false);
 }
@@ -452,13 +462,13 @@ int oTeam::getLegRunningTime(int leg, bool computedTime, bool multidayTotal) con
 
     if (cr.version == oe->dataRevision) {
       if (cr.time > 0)
-        return cr.time + addon + getTimeAdjustment();
+        return cr.time + addon; // Time adjustment already included in time ??
       else
         return 0;
     }
   }
-
-  return getLegRunningTimeUnadjusted(leg, multidayTotal, false) + getTimeAdjustment();
+  bool isLastLeg = (leg == -1 || leg + 1 == Runners.size());
+  return getLegRunningTimeUnadjusted(leg, multidayTotal, false) + (isLastLeg ? getTimeAdjustment(false) : 0);
 }
 
 int oTeam::getLegRestingTime(int leg, bool useComputedRunnerTime) const {
@@ -468,7 +478,7 @@ int oTeam::getLegRestingTime(int leg, bool useComputedRunnerTime) const {
   int rest = 0;
   int R = min<int>(Runners.size(), leg+1);
   for (int k = 1; k < R; k++) {
-    if (Class->getStartType(k) == STHunting && !Class->isParallel(k) &&
+    if (Class->getStartType(k) == STPursuit && !Class->isParallel(k) &&
         Runners[k] && Runners[k-1]) {
          
       int ft = getLegRunningTimeUnadjusted(k-1, false, useComputedRunnerTime) + tStartTime;
@@ -500,9 +510,9 @@ int oTeam::getLegRunningTimeUnadjusted(int leg, bool multidayTotal, bool useComp
 
       switch(lt) {
         case LTNormal:
-          if (Runners[leg]->prelStatusOK(useComputedRunnerTime, true)) {
+          if (Runners[leg]->prelStatusOK(useComputedRunnerTime, true, false)) {
             int dt = leg>0 ? getLegRunningTimeUnadjusted(leg-1, false, useComputedRunnerTime)+Runners[leg]->getRunningTime(useComputedRunnerTime):0;
-            return addon + max(Runners[leg]->getFinishTimeAdjusted() - 
+            return addon + max(Runners[leg]->getFinishTimeAdjusted(true) - 
                     (tStartTime + getLegRestingTime(leg, useComputedRunnerTime)), dt);
           }
           else return 0;
@@ -510,10 +520,10 @@ int oTeam::getLegRunningTimeUnadjusted(int leg, bool multidayTotal, bool useComp
 
         case LTParallelOptional:
         case LTParallel: //Take the longest time of this runner and the previous
-          if (Runners[leg]->prelStatusOK(useComputedRunnerTime, false)) {
+          if (Runners[leg]->prelStatusOK(useComputedRunnerTime, false, false)) {
             int pt=leg>0 ? getLegRunningTimeUnadjusted(leg-1, false, useComputedRunnerTime) : 0;
             int rest = getLegRestingTime(leg, useComputedRunnerTime);
-            int finishT = Runners[leg]->getFinishTimeAdjusted();
+            int finishT = Runners[leg]->getFinishTimeAdjusted(true);
             return addon + max(finishT-(tStartTime + rest), pt);
           }
           else return 0;
@@ -539,7 +549,7 @@ int oTeam::getLegRunningTimeUnadjusted(int leg, bool multidayTotal, bool useComp
               if (Runners[cLeg] && Runners[cLeg]->getFinishTime() > 0) {
                 int rt = Runners[cLeg]->getRunningTime(useComputedRunnerTime);
                 if (legTime == 0 || rt < legTime) {
-                  bad = !Runners[cLeg]->prelStatusOK(useComputedRunnerTime, false);
+                  bad = !Runners[cLeg]->prelStatusOK(useComputedRunnerTime, false, false);
                   legTime = rt;
                 }
               }
@@ -555,7 +565,7 @@ int oTeam::getLegRunningTimeUnadjusted(int leg, bool multidayTotal, bool useComp
         break;
 
         case LTSum:
-          if (Runners[leg]->prelStatusOK(useComputedRunnerTime, false)) {
+          if (Runners[leg]->prelStatusOK(useComputedRunnerTime, false, false)) {
             if (leg==0)
               return addon + Runners[leg]->getRunningTime(useComputedRunnerTime);
             else {
@@ -601,13 +611,13 @@ int oTeam::getLegRunningTimeUnadjusted(int leg, bool multidayTotal, bool useComp
   return 0;
 }
 
-wstring oTeam::getLegRunningTimeS(int leg, bool computedTime, bool multidayTotal) const
+wstring oTeam::getLegRunningTimeS(int leg, bool computedTime, bool multidayTotal, SubSecond mode) const
 {
   if (leg==-1)
     leg = Runners.size()-1;
 
   int rt=getLegRunningTime(leg, computedTime, multidayTotal);
-  const wstring &bf = formatTime(rt);
+  const wstring &bf = formatTime(rt, mode);
   if (rt>0) {
     if ((unsigned(leg)<Runners.size() && Runners[leg] &&
       Class && Runners[leg]->getStartTime()==Class->getRestartTime(leg)) || getNumShortening(leg)>0)
@@ -705,7 +715,7 @@ RunnerStatus oTeam::deduceComputedStatus() const {
     while (i<leg && Class->getLegType(i) == LTIgnore)
       i++;
 
-    int st = Runners[i] ? Runners[i]->getStatusComputed() : StatusDNS;
+    int st = Runners[i] ? Runners[i]->getStatusComputed(false) : StatusDNS;
     int bestTime = Runners[i] ? Runners[i]->getFinishTime() : 0;
 
     //When Type Extra is used, the runner with the best time
@@ -717,7 +727,7 @@ RunnerStatus oTeam::deduceComputedStatus() const {
       if (Runners[i]) {
         if (bestTime == 0 || (Runners[i]->getFinishTime()>0 &&
             Runners[i]->getFinishTime()<bestTime)) {
-          st = Runners[i]->getStatusComputed();
+          st = Runners[i]->getStatusComputed(false);
           bestTime = Runners[i]->getFinishTime();
         }
       }
@@ -736,7 +746,7 @@ RunnerStatus oTeam::deduceComputedStatus() const {
 }
 
 int oTeam::deduceComputedRunningTime() const {
-  return getLegRunningTimeUnadjusted(Runners.size() - 1, false, true) + getTimeAdjustment();
+  return getLegRunningTimeUnadjusted(Runners.size() - 1, false, true) + getTimeAdjustment(false);
 }
 
 int oTeam::deduceComputedPoints() const {
@@ -753,6 +763,15 @@ int oTeam::deduceComputedPoints() const {
 const wstring &oTeam::getLegStatusS(int leg, bool computed, bool multidayTotal) const
 {
   return oe->formatStatus(getLegStatus(leg, computed, multidayTotal), true);
+}
+
+RunnerStatus oTeam::getStatusComputed(bool allowUpdate) const {
+  auto& p = getTeamPlace(Runners.size()-1);
+
+  if (Class && allowUpdate && p.p.isOld(*oe)) {
+    oe->calculateTeamResults(std::set<int>({ getClassId(true) }), oEvent::ResultType::ClassResult);
+  }
+  return tComputedStatus != StatusUnknown ? tComputedStatus : tStatus;
 }
 
 int oTeam::getLegPlace(int leg, bool multidayTotal, bool allowUpdate) const {
@@ -804,6 +823,36 @@ wstring oTeam::getLegPrintPlaceS(int leg, bool multidayTotal, bool withDot) cons
   return _EmptyWString;
 }
 
+int oAbstractRunner::compareClubs(const oClub* ca, const oClub* cb) {
+  if (ca != cb) {
+    if (ca == nullptr && cb)
+      return true;
+    else if (cb == nullptr)
+      return false;
+
+    const wstring an = ca->getName();
+    const wstring bn = cb->getName();
+    int res = CompareString(LOCALE_USER_DEFAULT, 0,
+      an.c_str(), an.length(),
+      bn.c_str(), bn.length());
+
+    if (res != CSTR_EQUAL)
+      return res == CSTR_LESS_THAN;
+  }
+  return 2;
+}
+
+bool oTeam::compareResultClub(const oTeam& a, const oTeam& b) {
+  pClub ca = a.getClubRef();
+  pClub cb = b.getClubRef();
+  if (ca != cb) {
+    int cres = compareClubs(ca, cb);
+    if (cres != 2)
+      return cres != 0;
+  }
+  return compareResult(a, b);
+}
+
 bool oTeam::compareResult(const oTeam &a, const oTeam &b)
 {
   if (a.Class != b.Class) {
@@ -826,8 +875,13 @@ bool oTeam::compareResult(const oTeam &a, const oTeam &b)
 
   int aix = a.getDCI().getInt("SortIndex");
   int bix = b.getDCI().getInt("SortIndex");
-  if (aix != bix)
+  if (aix != bix) {
+    if (aix == 0)
+      aix = numeric_limits<int>::max();
+    if (bix == 0)
+      bix = numeric_limits<int>::max();
     return aix < bix;
+  }
 
   return CompareString(LOCALE_USER_DEFAULT, 0,
                        a.sName.c_str(), a.sName.length(),
@@ -847,6 +901,24 @@ bool oTeam::compareResultNoSno(const oTeam &a, const oTeam &b)
     return a.tmpSortStatus<b.tmpSortStatus;
   else if (a.tmpSortTime != b.tmpSortTime)
     return a.tmpSortTime<b.tmpSortTime;
+
+  int aix = a.getDCI().getInt("SortIndex");
+  int bix = b.getDCI().getInt("SortIndex");
+  if (aix != bix) {
+    if (aix == 0)
+      aix = numeric_limits<int>::max();
+    if (bix == 0)
+      bix = numeric_limits<int>::max();
+    return aix < bix;
+  }
+
+  pClub ca = a.getClubRef();
+  pClub cb = b.getClubRef();
+  if (ca != cb) {
+    int cres = compareClubs(ca, cb);
+    if (cres != 2)
+      return cres != 0;
+  }
 
   return CompareString(LOCALE_USER_DEFAULT, 0,
                        a.sName.c_str(), a.sName.length(),
@@ -888,9 +960,7 @@ void oTeam::setTeamMemberStatus(RunnerStatus dnsStatus)
   assert(!isResultStatus(dnsStatus) || dnsStatus == StatusOK);
   setStatus(dnsStatus, true, ChangeType::Update);
   for (unsigned i = 0; i < Runners.size(); i++) {
-    if (Runners[i] && !isResultStatus(Runners[i]->getStatus()) ||
-      ((dnsStatus == StatusOutOfCompetition || dnsStatus == StatusNoTiming) &&
-        Runners[i]->statusOK(false))) {
+    if (Runners[i] && (!isResultStatus(Runners[i]->getStatus()) || ((dnsStatus == StatusOutOfCompetition || dnsStatus == StatusNoTiming) && Runners[i]->statusOK(false, false)))) {
       Runners[i]->setStatus(dnsStatus, true, ChangeType::Update);
     }
   }
@@ -967,13 +1037,13 @@ void oTeam::quickApply() {
 void oTeam::apply(ChangeType changeType, pRunner source) {
   if (unsigned(status) >= 100)
     status = StatusUnknown; // Enforce correct status
-  
+
   int lastStartTime = 0;
   RunnerStatus lastStatus = StatusUnknown;
   bool freeStart = Class ? Class->hasFreeStart() : false;
   int extraFinishTime = -1;
 
-  if (Class && Runners.size()!=size_t(Class->getNumStages())) {
+  if (Class && Runners.size() != size_t(Class->getNumStages())) {
     for (size_t k = Class->getNumStages(); k < Runners.size(); k++) {
       auto tr = Runners[k];
       if (tr && tr->tInTeam) {
@@ -991,7 +1061,7 @@ void oTeam::apply(ChangeType changeType, pRunner source) {
   }
   tNumRestarts = 0;
   vector<int> availableStartTimes;
-  for (size_t i_c=0;i_c<Runners.size(); i_c++) {
+  for (size_t i_c = 0; i_c < Runners.size(); i_c++) {
     const size_t i = i_c;
     if (Runners[i] && Runners[i]->isRemoved()) {
       // Could happen for database not in sync / invalid manual modification
@@ -999,25 +1069,25 @@ void oTeam::apply(ChangeType changeType, pRunner source) {
       Runners[i]->tLeg = 0;
       Runners[i] = nullptr;
     }
-    
+
     if (changeType == ChangeType::Quiet && i > 0 && source != nullptr && Runners[i - 1] == source)
       return;
 
     if (!Runners[i] && Class) {
-       unsigned lr = Class->getLegRunner(i);
+      unsigned lr = Class->getLegRunner(i);
 
-       if (lr<i && Runners[lr]) {
-         Runners[lr]->createMultiRunner(false, false);
-         int dup=Class->getLegRunnerIndex(i);
-         Runners[i] = Runners[lr]->getMultiRunner(dup);
-       }
+      if (lr < i && Runners[lr]) {
+        Runners[lr]->createMultiRunner(false, false);
+        int dup = Class->getLegRunnerIndex(i);
+        Runners[i] = Runners[lr]->getMultiRunner(dup);
+      }
     }
 
     if (changeType == ChangeType::Update && Runners[i] && Class) {
       unsigned lr = Class->getLegRunner(i);
       if (lr == i && Runners[i]->tParentRunner) {
         pRunner parent = Runners[i]->tParentRunner;
-        for (size_t kk = 0; kk<parent->multiRunner.size(); ++kk) {
+        for (size_t kk = 0; kk < parent->multiRunner.size(); ++kk) {
           if (Runners[i] == parent->multiRunner[kk]) {
             pRunner tr = Runners[i];
             parent->multiRunner.erase(parent->multiRunner.begin() + kk);
@@ -1036,7 +1106,7 @@ void oTeam::apply(ChangeType changeType, pRunner source) {
     // than one leg
     //(note: quadric complexity, assume total runner count is low)
     if (Runners[i]) {
-      for (size_t k=0;k<i; k++)
+      for (size_t k = 0; k < i; k++)
         if (Runners[i] == Runners[k])
           Runners[i] = nullptr;
     }
@@ -1046,7 +1116,7 @@ void oTeam::apply(ChangeType changeType, pRunner source) {
       pClass actualClass = tr->getClassRef(true);
       if (actualClass == nullptr)
         actualClass = Class;
-      if (tr->tInTeam && tr->tInTeam!=this) {
+      if (tr->tInTeam && tr->tInTeam != this) {
         tr->tInTeam->correctRemove(tr);
       }
       //assert(Runners[i]->tInTeam==0 || Runners[i]->tInTeam==this);
@@ -1071,13 +1141,13 @@ void oTeam::apply(ChangeType changeType, pRunner source) {
         tr->updateChanged();
       }
 
-      tr->tNeedNoCard=false;
+      tr->tNeedNoCard = false;
       if (Class) {
-        pClass pc=Class;
+        pClass pc = Class;
 
         //Ignored runners need no SI-card (used by SI assign function)
         if (legType == LTIgnore) {
-          tr->tNeedNoCard=true;
+          tr->tNeedNoCard = true;
           if (lastStatus != StatusUnknown) {
             tr->setStatus(max(tr->tStatus, lastStatus), false, changeType);
           }
@@ -1088,196 +1158,199 @@ void oTeam::apply(ChangeType changeType, pRunner source) {
         StartTypes st = actualClass == pc ? pc->getStartType(i) : actualClass->getStartType(0);
         LegTypes lt = legType;
 
-        if ((lt==LTParallel || lt==LTParallelOptional) && i==0) {
+        if ((lt == LTParallel || lt == LTParallelOptional) && i == 0) {
           pc->setLegType(0, LTNormal);
           throw std::exception("Första sträckan kan inte vara parallell.");
         }
-        if (lt==LTIgnore || lt==LTExtra) {
+        if (lt == LTIgnore || lt == LTExtra) {
           if (st != STDrawn)
             tr->setStartTime(lastStartTime, false, changeType);
           tr->tUseStartPunch = (st == STDrawn);
         }
         else { //Calculate start time.
           switch (st) {
-            case STDrawn: //Do nothing
-              if (lt==LTParallel || lt==LTParallelOptional) {
-                tr->setStartTime(lastStartTime, false, changeType);
-                tr->tUseStartPunch=false;
-              }
-              else
-                lastStartTime = tr->getStartTime();
-
-              break;
-
-            case STTime: {
-              bool prs = false;
-              if (tr && tr->Card && freeStart) {
-                pCourse crs = tr->getCourse(false);
-                int startType = crs ? crs->getStartPunchType() : oPunch::PunchStart;
-                oPunch *pnc = tr->Card->getPunchByType(startType);
-                if (pnc && pnc->getAdjustedTime() > 0) {
-                  prs = true;
-                  lastStartTime = pnc->getAdjustedTime();
-                }
-              }
-              if (!prs) {
-                if (lt == LTNormal || lt == LTSum || lt == LTGroup) {
-                  if (actualClass == pc)
-                    lastStartTime = pc->getStartData(i);
-                  else
-                    lastStartTime = actualClass->getStartData(0); // Qualification/final classes
-                }
-                tr->setStartTime(lastStartTime, false, changeType);
-                tr->tUseStartPunch=false;
-              }
+          case STDrawn: //Do nothing
+            if (lt == LTParallel || lt == LTParallelOptional) {
+              tr->setStartTime(lastStartTime, false, changeType);
+              tr->tUseStartPunch = false;
             }
+            else
+              lastStartTime = tr->getStartTime();
+
             break;
 
-            case STChange: {
-              int probeIndex = 1;
-              int startData = pc->getStartData(i);
-
-              if (startData < 0) {
-                // A specified leg
-                probeIndex = -startData;
+          case STTime: {
+            bool prs = false;
+            if (tr && tr->Card && freeStart) {
+              pCourse crs = tr->getCourse(false);
+              int startType = crs ? crs->getStartPunchType() : oPunch::PunchStart;
+              oPunch* pnc = tr->Card->getPunchByType(startType);
+              if (pnc && pnc->getAdjustedTime() > 0) {
+                prs = true;
+                lastStartTime = pnc->getAdjustedTime();
               }
-              else {
-                // Allow for empty slots when ignore/extra
-                while ((i-probeIndex)>=0 && !Runners[i-probeIndex]) {
-                  LegTypes tlt = pc->getLegType(i-probeIndex);
-                  if (tlt == LTIgnore || tlt==LTExtra || tlt == LTGroup)
-                    probeIndex++;
-                  else
-                    break;
-                }
+            }
+            if (!prs) {
+              if (lt == LTNormal || lt == LTSum || lt == LTGroup) {
+                if (actualClass == pc)
+                  lastStartTime = pc->getStartData(i);
+                else
+                  lastStartTime = actualClass->getStartData(0); // Qualification/final classes
               }
+              tr->setStartTime(lastStartTime, false, changeType);
+              tr->tUseStartPunch = false;
+            }
+          }
+                     break;
 
-              if ( (i-probeIndex)>=0 && Runners[i-probeIndex]) {
-                int z = i-probeIndex;
-                LegTypes tlt = pc->getLegType(z);
-                int ft = 0;
-                if (availableStartTimes.empty() || startData < 0) {
+          case STChange: {
+            int probeIndex = 1;
+            int startData = pc->getStartData(i);
 
-                  if (!availableStartTimes.empty()) {
-                    // Parallel, but there is a specification. Take one from parallel anyway.
-                    ft = getBestStartTime(availableStartTimes);
-                  }
+            if (startData < 0) {
+              // A specified leg
+              probeIndex = -startData;
+            }
+            else {
+              // Allow for empty slots when ignore/extra
+              while ((i - probeIndex) >= 0 && !Runners[i - probeIndex]) {
+                LegTypes tlt = pc->getLegType(i - probeIndex);
+                if (tlt == LTIgnore || tlt == LTExtra || tlt == LTGroup)
+                  probeIndex++;
+                else
+                  break;
+              }
+            }
 
-                  //We are not involved in parallel legs
-                  ft = (tlt != LTIgnore) ? Runners[z]->getFinishTime() : 0;
+            if ((i - probeIndex) >= 0 && Runners[i - probeIndex]) {
+              int z = i - probeIndex;
+              LegTypes tlt = pc->getLegType(z);
+              int ft = 0;
+              if (availableStartTimes.empty() || startData < 0) {
 
-                  // Take the best time for extra runners
-                  while (z>0 && (tlt==LTExtra || tlt==LTIgnore)) {
-                    tlt = pc->getLegType(--z);
-                    if (Runners[z] && Runners[z]->getStatus() == StatusOK) {
-                      int tft = Runners[z]->getFinishTime();
-                      if (tft>0 && tlt != LTIgnore)
-                        ft = ft>0 ? min(tft, ft) : tft;
-                    }
-                  }
-                }
-                else {
+                if (!availableStartTimes.empty()) {
+                  // Parallel, but there is a specification. Take one from parallel anyway.
                   ft = getBestStartTime(availableStartTimes);
                 }
 
-                if (ft<=0)
-                  ft=0;
+                //We are not involved in parallel legs
+                ft = (tlt != LTIgnore) ? Runners[z]->getFinishTime() : 0;
 
-                int restart=pc->getRestartTime(i);
-                int rope=pc->getRopeTime(i);
+                // Take the best time for extra runners
+                while (z > 0 && (tlt == LTExtra || tlt == LTIgnore)) {
+                  tlt = pc->getLegType(--z);
+                  if (Runners[z]) {
+                    int tft = Runners[z]->getFinishTime();
+                    if (tft > 0 && tlt != LTIgnore)
+                      ft = ft > 0 ? min(tft, ft) : tft;
+                  }
+                }
+              }
+              else {
+                ft = getBestStartTime(availableStartTimes);
+              }
 
-                if (((restart > 0 && rope > 0 && (ft == 0 || ft > rope)) || (ft == 0 && restart > 0)) &&
-                    !preventRestart() && !tr->preventRestart()) {
-                  ft = restart; //Runner in restart
+              if (ft <= 0)
+                ft = 0;
+
+              int restart = pc->getRestartTime(i);
+              int rope = pc->getRopeTime(i);
+
+              if (((restart > 0 && rope > 0 && (ft == 0 || ft > rope)) || (ft == 0 && restart > 0)) &&
+                !preventRestart() && !tr->preventRestart()) {
+                ft = restart; //Runner in restart
+                tNumRestarts++;
+              }
+
+              if (ft >= 0)
+                tr->setStartTime(ft, false, changeType);
+              tr->tUseStartPunch = false;
+              lastStartTime = ft;
+            }
+            else {//The else below should only be run by mistake (for an incomplete team)
+              tr->setStartTime(Class->getRestartTime(i), false, changeType);
+              tr->tUseStartPunch = false;
+            }
+          }
+                       break;
+
+          case STPursuit: {
+            bool setStart = false;
+            if (i > 0 && Runners[i - 1]) {
+              if (lt == LTNormal || lt == LTSum || availableStartTimes.empty()) {
+                int rt = getLegRunningTimeUnadjusted(i - 1, false, false);
+
+                if (rt > 0)
+                  setStart = true;
+                int leaderTime = pc->getTotalLegLeaderTime(oClass::AllowRecompute::NoUseOld, i - 1, false, false);
+                int timeAfter = leaderTime > 0 ? rt - leaderTime : 0;
+
+                if (rt > 0 && timeAfter >= 0)
+                  lastStartTime = pc->getStartData(i) + timeAfter;
+
+                int restart = pc->getRestartTime(i);
+                int rope = pc->getRopeTime(i);
+
+                RunnerStatus hst = getLegStatus(i - 1, false, false);
+                if (hst != StatusUnknown && hst != StatusOK) {
+                  setStart = true;
+                  lastStartTime = restart;
+                }
+
+                if (restart > 0 && rope > 0 && (lastStartTime > rope) &&
+                  !preventRestart() && !tr->preventRestart()) {
+                  lastStartTime = restart; //Runner in restart
                   tNumRestarts++;
                 }
+                if (!availableStartTimes.empty()) {
+                  // Single -> to parallel pursuit
+                  if (setStart)
+                    fill(availableStartTimes.begin(), availableStartTimes.end(), lastStartTime);
+                  else
+                    fill(availableStartTimes.begin(), availableStartTimes.end(), 0);
 
-                if (ft > 0)
-                  tr->setStartTime(ft, false, changeType);
-                tr->tUseStartPunch=false;
-                lastStartTime=ft;
+                  availableStartTimes.pop_back(); // Used one
+                }
               }
-              else {//The else below should only be run by mistake (for an incomplete team)
-                tr->setStartTime(Class->getRestartTime(i), false, changeType);
-                tr->tUseStartPunch=false;
+              else if (lt == LTParallel || lt == LTParallelOptional) {
+                lastStartTime = getBestStartTime(availableStartTimes);
+                setStart = true;
               }
+
+              if (tr->getFinishTime() > 0) {
+                setStart = true;
+                if (lastStartTime == 0)
+                  lastStartTime = pc->getRestartTime(i);
+              }
+              if (!setStart)
+                lastStartTime = 0;
             }
-            break;
+            else
+              lastStartTime = 0;
 
-            case STHunting: {
-              bool setStart = false;
-              if (i>0 && Runners[i-1]) {
-                if (lt == LTNormal || lt == LTSum || availableStartTimes.empty()) {
-                  int rt = getLegRunningTimeUnadjusted(i-1, false, false);
-                
-                  if (rt>0)
-                    setStart = true;
-                  int leaderTime = pc->getTotalLegLeaderTime(oClass::AllowRecompute::NoUseOld, i-1, false, false);
-                  int timeAfter = leaderTime > 0 ? rt - leaderTime : 0;
-
-                  if (rt>0 && timeAfter>=0)
-                    lastStartTime=pc->getStartData(i)+timeAfter;
-
-                  int restart=pc->getRestartTime(i);
-                  int rope=pc->getRopeTime(i);
-
-                  RunnerStatus hst = getLegStatus(i-1, false, false);
-                  if (hst != StatusUnknown && hst != StatusOK) {
-                    setStart = true;
-                    lastStartTime = restart;
-                  }
-
-                  if (restart > 0 && rope > 0 && (lastStartTime > rope) &&
-                      !preventRestart() && !tr->preventRestart()) {
-                    lastStartTime = restart; //Runner in restart
-                    tNumRestarts++;
-                  }
-                  if (!availableStartTimes.empty()) {
-                    // Single -> to parallel pursuit
-                    if (setStart)
-                      fill(availableStartTimes.begin(), availableStartTimes.end(), lastStartTime);
-                    else
-                      fill(availableStartTimes.begin(), availableStartTimes.end(), 0);
-
-                    availableStartTimes.pop_back(); // Used one
-                  }
-                }
-                else if (lt == LTParallel || lt == LTParallelOptional) {
-                  lastStartTime = getBestStartTime(availableStartTimes);
-                  setStart = true;
-                }
-
-                if (tr->getFinishTime()>0) {
-                  setStart = true;
-                  if (lastStartTime == 0)
-                    lastStartTime = pc->getRestartTime(i);
-                }
-                if (!setStart)
-                  lastStartTime=0;
-              }
-              else
-                lastStartTime=0;
-
-              tr->tUseStartPunch=false;
-              tr->setStartTime(lastStartTime, false, changeType);
-            }
-            break;
+            tr->tUseStartPunch = false;
+            tr->setStartTime(lastStartTime, false, changeType);
+          }
+                        break;
           }
         }
 
-        size_t nextNonPar = i+1;
+        size_t nextNonPar = i + 1;
         while (nextNonPar < Runners.size() && pc->isOptional(nextNonPar) && !Runners[nextNonPar])
           nextNonPar++;
-        
+
         int nextBaseLeg = nextNonPar;
         while (nextNonPar < Runners.size() && pc->isParallel(nextNonPar))
           nextNonPar++;
 
         // Extra finish time is used to split extra legs to parallel legs
-        if (lt == LTExtra || pc->getLegType(i+1) == LTExtra) {
-          if (tr->getFinishTime()>0) {
+        if (lt == LTExtra || pc->getLegType(i + 1) == LTExtra) {
+          if (lt != LTExtra)
+            extraFinishTime = -1;
+
+          if (tr->getFinishTime() > 0) {
             if (extraFinishTime <= 0)
-              extraFinishTime =  tr->getFinishTime();
+              extraFinishTime = tr->getFinishTime();
             else
               extraFinishTime = min(extraFinishTime, tr->getFinishTime());
           }
@@ -1287,23 +1360,23 @@ void oTeam::apply(ChangeType changeType, pRunner source) {
 
         //Add available start times for parallel
         if (nextNonPar < Runners.size()) {
-          st=pc->getStartType(nextNonPar);
+          st = pc->getStartType(nextNonPar);
           int finishTime = tr->getFinishTime();
           if (lt == LTExtra)
             finishTime = extraFinishTime;
 
-          if (st==STDrawn || st==STTime)
+          if (st == STDrawn || st == STTime)
             availableStartTimes.clear();
-          else if (finishTime>0) {
+          else if (finishTime > 0) {
             int nRCurrent = pc->getNumParallel(i);
             int nRNext = pc->getNumParallel(nextBaseLeg);
-            if (nRCurrent>1 || nRNext>1) {
-              if (nRCurrent<nRNext) {
+            if (nRCurrent > 1 || nRNext > 1) {
+              if (nRCurrent < nRNext) {
                 // Going from single leg to parallel legs
-                for (int j=0; j<nRNext/nRCurrent; j++)
+                for (int j = 0; j < nRNext / nRCurrent; j++)
                   availableStartTimes.push_back(finishTime);
               }
-              else if (nRNext==1)
+              else if (nRNext == 1)
                 compressStartTimes(availableStartTimes, finishTime);
               else
                 addStartTime(availableStartTimes, finishTime);
@@ -1464,7 +1537,8 @@ void oTeam::fillSpeakerObject(int leg, int courseControlId, int previousControlC
                               bool totalResult, oSpeakerObject &spk) const {
   if (leg==-1)
     leg = Runners.size()-1;
-
+  oTeam *ths = (oTeam *)this;
+  ths->apply(oBase::ChangeType::Quiet, leg < Runners.size() ? Runners[leg] : nullptr);
   spk.club = getName();
   spk.missingStartTime = true;
   //Defaults (if early return)
@@ -1570,7 +1644,10 @@ void oTeam::fillSpeakerObject(int leg, int courseControlId, int previousControlC
     }
   }
 
-  spk.timeSinceChange = oe->getComputerTime() - (spk.runningTimeLeg.time + Runners[leg]->tStartTime);
+  if (spk.runningTimeLeg.time > 10)
+    spk.timeSinceChange = oe->getComputerTime() - (spk.runningTimeLeg.time + Runners[leg]->tStartTime);
+  else
+    spk.timeSinceChange = -1;
 
   spk.owner=Runners[leg];
   spk.finishStatus=getLegStatus(specifiedLeg, true, totalResult);
@@ -1648,7 +1725,7 @@ void oTeam::fillSpeakerObject(int leg, int courseControlId, int previousControlC
     spk.status = spk.finishStatus;
 }
 
-int oTeam::getTimeAfter(int leg) const {
+int oTeam::getTimeAfter(int leg, bool allowUpdate) const {
   if (leg == -1)
     leg = Runners.size() - 1;
 
@@ -1717,7 +1794,7 @@ pRunner oTeam::getRunner(unsigned leg) const {
   if (leg==-1)
     leg=Runners.size()-1;
 
-  return leg<Runners.size() ? Runners[leg] : 0;
+  return leg<Runners.size() ? Runners[leg] : nullptr;
 }
 
 int oTeam::getRogainingPoints(bool computed, bool multidayTotal) const {
@@ -2018,9 +2095,9 @@ void oTeam::addTableRow(Table &table) const {
   table.set(row++, it, TID_CLUB, getClub(), true, cellCombo);
 
   table.set(row++, it, TID_START, getStartTimeS(), true);
-  table.set(row++, it, TID_FINISH, getFinishTimeS(), true);
+  table.set(row++, it, TID_FINISH, getFinishTimeS(false, SubSecond::Auto), true);
   table.set(row++, it, TID_STATUS, getStatusS(false, true), true, cellSelection);
-  table.set(row++, it, TID_RUNNINGTIME, getRunningTimeS(true), false);
+  table.set(row++, it, TID_RUNNINGTIME, getRunningTimeS(true, SubSecond::Auto), false);
   int rp = getRogainingPoints(true, false);
   table.set(row++, it, TID_POINTS, rp ? itow(rp) : L"", false);
 
@@ -2053,9 +2130,21 @@ pair<int, bool> oTeam::inputData(int id, const wstring &input,
   synchronize(false);
 
   if (id>1000) {
+    const wstring &preBib = getDCI().getString("Bib");
     auto res = oe->oTeamData->inputData(this, id, input,
                                     inputId, output, noUpdate);
-    applyBibs();
+    
+    const wstring &postBib = getDCI().getString("Bib");
+
+    if (preBib != postBib) {
+      wchar_t pat[32];
+      int no = oClass::extractBibPattern(postBib, pat);
+      if (no > 0)
+        setStartNo(no, ChangeType::Update);
+
+      applyBibs();
+    }
+
     evaluate(oBase::ChangeType::Update);
     return res;
   }
@@ -2083,7 +2172,7 @@ pair<int, bool> oTeam::inputData(int id, const wstring &input,
       }
       else {
         if (isName && !input.empty() && Class) {
-          pRunner r = oe->addRunner(input, getClubId(), getClassId(false), 0, 0, false);
+          pRunner r = oe->addRunner(input, getClubId(), getClassId(false), 0, L"", false);
           setRunner(ix, r, true);
           output = r->getName();
         }
@@ -2133,6 +2222,8 @@ pair<int, bool> oTeam::inputData(int id, const wstring &input,
           inputId = c->getId();
       }
       setClassId(inputId, true);
+      adjustMultiRunners();
+
       synchronize(true);
       output = getClass(true);
       break;
@@ -2489,7 +2580,7 @@ const pair<wstring, int> oTeam::getRaceInfo() {
     int rtComp = getRunningTime(true);
     int pointsActual = getRogainingPoints(false, false);
     int pointsComp = getRogainingPoints(true, false);
-    RunnerStatus compStatus = getStatusComputed();
+    RunnerStatus compStatus = getStatusComputed(true);
     bool ok = compStatus == StatusOK || compStatus == StatusOutOfCompetition
       || compStatus == StatusNoTiming;
     res.second = ok ? 1 : -1;
@@ -2535,7 +2626,7 @@ const pair<wstring, int> oTeam::getRaceInfo() {
     oe->getPunchesForRunner(Id, true, pl);
     if (!pl.empty()) {
       res.first = lang.tl(L"Senast sedd: X vid Y.#" +
-                          oe->getAbsTime(pl.back()->Time) +
+                          oe->getAbsTime(pl.back()->getTimeInt()) +
                           L"#" + pl.back()->getType());
     }
   }
@@ -2547,4 +2638,46 @@ void oTeam::changedObject() {
   markClassChanged(-1);
   sqlChanged = true;
   oe->sqlTeams.changed = true;
+}
+
+bool oTeam::matchAbstractRunner(const oAbstractRunner* target) const {
+  if (target == nullptr)
+    return false;
+
+  if (target == this)
+    return true;
+
+  const oRunner* r = dynamic_cast<const oRunner*>(target);
+  if (r != nullptr) 
+    return r->getTeam() == this;
+  
+  return false;
+}
+
+pRunner oTeam::getRunnerBestTimePar(int linearLegInput) const {
+  if (!Class)
+    return getRunner(linearLegInput);
+
+  if (linearLegInput < 0)
+    linearLegInput = Runners.size() - 1;
+  int minL, maxL;
+  Class->getParallelOptionalRange(linearLegInput, minL, maxL);
+
+  int ft = numeric_limits<int>::max();
+  pRunner res = nullptr;
+  for (int i = minL; i <= maxL; i++) {
+    if (size_t(i) < Runners.size())
+      continue;
+    if (res == nullptr)
+      res = Runners[i]; // Ensure any
+
+    if (i < Runners.size() && Runners[i] && Runners[i]->prelStatusOK(false, false, false)) {
+      int f = Runners[i]->getFinishTime();
+      if (f > 0 && f < ft) {
+        ft = f;
+        res = Runners[i];
+      }
+    }
+  }
+  return res;
 }

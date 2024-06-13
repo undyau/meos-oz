@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -181,12 +181,6 @@ const oDataInfo *oDataContainer::findVariable(const char *name) const
 {
   if (name == 0)
     return 0;
-  /*map<string, oDataInfo>::const_iterator it=index.find(Name);
-
-  if (it == index.end())
-    return 0;
-  else return &(it->second);
-  */
   int res;
   if (index.lookup(hash(name), res)) {
     return &ordered[res];
@@ -213,7 +207,25 @@ void oDataContainer::initData(oBase *ob, int datasize) {
   }
 }
 
-bool oDataContainer::setInt(void *data, const char *Name, int V)
+bool oDataContainer::isInt(const char *name) const {
+  const oDataInfo *odi = findVariable(name);
+
+  if (!odi)
+    throw std::exception("oDataContainer: Variable not found.");
+
+  return odi->Type == oDTInt;
+}
+
+bool oDataContainer::isString(const char *name) const {
+  const oDataInfo *odi = findVariable(name);
+
+  if (!odi)
+    throw std::exception("oDataContainer: Variable not found.");
+
+  return odi->Type == oDTString || odi->Type == oDTStringDynamic;
+}
+
+bool oDataContainer::setInt(oBase* ob, void *data, const char *Name, int V)
 {
   oDataInfo *odi=findVariable(Name);
 
@@ -227,8 +239,12 @@ bool oDataContainer::setInt(void *data, const char *Name, int V)
     throw std::exception("oDataContainer: Variable to large.");
 
   LPBYTE vd=LPBYTE(data)+odi->Index;
-  if (*((int *)vd)!=V){
-    *((int *)vd)=V;
+  int oldValue = *((int*)vd);
+  
+  if (oldValue != V) {
+    *((int*)vd) = V;
+    if (odi->dataNotifier)
+      odi->dataNotifier->notify(ob, oldValue, V);
     return true;
   }
   else return false;//Not modified
@@ -373,11 +389,15 @@ bool oDataContainer::setDate(void *data, const char *Name, const wstring &V)
   if (odi->Type!=oDTInt)
     throw std::exception("oDataContainer: Variable of wrong type.");
 
-  int year=0,month=0,day=0;
+  int C = convertDateYMD(V, true);
+  if (C <= 0) {
+    C = _wtoi(V.c_str());
+    if (V.length() >= 2 && (C > 0 && C < 100) || (C == 0 && V[0] == '0' && V[1] == '0'))
+      C = extendYear(C);
 
-  swscanf_s(V.c_str(), L"%d-%d-%d", &year, &month, &day);
-
-  int C=year*10000+month*100+day;
+    if (C < 1900 || C > 9999)
+      C = 0;
+  }
 
   LPBYTE vd=LPBYTE(data)+odi->Index;
   if (*((int *)vd)!=C){
@@ -387,44 +407,92 @@ bool oDataContainer::setDate(void *data, const char *Name, const wstring &V)
   else return false;//Not modified
 }
 
-const wstring &oDataContainer::getDate(const void *data,
-                               const char *Name) const
-{
-  const oDataInfo *odi=findVariable(Name);
+const wstring& oDataContainer::getDate(const void* data, const char* name) const {
+  const oDataInfo* odi = findVariable(name);
 
   if (!odi)
     throw std::exception("oDataContainer: Variable not found.");
 
-  if (odi->Type!=oDTInt)
+  if (odi->Type != oDTInt)
     throw std::exception("oDataContainer: Variable of wrong type.");
 
-  LPBYTE vd=LPBYTE(data)+odi->Index;
-  int C=*((int *)vd);
+  LPBYTE vd = LPBYTE(data) + odi->Index;
+  int C = *((int*)vd);
 
   wchar_t bf[24];
-  if (C%10000!=0 || C==0)
-    swprintf_s(bf, L"%04d-%02d-%02d", C/10000, (C/100)%100, C%100);
-  else
-    swprintf_s(bf, L"%04d", C/10000);
-
-  wstring &res = StringCache::getInstance().wget();
+  if (odi->SubType == oISDateOrYear) {
+    if (C > 9999 && C % 10000 != 0)
+      swprintf_s(bf, L"%04d-%02d-%02d", C / 10000, (C / 100) % 100, C % 100);
+    else if (C > 9999)
+      swprintf_s(bf, L"%04d", C / 10000);
+    else if (C > 1900)
+      swprintf_s(bf, L"%04d", C );
+    else
+      swprintf_s(bf, L"");
+  }
+  else {
+    if (C % 10000 != 0 || C == 0)
+      swprintf_s(bf, L"%04d-%02d-%02d", C / 10000, (C / 100) % 100, C % 100);
+    else
+      swprintf_s(bf, L"%04d", C / 10000);
+  }
+  wstring& res = StringCache::getInstance().wget();
   res = bf;
   return res;
+}
+
+int oDataContainer::getYear(const void* data, const char *name) const {
+  const oDataInfo* odi = findVariable(name);
+
+  if (!odi)
+    throw std::exception("oDataContainer: Variable not found.");
+
+  if (odi->Type != oDTInt)
+    throw std::exception("oDataContainer: Variable of wrong type.");
+
+  LPBYTE vd = LPBYTE(data) + odi->Index;
+  int C = *((int*)vd);
+
+  if (odi->SubType == oISDateOrYear) {
+    if (C > 9999)
+      return C / 10000;
+    else if (C > 1900)
+      return C;
+    else
+      return 0;
+  }
+  else {
+    return C / 10000;
+  }
 }
 
 bool oDataContainer::write(const oBase *ob, xmlparser &xml) const {
   void *data, *oldData;
   vector< vector<wstring> > *strptr;
   ob->getDataBuffers(data, oldData, strptr);
-
   xml.startTag("oData");
-
 
   for (size_t kk = 0; kk < ordered.size(); kk++) {
     const oDataInfo &di=ordered[kk];
     if (di.Type==oDTInt){
       LPBYTE vd=LPBYTE(data)+di.Index;
-      if (di.SubType != oIS64) {
+      if (di.SubType == oISTime || di.SubType == oISTimeAdjust) {
+        int nr;
+        memcpy(&nr, vd, sizeof(int));
+        xml.writeTime(di.Name, nr);
+      }
+      else if (di.SubType == oISDateOrYear) {
+        int nr;
+        memcpy(&nr, vd, sizeof(int));
+        if (nr < 9999)
+          xml.write(di.Name, nr);
+        else {
+          char date[20];
+          sprintf_s(date, "%d-%02d-%02d", nr / 10000, (nr / 100) % 100, nr % 100);
+          xml.write(di.Name, date);
+        }
+      }
+      else if (di.SubType != oIS64) {
         int nr;
         memcpy(&nr, vd, sizeof(int));
         xml.write(di.Name, nr);
@@ -468,18 +536,29 @@ void oDataContainer::set(oBase *ob, const xmlobject &xo) {
     if (odi) {
       if (odi->Type == oDTInt){
         LPBYTE vd=LPBYTE(data)+odi->Index;
-        if (odi->SubType != oIS64)
+        if (odi->SubType == oISTime || odi->SubType == oISTimeAdjust)
+          *((int *)vd) = it->getRelativeTime();
+        else if (odi->SubType == oISDateOrYear) {
+          int val = convertDateYMD(it->getStr(), true);
+          if (val > 0)
+            *((int*)vd) = val;
+          else
+            *((int*)vd) = it->getInt();
+        }
+        else if (odi->SubType != oIS64)
           *((int *)vd) = it->getInt();
         else
           *((__int64 *)vd) = it->getInt64();
       }
       else if (odi->Type == oDTString) {
         LPBYTE vd=LPBYTE(data)+odi->Index;
-        wcsncpy_s((wchar_t *)vd, odi->Size/sizeof(wchar_t), it->getw(), (odi->Size-1)/sizeof(wchar_t));
+        const wchar_t* ptr = it->getWPtr();
+        if (ptr)
+          wcsncpy_s((wchar_t *)vd, odi->Size/sizeof(wchar_t), ptr, (odi->Size-1)/sizeof(wchar_t));
       }
       else if (odi->Type == oDTStringDynamic) {
         wstring &str = (*strptr)[0][odi->Index];
-        str = it->getw();
+        str = it->getWStr();
       }
     }
   }
@@ -487,17 +566,18 @@ void oDataContainer::set(oBase *ob, const xmlobject &xo) {
   allDataStored(ob);
 }
 
-void oDataContainer::buildDataFields(gdioutput &gdi, int maxFieldSize) const
+vector<InputInfo *> oDataContainer::buildDataFields(gdioutput &gdi, int maxFieldSize) const
 {
   vector<string> fields;
   for (size_t k = 0; k < ordered.size(); k++)
     fields.push_back(ordered[k].Name);
 
-  buildDataFields(gdi, fields, maxFieldSize);
+  return buildDataFields(gdi, fields, maxFieldSize);
 }
 
-void oDataContainer::buildDataFields(gdioutput &gdi, const vector<string> &fields, int maxFieldSize) const
+vector<InputInfo *> oDataContainer::buildDataFields(gdioutput &gdi, const vector<string> &fields, int maxFieldSize) const
 {
+  vector<InputInfo *> out;
   for (size_t k=0;k<fields.size();k++) {
     //map<string, oDataInfo>::const_iterator it=index.find(fields[k]);
     const oDataInfo *odi = findVariable(fields[k].c_str());
@@ -510,18 +590,19 @@ void oDataContainer::buildDataFields(gdioutput &gdi, const vector<string> &field
     string Id=di.Name+string("_odc");
 
     if (di.Type==oDTInt){
-      if (di.SubType == oISDate || di.SubType == oISTime)
-        gdi.addInput(Id, L"", 10, 0, gdi.widen(di.Description) + L":");
+      if (di.SubType == oISDate || di.SubType == oISTime || di.SubType == oISTimeAdjust || di.SubType == oISDateOrYear)
+        out.push_back(&gdi.addInput(Id, L"", 10, 0, gdi.widen(di.Description) + L":"));
       else
-        gdi.addInput(Id, L"", 6, 0, gdi.widen(di.Description) + L":");
+        out.push_back(&gdi.addInput(Id, L"", 6, 0, gdi.widen(di.Description) + L":"));
     }
     else if (di.Type==oDTString){
-      gdi.addInput(Id, L"", min(di.Size+2, maxFieldSize), 0, gdi.widen(di.Description) + L":");
+      out.push_back(&gdi.addInput(Id, L"", min(di.Size+2, maxFieldSize), 0, gdi.widen(di.Description) + L":"));
     }
     else if (di.Type==oDTStringDynamic){
-      gdi.addInput(Id, L"", maxFieldSize, 0, gdi.widen(di.Description) + L":");
+      out.push_back(&gdi.addInput(Id, L"", maxFieldSize, 0, gdi.widen(di.Description) + L":"));
     }
   }
+  return out;
 }
 
 int oDataContainer::getDataAmountMeasure(const void *data) const
@@ -591,9 +672,9 @@ void oDataContainer::fillDataFields(const oBase *ob, gdioutput &gdi) const
   }
 }
 
-bool oDataContainer::saveDataFields(oBase *ob, gdioutput &gdi) {
+bool oDataContainer::saveDataFields(oBase *ob, gdioutput &gdi, std::set<string> &modified) {
   void *data, *oldData;
-  vector< vector<wstring> > *strptr;
+  vector<vector<wstring>> *strptr;
   ob->getDataBuffers(data, oldData, strptr);
 
   for (size_t kk = 0; kk < ordered.size(); kk++) {
@@ -610,10 +691,23 @@ bool oDataContainer::saveDataFields(oBase *ob, gdioutput &gdi) {
         no = ob->getEvent()->interpretCurrency(gdi.getText(Id.c_str()));
       }
       else if (di.SubType == oISDate) {
-        no = convertDateYMS(gdi.getText(Id.c_str()), true);
+        no = convertDateYMD(gdi.getText(Id.c_str()), true);
+        if (no <= 0)
+          no = 0;
+      }
+      else if (di.SubType == oISDateOrYear) {
+        no = convertDateYMD(gdi.getText(Id.c_str()), true);
+        if (no <= 0) {
+          no = gdi.getTextNo(Id.c_str());
+          if (no < 1900 || no > 9999)
+            no = 0;
+        }
       }
       else if (di.SubType == oISTime) {
         no = convertAbsoluteTimeHMS(gdi.getText(Id.c_str()), -1);
+      }
+      else if (di.SubType == oISTimeAdjust) {
+        no = convertAbsoluteTimeMS(gdi.getText(Id.c_str()));
       }
       else if (di.SubType == oISDecimal) {
         wstring str = gdi.getText(Id.c_str());
@@ -635,6 +729,7 @@ bool oDataContainer::saveDataFields(oBase *ob, gdioutput &gdi) {
       if (oldNo != no) {
         *((int *)vd)=no;
         ob->updateChanged();
+        modified.insert(di.Name);
       }
     }
     else if (di.Type == oDTString) {
@@ -644,6 +739,7 @@ bool oDataContainer::saveDataFields(oBase *ob, gdioutput &gdi) {
       if (oldS != newS) {
         wcsncpy_s((wchar_t *)vd, di.Size/sizeof(wchar_t), newS.c_str(), (di.Size-1)/sizeof(wchar_t));
         ob->updateChanged();
+        modified.insert(di.Name);
       }
     }
     else if (di.Type == oDTStringDynamic) {
@@ -651,6 +747,7 @@ bool oDataContainer::saveDataFields(oBase *ob, gdioutput &gdi) {
       wstring newS = gdi.getText(Id.c_str());
       if (oldS != newS) {
         oldS = newS;
+        modified.insert(di.Name);
         ob->updateChanged();
       }
     }
@@ -759,7 +856,7 @@ string oDataContainer::generateSQLDefinition(const std::set<string> &exclude) co
       string name = di.Name;
       if (di.Type==oDTInt){
         if (di.SubType==oIS32 || di.SubType==oISDate || di.SubType==oISCurrency ||
-           di.SubType==oISTime || di.SubType==oISDecimal)
+           di.SubType==oISTime  || di.SubType == oISTimeAdjust || di.SubType==oISDecimal || di.SubType == oISDateOrYear)
           sql+=C_INT(name);
         else if (di.SubType==oIS16)
           sql+=C_SMALLINT(name);
@@ -1088,7 +1185,7 @@ void oDataContainer::buildTableCol(Table *table)
     }
     else if (di.Type == oDTInt) {
       bool right = di.SubType == oISCurrency;
-      bool numeric = di.SubType != oISDate && di.SubType != oISTime;
+      bool numeric = di.SubType != oISDate && di.SubType != oISTime && di.SubType != oISTimeAdjust && di.SubType != oISDateOrYear;
       int w;
       if (di.SubType == oISDecimal)
         w = max( (di.decimalSize+4)*10, 70);
@@ -1120,9 +1217,27 @@ void oDataContainer::buildTableCol(Table *table)
 
 bool oDataContainer::formatNumber(int nr, const oDataInfo &di, wchar_t bf[64]) const {
   if (di.SubType == oISDate) {
-    if (nr>0) {
-      swprintf_s(bf, 64, L"%d-%02d-%02d", nr/(100*100), (nr/100)%100, nr%100);
+    if (nr == 0)
+      bf[0] = 0;
+    else if ((nr < 99999999 && nr % 10000 != 0) || nr == 0)
+      swprintf_s(bf, 64, L"%d-%02d-%02d", nr / (100 * 100), (nr / 100) % 100, nr % 100);
+    else if (nr > 0  && nr < 9999)
+      swprintf_s(bf, 64, L"%04d", nr / 10000);
+    else {
+      bf[0] = '-';
+      bf[1] = 0;
     }
+    return true;
+  } 
+  else if (di.SubType == oISDateOrYear) {
+    if (nr == 0)
+      bf[0] = 0;
+    else if (nr > 9999 && nr % 10000 != 0)
+      swprintf_s(bf, 64, L"%04d-%02d-%02d", nr / 10000, (nr / 100) % 100, nr % 100);
+    else if (nr > 9999)
+      swprintf_s(bf, 64, L"%04d", nr / 10000);
+    else if (nr > 1900)
+      swprintf_s(bf, 64, L"%04d", nr);
     else {
       bf[0] = '-';
       bf[1] = 0;
@@ -1130,13 +1245,47 @@ bool oDataContainer::formatNumber(int nr, const oDataInfo &di, wchar_t bf[64]) c
     return true;
   }
   else if (di.SubType == oISTime) {
-    if (nr>0 && nr<(30*24*3600)) {
-      if (nr < 24*3600)
-        swprintf_s(bf, 64, L"%02d:%02d:%02d", nr/3600, (nr/60)%60, nr%60);
+    if (nr>0 && nr<(30*24*timeConstHour)) {
+      int cnt = 0;
+      if (nr < 24*timeConstHour)
+        cnt = swprintf_s(bf, 64, L"%02d:%02d:%02d", nr/timeConstHour, (nr/timeConstMinute)%60, (nr/timeConstSecond)%60);
       else {
-        int days = nr / (24*3600);
-        nr = nr % (24*3600);
-        swprintf_s(bf, 64, L"%d+%02d:%02d:%02d", days, nr/3600, (nr/60)%60, nr%60);
+        int days = nr / (24*timeConstHour);
+        nr = nr % (24*timeConstHour);
+        cnt = swprintf_s(bf, 64, L"%d+%02d:%02d:%02d", days, nr/timeConstHour, (nr/timeConstSecond)%60, (nr/timeConstSecond)%60);
+      }
+      if (timeConstSecond > 1) {
+        if (nr % 10 != 0) {
+          swprintf_s(bf + cnt, 64-cnt, L".%01d", nr % 10);
+        }
+      }
+    }
+    else {
+      bf[0] = '-';
+      bf[1] = 0;
+    }
+    return true;
+  }
+  else if (di.SubType == oISTimeAdjust) {
+    if (nr != 0 && nr != NOTIME) {
+      bool neg = false;
+      int cnt = 0;
+      if (nr < 0) {
+        bf[0] = '-';
+        cnt = 1;
+        nr = -nr;
+      }
+      if (nr < 24 * timeConstHour)
+        cnt += swprintf_s(bf + cnt, 64 - cnt, L"%02d:%02d:%02d", nr / timeConstHour, (nr / timeConstMinute) % 60, (nr / timeConstSecond) % 60);
+      else {
+        int days = nr / (24 * timeConstHour);
+        nr = nr % (24 * timeConstHour);
+        cnt += swprintf_s(bf + cnt, 64 - cnt, L"%d+%02d:%02d:%02d", days, nr / timeConstHour, (nr / timeConstSecond) % 60, (nr / timeConstSecond) % 60);
+      }
+      if (timeConstSecond > 1) {
+        if (nr % 10 != 0) {
+          swprintf_s(bf + cnt, 64 - cnt, L".%01d", nr % 10);
+        }
       }
     }
     else {
@@ -1259,10 +1408,28 @@ pair<int, bool>  oDataContainer::inputData(oBase *ob, int id,
           no = ob->getEvent()->interpretCurrency(input);
         }
         else if (di.SubType == oISDate) {
-          no = convertDateYMS(input, true);
+          no = convertDateYMD(input, true);
+          if (no <= 0)
+            no = 0;
+        } 
+        else if (di.SubType == oISDateOrYear) {
+          no = convertDateYMD(input, true);
+          if (no <= 0) {
+            no = _wtoi(input.c_str());
+            if (input.length() >= 2 && (no > 0 && no < 100) || (no == 0 && input[0] == '0' && input[1] == '0'))
+              no = extendYear(no);
+
+            if (no < 1900 || no > 9999)
+              no = 0;
+          }
         }
         else if (di.SubType == oISTime) {
           no = convertAbsoluteTimeHMS(input, -1);
+        }
+        else if (di.SubType == oISTimeAdjust) {
+          no = convertAbsoluteTimeMS(input);
+          if (no == NOTIME)
+            no = 0;
         }
         else if (di.SubType == oISDecimal) {
           wstring str = input;
@@ -1276,10 +1443,24 @@ pair<int, bool>  oDataContainer::inputData(oBase *ob, int id,
           no = int(di.decimalScale * val);
         }
         else if (di.SubType == oIS64) {
-          //__int64 no64 = _atoi64(input.c_str());
+          oEvent* oe = ob->getEvent();
           __int64 k64;
           memcpy(&k64, vd, sizeof(__int64));
+
           __int64 no64 = oBase::converExtIdentifierString(input);
+
+          wchar_t bf[16];
+          oBase::converExtIdentifierString(no64, bf);
+
+          if (compareStringIgnoreCase(bf, input)) {
+            throw meosException(L"Cannot represent ID X#" + input);
+          }
+
+          if (no64 != k64 && !oe->hasWarnedModifiedId()) {
+            if (oe->gdiBase().askOkCancel(L"warn:changeid") == gdioutput::AskAnswer::AnswerCancel)
+              throw meosCancel();
+            oe->hasWarnedModifiedId(true);
+          }
 
           memcpy(vd, &no64, sizeof(__int64));
           __int64 out64 = no64;
@@ -1312,6 +1493,9 @@ pair<int, bool>  oDataContainer::inputData(oBase *ob, int id,
             ob->synchronize(true);
 
           memcpy(&outN, vd, sizeof(int));
+
+          if (di.dataNotifier)
+            di.dataNotifier->notify(ob, k, no);
         }
 
         formatNumber(outN, di, bf);

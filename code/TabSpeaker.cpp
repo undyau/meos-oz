@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -67,8 +67,7 @@ TabSpeaker::~TabSpeaker()
 }
 
 
-int tabSpeakerCB(gdioutput *gdi, int type, void *data)
-{
+int tabSpeakerCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
   TabSpeaker &ts = dynamic_cast<TabSpeaker &>(*gdi->getTabs().get(TSpeakerTab));
 
   switch(type){
@@ -165,7 +164,7 @@ int TabSpeaker::processButton(gdioutput &gdi, const ButtonInfo &bu)
     gdi.addButton("AllClass", "Alla", tabSpeakerCB);
     gdi.addButton("NoClass", "Inga", tabSpeakerCB);
 
-    oe->fillClasses(gdi, "Classes", oEvent::extraNone, oEvent::filterNone);
+    oe->fillClasses(gdi, "Classes", {}, oEvent::extraNone, oEvent::filterNone);
     gdi.setSelection("Classes", classesToWatch);
 
     gdi.fillRight();
@@ -176,8 +175,8 @@ int TabSpeaker::processButton(gdioutput &gdi, const ButtonInfo &bu)
     gdi.fillDown();
 
     vector< pair<wstring, size_t> > d;
-    oe->fillControls(d, oEvent::CTCourseControl);
-    gdi.addItem("Controls", d);
+    oe->fillControls(d, oEvent::ControlType::CourseControl);
+    gdi.setItems("Controls", d);
 
     gdi.setSelection("Controls", controlsToWatch);
 
@@ -241,11 +240,11 @@ int TabSpeaker::processButton(gdioutput &gdi, const ButtonInfo &bu)
     gdi.dropLine(3);
     gdi.popX();
     gdi.registerEvent("DataUpdate", tabSpeakerCB);
-    vector<pair<int, bool>> runnersToReport;
+    deque<pair<int, bool>> runnersToReport;
     if (runnerId > 0) {
       runnersToReport.emplace_back(runnerId, false);
     }
-    TabRunner::generateRunnerReport(*oe, gdi, runnersToReport);
+    TabRunner::generateRunnerReport(*oe, gdi, 1, 1, false, runnersToReport);
     gdi.refresh();
   }
   else if (bu.id == "Priority") {
@@ -257,7 +256,7 @@ int TabSpeaker::processButton(gdioutput &gdi, const ButtonInfo &bu)
     gdi.pushX();
     gdi.addString("", 0, "Klass:");
     gdi.addSelection("Class", 200, 200, tabSpeakerCB, L"", L"Välj klass");
-    oe->fillClasses(gdi, "Class", oEvent::extraNone, oEvent::filterNone);
+    oe->fillClasses(gdi, "Class", {}, oEvent::extraNone, oEvent::filterNone);
     gdi.addButton("ClosePri", "Stäng", tabSpeakerCB);
     gdi.dropLine(2);
     gdi.popX();
@@ -278,7 +277,7 @@ int TabSpeaker::processButton(gdioutput &gdi, const ButtonInfo &bu)
     gdi_new->pushX();
 
     TabList::makeClassSelection(*gdi_new);
-    oe->fillClasses(*gdi_new, "ListSelection", oEvent::extraNone, oEvent::filterNone);
+    oe->fillClasses(*gdi_new, "ListSelection", {}, oEvent::extraNone, oEvent::filterNone);
     
     gdi_new->popY();
     gdi_new->setCX(gdi_new->getCX() + gdi_new->scaleLength(280));
@@ -382,7 +381,7 @@ int TabSpeaker::processButton(gdioutput &gdi, const ButtonInfo &bu)
       controlsToWatch.insert(-2); // Non empty but no control
 
     for (set<int>::iterator it=controlsToWatch.begin();it!=controlsToWatch.end();++it) {
-      pControl pc=oe->getControl(*it, false);
+      pControl pc=oe->getControl(*it, false, false);
       if (pc) {
         pc->setRadio(true);
         pc->synchronize(true);
@@ -461,7 +460,7 @@ void TabSpeaker::drawTimeLine(gdioutput &gdi) {
   gdi.addItem("WatchNumber", lang.tl("X senaste#10"), 10);
   gdi.addItem("WatchNumber", lang.tl("X senaste#20"), 20);
   gdi.addItem("WatchNumber", lang.tl("X senaste#50"), 50);
-  gdi.addItem("WatchNumber", L"Alla", 0);
+  gdi.addItem("WatchNumber", lang.tl("Alla"), 0);
   gdi.selectItemByData("WatchNumber", watchNumber);
   gdi.dropLine(2);
   gdi.popX();
@@ -722,7 +721,7 @@ void TabSpeaker::splitAnalysis(gdioutput &gdi, int xp, int yp, pRunner r)
       else
         first = false;
 
-      timeloss += pc->getControlOrdinal(j) + L". " + formatTime(delta[j]);
+      timeloss += pc->getControlOrdinal(j) + L". " + formatTime(delta[j], SubSecond::Auto);
     }
     if (timeloss.length() > charlimit || (!timeloss.empty() && !first && j+1 == delta.size())) {
       gdi.addStringUT(yp, xp, 0, timeloss).setColor(colorDarkRed);
@@ -1223,7 +1222,7 @@ void TabSpeaker::storeManualTime(gdioutput &gdi)
     throw std::exception(bf);
   }
 
-  oe->addFreePunch(itime, punch, sino, true);
+  oe->addFreePunch(itime, punch, 0, sino, true, false);
 
   gdi.restore("manual", false);
   gdi.addString("", 0, L"Löpare: X, kontroll: Y, kl Z#" + Name + L"#" + oPunch::getType(punch) + L"#" +  oe->getAbsTime(itime));
@@ -1432,7 +1431,7 @@ void TabSpeaker::loadSettings(vector< multimap<string, wstring> > &settings) {
     xmlList allS;
     s.getObjects(allS);
     for (auto &prop : allS) {
-      settings.back().insert(make_pair(prop.getName(), prop.getw()));
+      settings.back().insert(make_pair(prop.getName(), prop.getWStr()));
     }
   }
 }

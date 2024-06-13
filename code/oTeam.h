@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -31,8 +31,7 @@ typedef const oTeam* cTeam;
 
 const unsigned int maxRunnersTeam=32;
 
-class oTeam : public oAbstractRunner
-{
+class oTeam final : public oAbstractRunner {
 public:
   enum ResultCalcCacheSymbol {
     RCCCourse,
@@ -58,8 +57,8 @@ protected:
   vector<pRunner> Runners;
   void setRunnerInternal(int k, pRunner r);
 
-  static const int dataSize = 160;
-  int getDISize() const {return dataSize;}
+  static const int dataSize = 256;
+  int getDISize() const final {return dataSize;}
   BYTE oData[dataSize];
   BYTE oDataOld[dataSize];
 
@@ -141,6 +140,8 @@ protected:
   void changedObject() final;
 
 public:
+
+  bool matchAbstractRunner(const oAbstractRunner* target) const override;
 
   /** Deduce from computed runner times.*/
   RunnerStatus deduceComputedStatus() const;
@@ -231,9 +232,16 @@ public:
     return cnt;
   }
 
+  /** For legs with many parallel / extra runner, get the runner with the 
+      first finish time */
+  pRunner getRunnerBestTimePar(int linearLegInput) const;
+
   void decodeRunners(const string &rns, vector<int> &rid);
   void importRunners(const vector<int> &rns);
   void importRunners(const vector<pRunner> &rns);
+
+
+  RunnerStatus getStatusComputed(bool allowUpdate) const final;
 
   int getPlace(bool allowUpdate = true) const override {return getLegPlace(-1, false, allowUpdate);}
   int getTotalPlace(bool allowUpdate = true) const override {return getLegPlace(-1, true, allowUpdate);}
@@ -251,16 +259,19 @@ public:
   wstring getLegStartTimeS(int leg) const;
   wstring getLegStartTimeCompact(int leg) const;
 
-  wstring getLegFinishTimeS(int leg) const;
+  wstring getLegFinishTimeS(int leg, SubSecond mode) const;
   int getLegFinishTime(int leg) const;
 
-  int getTimeAfter(int leg) const;
+  int getTimeAfter(int leg, bool allowUpdate) const override;
 
   //Get total running time after leg
-  wstring getLegRunningTimeS(int leg, bool computed, bool multidayTotal) const;
+  wstring getLegRunningTimeS(int leg, bool computed, bool multidayTotal, SubSecond mode) const;
 
   int getLegRunningTime(int leg, bool computed, bool multidayTotal) const;
- 
+  
+  // Get the team's total running time when starting specified leg
+  int getTotalRunningTimeAtLegStart(int leg, bool multidayTotal) const;
+
   RunnerStatus getLegStatus(int leg, bool computed, bool multidayTotal) const;
   const wstring &getLegStatusS(int leg, bool computed, bool multidayTotal) const;
 
@@ -274,7 +285,8 @@ public:
   static bool compareName(const oTeam &a, const oTeam &b) {return a.sName<b.sName;}
   static bool compareResult(const oTeam &a, const oTeam &b);
   static bool compareResultNoSno(const oTeam &a, const oTeam &b);
-  
+  static bool compareResultClub(const oTeam& a, const oTeam& b);
+
   static void checkClassesWithReferences(oEvent &oe, set<int> &clsWithRef);
   static void convertClassWithReferenceToPatrol(oEvent &oe, const set<int> &clsWithRef);
 
@@ -282,6 +294,9 @@ public:
   bool write(xmlparser &xml);
 
   void merge(const oBase &input, const oBase *base) final;
+
+  bool isTeam() const final { return true; }
+
 
   oTeam(oEvent *poe, int id);
   oTeam(oEvent *poe);

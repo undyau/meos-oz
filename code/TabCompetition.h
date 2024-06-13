@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ class TabCompetition :
 
   // Events from Eventor
   vector<CompetitionInfo> events;
-  list<PrefsEditor> prefsEditor;
+  shared_ptr<PrefsEditor> prefsEditor;
 
   oFreeImport fi;
   wstring entryText;
@@ -59,6 +59,8 @@ class TabCompetition :
 
   void copyrightLine(gdioutput &gdi) const;
   void loadAboutPage(gdioutput &gdi) const;
+
+  void updateWarning(gdioutput &gdi) const;
 
   int organizorId;
 
@@ -81,8 +83,7 @@ class TabCompetition :
                               vector<CompetitionInfo> &events) const;
 
   void saveSettings(gdioutput &gdi);
-  void loadSettings(gdioutput &gdi);
-
+  
   void getEventorCmpData(gdioutput &gdi, int id,
                          const wstring &eventFile,
                          const wstring &clubFile,
@@ -96,6 +97,8 @@ class TabCompetition :
 
   string eventorOrigin; // The command used when checking eventor
   bool checkEventor(gdioutput &gdi, ButtonInfo &bi);
+
+  pair<bool, bool> hasPersonExtId() const;
 
   bool useEventor() const;
   bool useEventorUTC() const;
@@ -119,19 +122,27 @@ class TabCompetition :
   void meosFeatures(gdioutput &gdi, bool newGuide);
 
   void newCompetitionGuide(gdioutput &gdi, int step);
+  void createNewCmp(gdioutput &gdi, bool useExisting);
 
   void entryForm(gdioutput &gdi, bool isGuide);
-  FlowOperation saveEntries(gdioutput &gdi, bool removeRemoved, bool isGuide);
+  FlowOperation saveEntries(gdioutput &gdi, bool removeRemoved, int classOffset, bool isGuide);
   
-  FlowOperation checkStageFilter(gdioutput &gdi, const wstring &fname, set<int> &filter, string &preferredIdProvider);
+  FlowOperation checkStageFilter(gdioutput &gdi, const wstring &fname, set<int> &filter, pair<string, string> &preferredIdProvider);
   
   void setExportOptionsStatus(gdioutput &gdi, int format) const;
 
   void selectStartlistOptions(gdioutput &gdi);
   void selectExportSplitOptions(gdioutput &gdi);
 
+  void showSelectId(std::pair<bool, bool>& priSecondId, gdioutput& gdi);
+  pair<string, string> TabCompetition::getPreferredIdTypes(gdioutput& gdi);
+
+  void saveExtraFields(gdioutput& gdi, oEvent::ExtraFieldContext type);
+
   void entryChoice(gdioutput &gdi);
   void createCompetition(gdioutput &gdi);
+
+  void importDefaultHiredCards(gdioutput& gdi);
 
   void listBackups(gdioutput &gdi);
 
@@ -145,6 +156,9 @@ protected:
   void clearCompetitionData();
 
 public:
+  void loadSettings(gdioutput& gdi);
+  void showExtraFields(gdioutput& gdi, oEvent::ExtraFieldContext type);
+
   const char * getTypeStr() const {return "TCmpTab";}
   TabType getType() const {return TCmpTab;}
 
@@ -154,9 +168,9 @@ public:
   void setEventorServer(const wstring &server);
   void setEventorUTC(bool useUTC);
 
-  int competitionCB(gdioutput &gdi, int type, void *data);
-  int restoreCB(gdioutput &gdi, int type, void *data);
-  int newGuideCB(gdioutput &gdi, int type, void *data);
+  int competitionCB(gdioutput &gdi, GuiEventType type, BaseInfo *data);
+  int restoreCB(gdioutput &gdi, GuiEventType type, BaseInfo *data);
+  int newGuideCB(gdioutput &gdi, GuiEventType type, BaseInfo *data);
 
   bool loadPage(gdioutput &gdi);
   TabCompetition(oEvent *oe);

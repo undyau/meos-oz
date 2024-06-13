@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -136,7 +136,7 @@ void Download::initInternet() {
     throw meosException(error);
   }
 
-  DWORD dwTimeOut = 180 * 1000;
+  DWORD dwTimeOut = 60 * 10 * 1000;
   InternetSetOption(hInternet, INTERNET_OPTION_RECEIVE_TIMEOUT, &dwTimeOut, sizeof(DWORD));
   InternetSetOption(hInternet, INTERNET_OPTION_SEND_TIMEOUT, &dwTimeOut, sizeof(DWORD));
 }
@@ -215,10 +215,10 @@ void Download::downloadFile(const wstring &url, const wstring &file, const vecto
     }
   }
 
-  fileno=_wopen(file.c_str(), O_BINARY|O_CREAT|O_WRONLY|O_TRUNC, S_IREAD|S_IWRITE);
-
-  if (fileno==-1) {
-    fileno=0;
+  //fileno=_wopen(file.c_str(), O_BINARY|O_CREAT|O_WRONLY|O_TRUNC, S_IREAD|S_IWRITE);
+  errno_t err = _wsopen_s(&fileno, file.c_str(), _O_BINARY | _O_CREAT | _O_WRONLY | _O_TRUNC, _SH_DENYWR ,_S_IREAD | _S_IWRITE);
+  if (err != 0) {
+    fileno = 0;
     endDownload();
     wchar_t bf[256];
     swprintf_s(bf, L"Error opening '%s' for writing", file.c_str());
@@ -473,7 +473,13 @@ bool Download::httpSendReqEx(HINTERNET hConnect, bool https, const wstring &dest
     }
   }
 
-  int rfileno = _wopen(outFile.c_str(), O_BINARY|O_CREAT|O_WRONLY|O_TRUNC, S_IREAD|S_IWRITE);
+//  int rfileno = _wopen(outFile.c_str(), O_BINARY|O_CREAT|O_WRONLY|O_TRUNC, S_IREAD|S_IWRITE);
+  int rfileno;
+  errno_t err = _wsopen_s(&rfileno, outFile.c_str(), _O_BINARY | _O_CREAT | _O_WRONLY | _O_TRUNC, _SH_DENYWR, _S_IREAD | _S_IWRITE);
+  if (err != 0) {
+    InternetCloseHandle(hRequest);
+    throw meosException(L"Failed to open + " + outFile);
+  }
 
   do {
     dwBytesRead=0;

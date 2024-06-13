@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -70,6 +70,7 @@ bool oCard::Write(xmlparser &xml)
   xml.write("Punches", getPunchString());
   xml.write("ReadId", int(readId));
   xml.write("Voltage", miliVolt);
+  xml.write("BatteryDate", batteryDate);
   xml.write("Id", Id);
   xml.write("Updated", getStamp());
   xml.endTag();
@@ -87,20 +88,23 @@ void oCard::Set(const xmlobject &xo)
     if (it->is("CardNo")){
       cardNo = it->getInt();
     }
-    if (it->is("Voltage")) {
+    else if (it->is("Voltage")) {
       miliVolt = it->getInt();
     }
+    else if (it->is("BatteryDate")) {
+      batteryDate = it->getInt();
+    }
     else if (it->is("Punches")){
-      importPunches(it->getRaw());
+      importPunches(it->getRawStr());
     }
     else if (it->is("ReadId")){
-      readId = it->getInt(); // COded as signed int
+      readId = it->getInt(); // Coded as signed int
     }
     else if (it->is("Id")){
       Id = it->getInt();
     }
     else if (it->is("Updated")){
-      Modified.setStamp(it->getRaw());
+      Modified.setStamp(it->getRawStr());
     }
   }
 }
@@ -110,8 +114,8 @@ pair<int, int> oCard::getCardHash() const {
   int b = readId;
 
   for (auto &p : punches) {
-    a = a * 31 + p.getTimeInt() * 997 + p.getTypeCode();
-    b = b * 41 + p.getTimeInt() * 97 + p.getTypeCode();
+    a = a * 31 + p.punchTime * 997 + p.getTypeCode();
+    b = b * 41 + p.punchTime * 97 + p.getTypeCode();
   }
   return make_pair(a, b);
 }
@@ -128,13 +132,17 @@ const wstring &oCard::getCardNoString() const {
   return itow(cardNo);
 }
 
-void oCard::addPunch(int type, int time, int matchControlId)
-{
+void oCard::addPunch(int type, int time, int matchControlId, int unit, PunchOrigin origin) {
   oPunch p(oe);
-  p.Time = time;
-  p.Type = type;
+  p.punchTime = time;
+  p.type = type;
   p.tMatchControlId = matchControlId;
   p.isUsed =  matchControlId!=0;
+  p.punchUnit = unit;
+  if (origin == PunchOrigin::Original)
+    p.origin = p.computeOrigin(oe->getZeroTimeNum() + time, type);
+  else if (origin == PunchOrigin::Manual)
+    p.origin = -1;
 
   if (punches.empty())
     punches.push_back(p);
@@ -161,18 +169,18 @@ const string &oCard::getPunchString() const {
 }
 
 void oCard::importPunches(const string &s) {
-  int startpos=0;
+  int startpos = 0;
   int endpos;
 
-  endpos=s.find_first_of(';', startpos);
+  endpos = s.find_first_of(';', startpos);
   punches.clear();
 
-  while(endpos!=string::npos) {
+  while (endpos != string::npos) {
     oPunch p(oe);
-    p.decodeString(s.substr(startpos, endpos));
+    p.decodeString(s.c_str() + startpos);
     punches.push_back(p);
-    startpos=endpos+1;
-    endpos=s.find_first_of(';', startpos);
+    startpos = endpos + 1;
+    endpos = s.find_first_of(';', startpos);
   }
   return;
 }
@@ -194,7 +202,7 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, oCourse *crs) {
   bool hasFinish=false;
   bool extra=false;
   int k=0;
-
+  int currentTimeAdjust = 0;
   pControl ctrl=0;
 
   int matchPunch=0;
@@ -283,7 +291,16 @@ bool oCard::fillPunches(gdioutput &gdi, const string &name, oCourse *crs) {
           }
         }
 
-        gdi.addItem(name, it->getString(), it->tCardIndex);
+        wstring tadj;
+        if (currentTimeAdjust != it->tTimeAdjust.second) {
+          int adj = it->tTimeAdjust.second - currentTimeAdjust;
+          currentTimeAdjust = it->tTimeAdjust.second;
+          if (adj > 0)
+            tadj = L" +" + formatTime(adj);
+          else
+            tadj = L" -" + formatTime(-adj);
+        }
+        gdi.addItem(name, it->getString() + tadj, it->tCardIndex);
 
         if (!(it->isFinish() || it->isStart())) {
           punchRemain--;
@@ -363,8 +380,8 @@ void oCard::insertPunchAfter(int pos, int type, int time)
   oPunchList::iterator it;
 
   oPunch punch(oe);
-  punch.Time=time;
-  punch.Type=type;
+  punch.punchTime=time;
+  punch.type=type;
 
   int k=-1;
   for (it=punches.begin(); it != punches.end(); ++it) {
@@ -423,7 +440,7 @@ oPunch *oCard::getPunchByType(int Type) const
   oPunchList::const_iterator it;
 
   for (it=punches.begin(); it != punches.end(); ++it)
-    if (it->Type==Type)
+    if (it->type==Type)
       return pPunch(&*it);
 
   return 0;
@@ -476,8 +493,8 @@ void oCard::getSICard(SICard &card) const {
   card.convertedTime = ConvertedTimeStatus::Done;
   oPunchList::const_iterator it;
   for (it = punches.begin(); it != punches.end(); ++it) {
-    if (it->Type>30)
-      card.Punch[card.nPunch++].Code = it->Type;
+    if (it->type>30)
+      card.Punch[card.nPunch++].Code = it->type;
   }
 }
 
@@ -486,15 +503,15 @@ pRunner oCard::getOwner() const {
   return tOwner && !tOwner->isRemoved() ? tOwner : 0;
 }
 
-bool oCard::setPunchTime(const pPunch punch, const wstring &time)
+bool oCard::setPunchTime(const pPunch punch, const wstring& time)
 {
-  oPunch *op=getPunch(punch);
+  oPunch* op = getPunch(punch);
   if (!op) return false;
 
-  DWORD ot=op->Time;
+  DWORD ot = op->punchTime;
   op->setTime(time);
 
-  if (ot!=op->Time)
+  if (ot != op->punchTime)
     updateChanged();
 
   return true;
@@ -518,14 +535,20 @@ pCard oEvent::getCard(int Id) const
   return 0;
 }
 
-void oEvent::getCards(vector<pCard> &c) {
-  synchronizeList(oListId::oLCardId);
-  c.clear();
-  c.reserve(Cards.size());
+void oEvent::getCards(vector<pCard>& cards, bool synchronize, bool onlyUnpaired) {
+  if (synchronize)
+    synchronizeList(oListId::oLCardId);
 
-  for (oCardList::iterator it = Cards.begin(); it != Cards.end(); ++it) {
-    if (!it->isRemoved())
-     c.push_back(&*it);
+  cards.clear();
+  cards.reserve(Cards.size());
+
+  for (auto &c : Cards) {
+    if (!c.isRemoved()) {
+      if (onlyUnpaired && c.getOwner() != nullptr)
+        continue;
+
+      cards.push_back(&c);
+    }
   }
 }
 
@@ -581,6 +604,7 @@ const shared_ptr<Table> &oCard::getTable(oEvent *oe) {
     table->addColumn("Bricka", 120, true);
     table->addColumn("Deltagare", 200, false);
     table->addColumn("Spänning", 70, false);
+    table->addColumn("Batteridatum", 100, false);
 
     table->addColumn("Starttid", 70, false);
     table->addColumn("Måltid", 70, false);
@@ -629,17 +653,20 @@ void oCard::addTableRow(Table &table) const {
 
   table.set(row++, it, TID_VOLTAGE, getCardVoltage(), false, cellAction);
 
+  table.set(row++, it, TID_BATTERYDATE, getBatteryDate(), false, cellAction);
+
+
   oPunch *p=getPunchByType(oPunch::PunchStart);
   wstring time;
   if (p)
-    time = p->getTime();
+    time = p->getTime(false, SubSecond::Auto);
   else
     time = makeDash(L"-");
   table.set(row++, it, TID_START, time, false, cellEdit);
 
   p = getPunchByType(oPunch::PunchFinish);
   if (p)
-    time = p->getTime();
+    time = p->getTime(false, SubSecond::Auto);
   else
     time = makeDash(L"-");
   
@@ -699,11 +726,12 @@ bool oCard::canRemove() const
 }
 
 pair<int, int> oCard::getTimeRange() const {
-  pair<int, int> t(24*3600, 0);
+  pair<int, int> t(24*timeConstHour, 0);
   for(oPunchList::const_iterator it = punches.begin(); it != punches.end(); ++it) {
-    if (it->Time > 0) {
-      t.first = min(t.first, it->Time);
-      t.second = max(t.second, it->Time);
+    if (it->hasTime()) {
+      int pt = it->getTimeInt();
+      t.first = min(t.first, pt);
+      t.second = max(t.second, pt);
     }
   }
   return t;
@@ -723,8 +751,8 @@ void oCard::setupFromRadioPunches(oRunner &r) {
   oe->getPunchesForRunner(r.getId(), true, p);
 
   for (size_t k = 0; k < p.size(); k++)
-    addPunch(p[k]->Type, p[k]->Time, 0);
-
+    addPunch(p[k]->type, p[k]->punchTime, 0, p[k]->punchUnit, p[k]->isOriginal() ? oCard::PunchOrigin::Original : oCard::PunchOrigin::Manual);
+  
   cardNo = r.getCardNo();
   readId = ConstructedFromPunches; //Indicates
 }
@@ -751,8 +779,8 @@ void oCard::adaptTimes(int startTime) {
   int st = -1;
   oPunchList::iterator it = punches.begin();
   while (it != punches.end()) {
-    if (it->Time > 0) {
-      st = it->Time;
+    if (it->hasTime()) {
+      st = it->getTimeInt();
       break;
     }
     ++it;
@@ -761,18 +789,17 @@ void oCard::adaptTimes(int startTime) {
   if (st == -1)
     return;
 
-  const int h24 = 24 * 3600;
+  const int h24 = 24 * timeConstHour;
   int offset = st / h24;
   if (offset > 0) {
     for (it = punches.begin(); it != punches.end(); ++it) {
-      if (it->Time > 0 && it->Time < offset * h24)
+      if (it->hasTime() && it->getTimeInt() < offset * h24)
         return; // Inconsistent, do nothing
     }
-
-     
+         
     for (it = punches.begin(); it != punches.end(); ++it) {
-      if (it->Time > 0)
-        it->Time -= offset * h24;
+      if (it->hasTime())
+        it->punchTime -= offset * h24;
     }
     updateChanged();
   }
@@ -780,18 +807,22 @@ void oCard::adaptTimes(int startTime) {
   if (startTime >= h24) {
     offset = startTime / h24;
     for (it = punches.begin(); it != punches.end(); ++it) {
-      if (it->Time > 0)
-        it->Time += offset * h24;
+      if (it->hasTime())
+        it->punchTime += offset * h24;
     }
     updateChanged();
   }
 }
 
 wstring oCard::getCardVoltage() const {
-  if (miliVolt == 0)
+  return getCardVoltage(miliVolt);
+}
+
+wstring oCard::getCardVoltage(int miliVolt) {
+  if (miliVolt <= 10)
     return L"";
   int vi = miliVolt / 1000;
-  int vd = (miliVolt % 1000)/10;
+  int vd = (miliVolt % 1000) / 10;
 
   wchar_t bf[64];
   swprintf_s(bf, L"%d.%02d V", vi, vd);
@@ -799,11 +830,37 @@ wstring oCard::getCardVoltage() const {
 }
 
 oCard::BatteryStatus oCard::isCriticalCardVoltage() const {
-  if (miliVolt > 0 && miliVolt < 2445)
+  return isCriticalCardVoltage(miliVolt);
+}
+
+oCard::BatteryStatus oCard::isCriticalCardVoltage(int miliVolt)  {
+  if (miliVolt > 10 && miliVolt < 2445)
     return BatteryStatus::Bad;
-  else if (miliVolt > 0 && miliVolt <= 2710)
+  else if (miliVolt > 10 && miliVolt <= 2710)
     return BatteryStatus::Warning;
 
   return BatteryStatus::OK;
 }
 
+wstring oCard::getBatteryDate() const {
+  if (batteryDate > 0)
+    return formatDate(batteryDate, false);
+  return _EmptyWString;
+}
+
+oCard::PunchOrigin oCard::isOriginalCard() const {
+  bool isUnknown = false;
+  for (auto& p : punches) {
+    if (p.origin == 0) {
+      isUnknown = true;
+    }
+    else {
+      if (!p.isOriginal())
+        return PunchOrigin::Manual;
+    }
+  }
+  if (isUnknown)
+    return PunchOrigin::Unknown;
+  else
+    return PunchOrigin::Original;
+}

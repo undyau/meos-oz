@@ -11,7 +11,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@ protected:
   wstring Name;
   int Length;
   static const int dataSize = 128;
-  int getDISize() const {return dataSize;}
+  int getDISize() const final {return dataSize;}
 
   BYTE oData[dataSize];
   BYTE oDataOld[dataSize];
@@ -204,7 +204,10 @@ public:
       Positive return = extra controls
       Negative return = missing controls
       Zero return = exact match */
-  int distance(const SICard &card);
+  int distance(const SICard &card) const;
+  int distance(const oCard &card) const;
+  int distance(int *punches, int numPunches) const;
+
 
   bool fillCourse(gdioutput &gdi, const string &name);
 

@@ -6,7 +6,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,6 +39,8 @@
 #include "oTeam.h"
 
 #include "intkeymap.hpp"
+#include "meos_util.h"
+
 #include <set>
 #include <map>
 
@@ -47,6 +49,9 @@
 
 #define cVacantId 888888888
 #define cNoClubId 999999999
+
+constexpr int MaxOrderRank = 20000;
+constexpr int MaxRankingConstant = numeric_limits<int>::max();
 
 class MeOSFileLock;
 class RunnerDB;
@@ -107,7 +112,6 @@ private:
   int classId;
   int ID;
 public:
-
   oTimeLine &setMessage(const wstring &msg_) {msg = msg_; return *this;}
   oTimeLine &setDetail(const wstring &detail_) {detail = detail_; return *this;}
 
@@ -119,10 +123,10 @@ public:
   Priority getPriority() const {return priority;}
   int getClassId() const {return classId;}
   pair<bool, int> getSource() const {return typeId;}
-  oAbstractRunner *getSource(const oEvent &oe) const;
+  oRunner *getSource(const oEvent &oe) const;
 
   __int64 getTag() const;
-  oTimeLine(int time, TimeLineType type, Priority priority, int classId, int id, oAbstractRunner *source);
+  oTimeLine(int time, TimeLineType type, Priority priority, int classId, int id, oRunner *source);
   virtual ~oTimeLine();
 };
 
@@ -138,8 +142,6 @@ typedef list<oCard> oCardList;
 typedef list<oTeam> oTeamList;
 
 typedef list<oFreePunch> oFreePunchList;
-
-typedef int (*GUICALLBACK)(gdioutput *gdi, int type, void *data);
 
 struct ClassInfo;
 struct DrawInfo;
@@ -189,11 +191,6 @@ struct BackupInfo : public CompetitionInfo {
 class oListInfo;
 class MetaListContainer;
 
-typedef bool (__cdecl* ERRORMESG_FCN)(char *bf256);
-typedef bool (__cdecl* OPENDB_FCN)(void);
-typedef int  (__cdecl* SYNCHRONIZE_FCN)(oBase *obj);
-typedef bool (__cdecl* SYNCHRONIZELIST_FCN)(oBase *obj, int lid);
-
 enum class oListId {oLRunnerId=1, oLClassId=2, oLCourseId=4,
                     oLControlId=8, oLClubId=16, oLCardId=32,
                     oLPunchId=64, oLTeamId=128, oLEventId=256};
@@ -236,6 +233,7 @@ protected:
 
   // Set to true if a global modification is made that should case all lists etc to regenerate.
   bool globalModification;
+  bool isMainEvent = false;
 
   gdioutput &gdibase;
   
@@ -272,6 +270,7 @@ protected:
   bool writeTeams(xmlparser &xml);
 
   oControlList Controls;
+  shared_ptr<oControl> tmpControl;
   oCourseList Courses;
   intkeymap<pCourse> courseIdIndex;
   oClassList Classes;
@@ -289,12 +288,18 @@ protected:
   oCardList Cards;
 
   oFreePunchList punches;
-  typedef unordered_multimap<int, pFreePunch> PunchIndexType;
+  typedef std::unordered_multimap<int, pFreePunch> PunchIndexType;
   typedef PunchIndexType::iterator PunchIterator;
   typedef PunchIndexType::const_iterator PunchConstIterator;
   /** First level maps a constant based on control number
       and index on course to a second maps, that maps cardNo to punches. */
   map<int, PunchIndexType> punchIndex;
+
+  /** Defined map from a pair (type, unit) of punches to a time adjustment (for that unit)*/
+  mutable pair<int, map<pair<oPunch::SpecialPunch, int>, int>> typeUnitPunchTimeAdjustment;
+
+  /** Return start/finish/check units existing in punches/cards*/
+  void getExistingUnits(vector<pair<oPunch::SpecialPunch, int>>& typeUnit);
 
   oTeamList Teams;
   intkeymap<pTeam> teamById;
@@ -380,13 +385,16 @@ protected:
   //Protected speaker functions.
   int computerTime;
 
+  // True if warning has beend issued for manual id modification
+  bool hasWarnedModifiedExtId = false;
+
   multimap<int, oTimeLine> timeLineEvents;
   int timeLineRevision;
   set<int> timelineClasses;
   set<int> modifiedClasses;
 
   static const int dataSize = 1024;
-  int getDISize() const {return dataSize;}
+  int getDISize() const final {return dataSize;}
   BYTE oData[dataSize];
   BYTE oDataOld[dataSize];
   vector<vector<wstring>> dynamicData;
@@ -404,7 +412,7 @@ protected:
   
   bool tUseStartSeconds;
 
-  set< pair<int,int> > readPunchHash;
+  set<pair<int,int>> readPunchHash;
   void insertIntoPunchHash(int card, int code, int time);
   void removeFromPunchHash(int card, int code, int time);
   bool isInPunchHash(int card, int code, int time);
@@ -476,6 +484,12 @@ protected:
   // Temporarily disable recaluclate leader times
   bool disableRecalculate;
 public:
+  /** Mark as main event.*/
+  void setMainEvent() { isMainEvent = true; }
+
+  /** Get adjustment for a specific unit*/
+  int getUnitAdjustment(oPunch::SpecialPunch type, int unit) const;
+  void clearUnitAdjustmentCache();
 
   void setStartGroup(int id, 
                      int firstStart, 
@@ -583,9 +597,16 @@ public:
   MeOSFeatures &getMeOSFeatures() const {return *meosFeatures;}
   void getDBRunnersInEvent(intkeymap<int, __int64> &runners) const;
   MetaListContainer &getListContainer() const;
+
+  /** Load image with specified id from database. Call before accessing user image. */
+  void loadImage(uint64_t id) const;
+
+  /** Save image with specified id to database. Call when importing new user image. */
+  void saveImage(uint64_t id) const;
+
   wstring getNameId(int id) const;
   const wstring &getFileNameFromId(int id) const;
-
+  void updateListReferences(const string &oldId, const string &newId);
   // Adjust team size to class size and create multi runners.
   void adjustTeamMultiRunners(pClass cls);
 
@@ -622,7 +643,7 @@ public:
   virtual void loadProperties(const wchar_t *file);
 
   /** Get number of classes*/
-  int getNumClasses() const {return Classes.size();}
+  int getNumClasses() const;
 
   /** Get number of runners */
   int getNumRunners() const {return runnerById.size();}
@@ -696,7 +717,6 @@ public:
   void getFreeImporter(oFreeImport &fi);
   void init(oFreeImport &fi);
 
-
   void calculateSplitResults(int controlIdFrom, int controlIdTo);
   
   pTeam findTeam(const wstring &s, int lastId, unordered_set<int> &filter) const;
@@ -707,16 +727,25 @@ public:
   inline bool useStartSeconds() const {return tUseStartSeconds;}
   void calcUseStartSeconds();
 
-  void assignCardInteractive(gdioutput &gdi, GUICALLBACK cb);
+  void assignCardInteractive(gdioutput &gdi, GUICALLBACK cb, SortOrder& orderRunners);
 
   int getPropertyInt(const char *name, int def);
+  bool getPropertyBool(const char* name, bool def) {
+    return getPropertyInt(name, def ? 1 : 0) != 0;
+  }
   const string &getPropertyString(const char *name, const string &def);
   const wstring &getPropertyString(const char *name, const wstring &def);
   
   string getPropertyStringDecrypt(const char *name, const string &def);
 
   void setProperty(const char *name, int prop);
-  //void setProperty(const char *name, const string &prop);
+  void setProperty(const char* name, bool prop) {
+    setProperty(name, prop ? 1 : 0);
+  }
+  void setProperty(const char* name, size_t prop) {
+    setProperty(name, int(prop));
+  }
+
   void setProperty(const char *name, const wstring &prop);
   
   void setPropertyEncrypt(const char *name, const string &prop);
@@ -755,12 +784,14 @@ public:
   int getFreeStartNo() const;
   void generatePreReport(gdioutput &gdi);
 
+  // Format the header of a list
+  void formatHeader(gdioutput& gdi, const oListInfo& li, const pRunner rInput);
   void generateList(gdioutput &gdi, bool reEvaluate, const oListInfo &li, bool updateScrollBars);
   
-  void generateListInfo(oListParam &par, oListInfo &li);
-  void generateListInfo(vector<oListParam> &par, oListInfo &li);
-  void generateListInfo(EStdListType lt, const gdioutput &gdi, int classId, oListInfo &li);
-  void generateListInfoAux(oListParam &par, oListInfo &li, const wstring &name);
+  void generateListInfo(const gdioutput& target, oListParam &par, oListInfo &li);
+  void generateListInfo(const gdioutput& target, vector<oListParam> &par, oListInfo &li);
+  void generateListInfo(const gdioutput& target, EStdListType lt, int classId, oListInfo &li);
+  void generateListInfoAux(const gdioutput &target, oListParam &par, oListInfo &li, const wstring &name);
 
   /** Format a string for a list. Returns true of output is not empty*/
   const wstring &formatListString(const oPrintPost &pp, const oListParam &par,
@@ -799,13 +830,13 @@ public:
 
   void checkOrderIdMultipleCourses(int ClassId);
 
-  void addBib(int ClassId, int leg, const wstring &firstNumber);
+  void addBib(int ClassId, int leg, const wstring &firstNumber, bool assignVacant);
   void addAutoBib();
 
   //Speaker functions.
   void speakerList(gdioutput &gdi, int classId, int leg, int controlId,
                    int previousControlId, bool totalResults, bool shortNames);
-  int getComputerTime() const {return (computerTime+500)/1000;}
+  int getComputerTime() const {return timeConstSecond * ((computerTime+500)/1000);}
   int getComputerTimeMS() const {return computerTime;}
 
   void updateComputerTime();
@@ -813,14 +844,14 @@ public:
   // Get set of controls with registered punches
   void getFreeControls(set<int> &controlId) const;
   // Returns the added punch, of null of already added.
-  pFreePunch addFreePunch(int time, int type, int card, bool updateRunner);
+  pFreePunch addFreePunch(int time, int type, int unit, int card, bool updateRunner, bool isOriginal);
   pFreePunch addFreePunch(oFreePunch &fp);
 
   bool useLongTimes() const;
   void useLongTimes(bool use);
 
-  /** Use the current computer time to convert the specified time to a long time, if long times are used. */
-  int convertToFullTime(int inTime);
+  bool supportSubSeconds() const;
+  void supportSubSeconds(bool use);
 
   struct ResultEvent {
     ResultEvent() {}
@@ -877,7 +908,7 @@ protected:
   bool enumerateBackups(const wstring &file, const wstring &filetype, int type);
   mutable multimap<int, oAbstractRunner*> bibStartNoToRunnerTeam;
 
-  mutable shared_ptr<unordered_multimap<int, pRunner>> cardToRunnerHash;
+  mutable shared_ptr<std::unordered_multimap<int, pRunner>> cardToRunnerHash;
   vector<pRunner> getCardToRunner(int cardNo) const;
 
   mutable shared_ptr<map<int, vector<pRunner>>> classIdToRunnerHash;
@@ -888,7 +919,8 @@ protected:
   int tClubDataRevision;
   int tCalcNumMapsDataRevision = -1;
 
-  bool readOnly;
+  bool readOnly = false;
+  bool kiosk = false;
   virtual void writeExtraXml(xmlparser &xml){};
   virtual void readExtraXml(const xmlparser &xml) {};
   mutable int tLongTimesCached;
@@ -900,7 +932,7 @@ protected:
 
   unsigned int lastTimeConsistencyCheck = 0;
   mutable bool lastResultCalcPrelState = false;
-
+  mutable bool lastResultCalcSplitResult = false;
 public:
   void updateStartTimes(int delta);
 
@@ -908,6 +940,9 @@ public:
 
   bool isReadOnly() const {return readOnly;}
   void setReadOnly() {readOnly = true;}
+  void setKiosk() { kiosk = true; }
+
+  bool isKiosk() const { return readOnly || kiosk; };
 
   enum IOFVersion {IOF20, IOF30};
 
@@ -946,11 +981,12 @@ public:
   pFreePunch getPunch(int id) const;
   pFreePunch getPunch(int runnerId, int courseControlId, int card) const;
   void getPunchesForRunner(int runnerId, bool sort, vector<pFreePunch> &punches) const;
+  vector<pFreePunch> getPunchesByType(int type, int unit) const;
 
   //Returns true if data is changed.
   bool autoSynchronizeLists(bool syncPunches);
    
-  bool synchronizeList(initializer_list<oListId> types);
+  bool synchronizeList(std::initializer_list<oListId> types);
   bool synchronizeList(oListId id, bool preSyncEvent = true, bool postSyncEvent = true);
 
   bool checkDatabaseConsistency(bool force);
@@ -973,7 +1009,7 @@ public:
   pCard getCard(int Id) const;
   pCard getCardByNumber(int cno) const;
   bool isCardRead(const SICard &card) const;
-  void getCards(vector<pCard> &cards);
+  void getCards(vector<pCard> &cards, bool synchronize, bool onlyUnpaired);
   int getNumCards() const { return Cards.size(); }
   /** Try to find the class that best matches the card.
       Negative return = missing controls
@@ -982,7 +1018,6 @@ public:
   int findBestClass(const SICard &card, vector<pClass> &classes) const;
   wstring getCurrentTimeS() const;
 
-  //void reEvaluateClass(const set<int> &classId, bool doSync);
   void reEvaluateCourse(int courseId, bool doSync);
   void reEvaluateAll(const set<int> &classId, bool doSync);
   void reEvaluateChanged();
@@ -990,27 +1025,35 @@ public:
   void exportIOFSplits(IOFVersion version, const wchar_t *file, bool oldStylePatrolExport,
                        bool useUTC,
                        const set<int> &classes,
+                       const pair<string, string> &preferredIdTypes,
                        int leg,
                        bool teamsAsIndividual,
                        bool unrollLoops,
                        bool includeStageData,
-                       bool forceSplitFee);
+                       bool forceSplitFee,
+                       bool useEventorQuirks);
 
   void exportIOFStartlist(IOFVersion version, const wchar_t *file,
                           bool useUTC, const set<int> &classes,
+                          const pair<string, string>& preferredIdTypes,
                           bool teamsAsIndividual,
                           bool includeStageInfo,
-                          bool forceSplitFee);
+                          bool forceSplitFee,
+                          bool useEventorQuirks);
 
-  bool exportOECSV(const wchar_t *file, int LanguageTypeIndex, bool includeSplits, bool byClass = true);
+  bool exportOECSV(const wchar_t *file, const set<int> &classes, int LanguageTypeIndex, bool includeSplits, bool byClass = true);
   bool save();
   void duplicate(const wstring &annotation, bool keepTags = false);
-  void newCompetition(const wstring &Name);
+  
+  void newCompetition(const wstring &name);
+  void loadDefaults();
+
   void clearListedCmp();
   bool enumerateCompetitions(const wchar_t *path, const wchar_t *extension);
 
   bool fillCompetitions(gdioutput &gdi, const string &name,
-                        int type, const wstring &select = L"");
+                        int type, const wstring &select = L"",
+                        bool doClear = true);
 
   bool enumerateBackups(const wstring &path);
   bool listBackups(gdioutput &gdi, GUICALLBACK cb);
@@ -1040,20 +1083,16 @@ public:
 
   /// Convert a clock time string to time relative zero time
   int getRelativeTime(const wstring &absoluteTime) const;
-  //int getRelativeTime(const string &absoluteTime) const {return getRelativeTime(toWide(absoluteTime));}
-
+  
   /// Convert a clock time string to time relative zero time
   int getRelativeTime(const string &date, const string &absoluteTime, const string &timeZone) const;
-
-  // Convert a clock time string (SI5 12 Hour clock) to time relative zero time
-  //int getRelativeTimeFrom12Hour(const wstring &absoluteTime) const;
 
   /// Convert c clock time string to absolute time (after 00:00:00)
   static int convertAbsoluteTime(const string &m);
   static int convertAbsoluteTime(const wstring &m);
 
   /// Get clock time from relative time
-  const wstring &getAbsTime(DWORD relativeTime, bool oldStyle = false) const;
+  const wstring &getAbsTime(DWORD relativeTime, SubSecond mode = SubSecond::Auto, bool byClass = true) const;
   
   wstring getAbsDateTimeISO(DWORD relativeTime, bool includeDate, bool useGMT) const;
 
@@ -1104,7 +1143,6 @@ public:
   bool sortTeams(SortOrder so, int leg, bool linearLeg, vector<const oTeam *> &teams) const;
   bool sortTeams(SortOrder so, int leg, bool linearLeg, vector<oTeam *> &teams) const;
 
-
   pCard allocateCard(pRunner owner);
 
   /** Optimize the start order based on drawInfo. Result in cInfo */
@@ -1112,7 +1150,7 @@ public:
 
   void loadDrawSettings(const set<int> &classes, DrawInfo &drawInfo, vector<ClassInfo> &cInfo) const;
 
-  void drawRemaining(DrawMethod method, bool placeAfter);
+  void drawRemaining(const set<int> &classSel, DrawMethod method, bool placeAfter);
   void drawListStartGroups(const vector<ClassDrawSpecification> &spec,
                            DrawMethod method, int pairSize, DrawType drawType,
                            bool limitGroupSize = true,
@@ -1124,14 +1162,23 @@ public:
                        int ropeTime, int interval, int pairSize,
                        bool reverse, double scale);
 
+  /** Request a start time for a runner after a specified time. Returns
+      start time (but does not "lock" it)*/
+  int requestStartTime(int runnerId, int afterThisTime, int minTimeInterval,
+                       int lastAllowedTime, int maxParallel, 
+                       bool allowSameCourse, 
+                       bool allowSameCourseNeighbour,
+                       bool allowSameFirstControl,
+                       bool allowClubNeighbour);
+
   wstring getAutoTeamName() const;
   pTeam addTeam(const oTeam &t, bool autoAssignStartNo);
   pTeam addTeam(const wstring &pname, int clubId=0, int classId=0);
   pTeam getTeam(int Id) const;
   pTeam getTeamByName(const wstring &pname) const;
-  const vector< pair<wstring, size_t> > &fillTeams(vector< pair<wstring, size_t> > &out, int classId=0);
-  static const vector< pair<wstring, size_t> > &fillStatus(vector< pair<wstring, size_t> > &out);
-  const vector< pair<wstring, size_t> > &fillControlStatus(vector< pair<wstring, size_t> > &out) const;
+  const vector<pair<wstring, size_t>> &fillTeams(vector< pair<wstring, size_t>> &out, int classId=0);
+  static const vector<pair<wstring, size_t>> &fillStatus(vector< pair<wstring, size_t>> &out);
+  const vector<pair<wstring, size_t>> &fillControlStatus(vector< pair<wstring, size_t>> &out) const;
 
   void fillTeams(gdioutput &gdi, const string &id, int ClassId=0);
   static void fillStatus(gdioutput &gdi, const string &id);
@@ -1141,10 +1188,10 @@ public:
   wstring getAutoRunnerName() const;
   
   pRunner addRunner(const wstring &pname, int clubId, int classId,
-                    int cardNo, int birthYear, bool autoAdd);
+                    int cardNo, const wstring &birthDate, bool autoAdd);
 
   pRunner addRunner(const wstring &pname, const wstring &pclub, int classId,
-                    int cardNo, int birthYear, bool autoAdd);
+                    int cardNo, const wstring& birthDate, bool autoAdd);
 
   pRunner addRunnerFromDB(const pRunner db_r, int classId, bool autoAdd);
   pRunner addRunner(const oRunner &r, bool updateStartNo);
@@ -1189,10 +1236,39 @@ public:
                          RunnerFilterWithResult = 4,
                          RunnerCompactMode = 8};
 
-  const vector< pair<wstring, size_t> > &fillRunners(vector< pair<wstring, size_t> > &out,
-                                                    bool longName, int filter,
-                                                    const unordered_set<int> &personFilter);
+  const vector<pair<wstring, size_t>> &fillRunners(vector<pair<wstring, size_t>> &out,
+                                                   bool longName, int filter,
+                                                   const unordered_set<int> &personFilter);
   void fillRunners(gdioutput &gdi, const string &id, bool longName = false, int filter = 0);
+
+
+  enum class ExtraFields {
+    DataA = 0,
+    DataB = 1,
+    TextA = 2,
+    Nationality = 3,
+    Sex = 4,
+    BirthDate = 5,
+    Rank = 6,
+    Phone = 7,
+    StartTime = 8,
+    Bib = 9,
+    MaxField
+  };
+
+  enum class ExtraFieldContext {
+    Runner = 0,
+    Team = 1,
+    Class = 2,
+    DirectEntry = 3,
+    MaxContext
+  };
+
+  /** Get extra fields to show in UI*/
+  map<ExtraFields, wstring> getExtraFields(ExtraFieldContext context) const;
+  map<ExtraFields, wstring> getExtraFieldNames() const;
+
+  void updateExtraFields(ExtraFieldContext context, const map<ExtraFields, wstring> &fields);
 
   const shared_ptr<Table> &getTable(const string &key) const;
   void setTable(const string &key, const shared_ptr<Table> &table);
@@ -1223,7 +1299,7 @@ public:
   pClub getClub(int Id) const;
   pClub getClub(const wstring &pname) const;
   
-  const vector< pair<wstring, size_t> > &fillClubs(vector< pair<wstring, size_t> > &out);
+  const vector<pair<wstring, size_t>> &fillClubs(vector<pair<wstring, size_t>> &out);
   void fillClubs(gdioutput &gdi, const string &id);
   void getClubs(vector<pClub> &c, bool sort);
 
@@ -1262,13 +1338,13 @@ public:
     extraNumMaps,
   };
 
-  const vector< pair<wstring, size_t> > &fillClasses(vector< pair<wstring, size_t> > &out,
+  const vector<pair<wstring, size_t>> &fillClasses(vector<pair<wstring, size_t>> &out,
                     ClassExtra extended, ClassFilter filter);
-  void fillClasses(gdioutput &gdi, const string &id, ClassExtra extended, ClassFilter filter);
+  void fillClasses(gdioutput &gdi, const string &id, const vector<pair<wstring, size_t>>& extraItems, ClassExtra extended, ClassFilter filter);
 
   bool fillClassesTB(gdioutput &gdi);
-  const vector< pair<wstring, size_t> > &fillStarts(vector< pair<wstring, size_t> > &out);
-  const vector< pair<wstring, size_t> > &fillClassTypes(vector< pair<wstring, size_t> > &out);
+  const vector<pair<wstring, size_t>> &fillStarts(vector<pair<wstring, size_t>> &out);
+  const vector<pair<wstring, size_t>> &fillClassTypes(vector<pair<wstring, size_t>> &out);
   void fillStarts(gdioutput &gdi, const string &id);
   void fillClassTypes(gdioutput &gdi, const string &id);
 
@@ -1287,24 +1363,29 @@ public:
   /** Get controls. If calculateCourseControls, duplicate numbers are calculated for each control and course. */
   void getControls(vector<pControl> &controls, bool calculateCourseControls) const;
 
-  void fillCourses(gdioutput &gdi, const string &id, bool simple = false);
-  const vector< pair<wstring, size_t> > &fillCourses(vector< pair<wstring, size_t> > &out, bool simple = false);
+  void fillCourses(gdioutput &gdi, const string &id, const vector<pair<wstring, size_t>>& extraItems, bool simple);
+  const vector<pair<wstring, size_t>> &getCourses(vector<pair<wstring, size_t>> &out,
+                                                  const wstring &filter,
+                                                  bool simple = false, 
+                                                  bool synchronize = true);
 
   void calculateNumRemainingMaps(bool forceRecalculate);
 
   pControl getControl(int Id) const;
   pControl getControlByType(int type) const;
-  pControl getControl(int Id, bool create);
-  enum ControlType {CTAll, CTRealControl, CTCourseControl};
+  pControl getControl(int Id, bool create, bool includeVirtual);
+  enum class ControlType {All, RealControl, CourseControl};
 
-  const vector< pair<wstring, size_t> > &fillControls(vector< pair<wstring, size_t> > &out, ControlType type);
-  const vector< pair<wstring, size_t> > &fillControlTypes(vector< pair<wstring, size_t> > &out);
+  const vector<pair<wstring, size_t>> &fillControls(vector<pair<wstring, size_t>> &out, ControlType type);
+  const vector<pair<wstring, size_t>> &fillControlTypes(vector<pair<wstring, size_t>> &out);
 
   bool open(int id);
-  bool open(const wstring &file, bool import, bool forMerge);
+  bool open(const wstring &file, bool doImport, bool forMerge, bool forceNew);
   bool open(const xmlparser &xml);
 
-  bool save(const wstring &file);
+  void clearData(bool runnerTeam, bool courses);
+
+  bool save(const wstring &file, bool isAutoSave);
   pControl addControl(int id, int number, const wstring &name);
   pControl addControl(const oControl &oc);
   int getNextControlNumber() const;
@@ -1314,7 +1395,11 @@ public:
   /** Import entry data */
   void importXML_EntryData(gdioutput &gdi, const wstring &file, 
                            bool updateClass, bool removeNonexisting,
-                           const set<int> &filter, const string &preferredIdType);
+                           const set<int> &filter, int classIdOffset, 
+                           int courseIdOffset, const pair<string, string> &preferredIdType);
+
+  void setRunnerIdTypes(const pair<string, string> &preferredIdType);
+  pair<wstring, wstring> getRunnerIdTypes() const;
 
 protected:
   pClass getXMLClass(const xmlobject &xentry);
@@ -1335,7 +1420,8 @@ protected:
     Ambivalent
   };
 
-  bool addXMLRank(const xmlobject &xrank, const map<__int64, int> &externIdToRunnerId, map<int, pair<int, RankStatus>> &output);
+  bool addXMLRank(const xmlobject &xrank, const map<__int64, int> &externIdToRunnerId,
+    map<int, pair<int, RankStatus>> &output);
   bool addXMLEvent(const xmlobject &xevent);
 
   bool addXMLCourse(const xmlobject &xcourse, bool addClasses, set<wstring> &matchedClasses);
@@ -1344,8 +1430,29 @@ protected:
 
   void merge(const oBase &src, const oBase *base) final;
 
+  mutable bool useSubSecondsCache = false;
+  mutable int useSubsecondsVersion = -1;
+
 public:
   void calculateCourseRogainingResults(); // implemented in oExtendedEvent.cpp
+
+  /** Do some operation and disable (global) reevaluate/update */
+  template<typename OP>
+  void noReevaluateOperation(OP& operation) {
+    bool origState = disableRecalculate;
+    disableRecalculate = true;
+    try {
+      operation();
+    }
+    catch (...) {
+      disableRecalculate = origState;
+      throw;
+    }
+    disableRecalculate = origState;
+  }
+
+  /** Return true if subseconds are used*/
+  bool useSubSecond() const;
 
   const shared_ptr<GeneralResult> &getGeneralResult(const string &tag, wstring &sourceFileOut) const;
   void getGeneralResults(bool onlyEditable, vector<pair<int, pair<string, wstring>>> &tagNameList, bool includeDateInName) const;
@@ -1418,7 +1525,10 @@ public:
                   vector<pRunner> &known, vector<pRunner> &unknown, bool &hasSetDNS);
 
   void importOECSV_Data(const wstring &oecsvfile, bool clear);
-  void importXML_IOF_Data(const wstring &clubfile, const wstring &competitorfile, bool clear);
+  void importXML_IOF_Data(const wstring &clubfile, 
+                          const wstring &competitorfile, 
+                          bool onlyWithClub,
+                          bool clear);
 
   void generateTestCard(SICard &sic) const;
   pClass generateTestClass(int nlegs, int nrunners,
@@ -1429,8 +1539,12 @@ public:
   int checkChanged(vector<wstring> &out) const;
   void checkDB(); //Check database for consistancy...
   oEvent(gdioutput &gdi);
-  oEvent &operator=(const oEvent &oe);
+  oEvent &operator=(const oEvent &oe) = delete;
   virtual ~oEvent();
+
+  void hasWarnedModifiedId(bool hasWarned) { hasWarnedModifiedExtId = hasWarned; }
+  bool hasWarnedModifiedId() const { return hasWarnedModifiedExtId; }
+
   friend class oAbstractRunner;
   friend class oCourse;
   friend class oClass;

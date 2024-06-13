@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -37,6 +37,8 @@
 
 extern gdioutput *gdi_main;
 
+using namespace std;
+
 xmlparser::xmlparser() : utfConverter(gdi_main)
 {
   progress = 0;
@@ -45,6 +47,8 @@ xmlparser::xmlparser() : utfConverter(gdi_main)
   isUTF = false;
   cutMode = false;
   toString = false;
+  strbuff.resize(buff_pre_alloc);
+  strbuffw.resize(buff_pre_alloc);
 }
 
 xmlparser::~xmlparser()
@@ -199,18 +203,19 @@ void xmlparser::writeBool(const char *tag, const char *prop, bool value)
     write(tag, prop, value ? L"true" : L"false");
 }
 
-/*
-void xmlparser::write(const char *tag, const char *Property, const string &PropValue, const string &Value)
-{
-  if (!cutMode || Value != "" || PropValue != "") {
-    fOut() << "<" << tag << " " << Property << "=\""
-           << encodeXML(PropValue) << "\">" << encodeXML(Value)
+void xmlparser::writeAscii(const char *tag, const vector<pair<string, wstring>>& propValue,
+                           const string &valueAscii) {
+  if (!cutMode || valueAscii != "") {
+    fOut() << "<" << tag;
+    for (size_t k = 0; k < propValue.size(); k++) {
+      fOut() << " " << propValue[k].first << "=\"" << encodeXML(propValue[k].second) << "\"";
+    }
+    fOut() << ">" << ::encodeXML(valueAscii)
            << "</" << tag << ">" << endl;
   }
   if (!fOut().good())
     throw meosException("Writing to XML file failed.");
 }
-*/
 
 void xmlparser::write(const char *tag, const char *Property, const wstring &PropValue, const wstring &Value)
 {
@@ -308,6 +313,29 @@ void xmlparser::write(const char *tag, int Value)
     //fOut() << "<" << tag << ">"
     //       << Value
     //       << "</" << tag << ">" << endl;
+  }
+  if (!fOut().good())
+    throw meosException("Writing to XML file failed.");
+}
+
+void xmlparser::writeTime(const char *tag, int relativeTime) {
+  if (!cutMode || relativeTime != 0) {
+    char bf[256];
+    int subSec = timeConstSecond == 1 ? 0 : relativeTime % timeConstSecond;
+
+    if (timeConstSecond == 1 || relativeTime == -1)
+      sprintf_s(bf, "<%s>%d</%s>\n", tag, relativeTime, tag);
+    else if (subSec == 0 && relativeTime != -10) 
+      sprintf_s(bf, "<%s>%d</%s>\n", tag, relativeTime / timeConstSecond, tag);
+    else if (relativeTime >= 0)
+      sprintf_s(bf, "<%s>%d.%d</%s>\n", tag, (relativeTime / timeConstSecond), 
+                                             (relativeTime % timeConstSecond), tag);
+    else {
+      int at = std::abs(relativeTime);
+      sprintf_s(bf, "<%s>-%d.%d</%s>\n", tag, (at / timeConstSecond),
+                                              (at % timeConstSecond), tag);
+    }
+    fOut() << bf;
   }
   if (!fOut().good())
     throw meosException("Writing to XML file failed.");
@@ -867,14 +895,11 @@ xmlattrib xmlobject::getAttrib(const char *pname) const
 
 static int unconverted = 0;
 
-
-
-
-const wchar_t *xmlobject::getw() const
+const wchar_t *xmlobject::getWPtr() const
 {
-  const char *ptr = getRaw();
-  if (ptr == 0)
-    return 0;
+  const char *ptr = getRawPtr();
+  if (ptr == nullptr)
+    return nullptr;
   static wchar_t buff[buff_pre_alloc];
   int len = strlen(ptr);
   len = min(len+1, buff_pre_alloc-10);
@@ -901,17 +926,15 @@ const wchar_t *xmlobject::getw() const
   return buff;
 }
 
-
-const char *xmlobject::get() const
-{
-  const char *ptr = getRaw();
-  if (ptr == 0)
-    return 0;
+const char *xmlobject::getPtr() const {
+  const char *ptr = getRawPtr();
+  if (ptr == nullptr)
+    return nullptr;
   static char buff[buff_pre_alloc];
   if (parser->isUTF) {
     int len = strlen(ptr);
     len = min(len+1, buff_pre_alloc-10);
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, ptr, len, parser->strbuffw, buff_pre_alloc);
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, ptr, len, parser->strbuffw.data(), buff_pre_alloc);
     parser->strbuffw[wlen-1] = 0;
     for (int k = 0; k< wlen; k++) {
       buff[k] = parser->strbuffw[k] & 0xFF; 
@@ -923,10 +946,14 @@ const char *xmlobject::get() const
   return buff;
 }
 
+int xmlobject::getRelativeTime() const {
+  const char *d = parser->xmlinfo[index].data;
+  return parseRelativeTime(d);
+}
 
 void xmlparser::convertString(const char *in, char *out, int maxlen) const
 {
-  if (in==0)
+  if (in == nullptr)
     throw std::exception("Null pointer exception");
 
   if (!isUTF) {
@@ -995,18 +1022,18 @@ string &xmlobject::getObjectString(const char *pname, string &out) const
 {
   xmlobject x=getObject(pname);
   if (x) {
-    const char *bf = x.getRaw();
+    const char *bf = x.getRawPtr();
     if (bf) {
-      parser->convertString(x.getRaw(), parser->strbuff, buff_pre_alloc);
-      out = parser->strbuff;
+      parser->convertString(bf, parser->strbuff.data(), buff_pre_alloc);
+      out = parser->strbuff.data();
       return out;
     }
   }
 
   xmlattrib xa(getAttrib(pname));
   if (xa && xa.data) {
-    parser->convertString(xa.get(), parser->strbuff, buff_pre_alloc);
-    out = parser->strbuff;
+    parser->convertString(xa.getPtr(), parser->strbuff.data(), buff_pre_alloc);
+    out = parser->strbuff.data();
   }
   else
     out = "";
@@ -1018,7 +1045,7 @@ wstring &xmlobject::getObjectString(const char *pname, wstring &out) const
 {
   xmlobject x=getObject(pname);
   if (x) {
-    const wchar_t *bf = x.getw();
+    const wchar_t *bf = x.getWPtr();
     if (bf) {
       out = bf;
       return out;
@@ -1027,8 +1054,8 @@ wstring &xmlobject::getObjectString(const char *pname, wstring &out) const
 
   xmlattrib xa(getAttrib(pname));
   if (xa && xa.data) {
-    parser->convertString(xa.get(), parser->strbuffw, buff_pre_alloc);
-    out = parser->strbuffw;
+    parser->convertString(xa.getPtr(), parser->strbuffw.data(), buff_pre_alloc);
+    out = parser->strbuffw.data();
   }
   else
     out = L"";
@@ -1041,7 +1068,7 @@ char *xmlobject::getObjectString(const char *pname, char *out, int maxlen) const
 {
   xmlobject x=getObject(pname);
   if (x) {
-    const char *bf = x.getRaw();
+    const char *bf = x.getRawPtr();
     if (bf) {
       parser->convertString(bf, out, maxlen);
       return out;
@@ -1064,7 +1091,7 @@ wchar_t *xmlobject::getObjectString(const char *pname, wchar_t *out, int maxlen)
 {
   xmlobject x=getObject(pname);
   if (x) {
-    const char *bf = x.getRaw();
+    const char *bf = x.getRawPtr();
     if (bf) {
       parser->convertString(bf, out, maxlen);
       return out;
@@ -1084,15 +1111,15 @@ wchar_t *xmlobject::getObjectString(const char *pname, wchar_t *out, int maxlen)
 }
 
 
-const char *xmlattrib::get() const
+const char *xmlattrib::getPtr() const
 {
   if (data)
     return decodeXML(data);
   else
-    return 0;
+    return nullptr;
 }
 
-const wchar_t *xmlattrib::wget() const
+const wchar_t *xmlattrib::getWPtr() const
 {
   if (data) {
     const char *dec = decodeXML(data);
@@ -1101,5 +1128,5 @@ const wchar_t *xmlattrib::wget() const
     return xbf;
   }
   else
-    return 0;
+    return nullptr;
 }

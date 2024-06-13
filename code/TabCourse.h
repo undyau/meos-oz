@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ class TabCourse :
   int courseId;
   /** canSwitchViewMode: 0 = no, 1 = yes, 2 = switching to legs */
   void save(gdioutput &gdi, int canSwitchViewMode);
-  int courseCB(gdioutput &gdi, int type, void *data);
+  int courseCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
   bool addedCourse;
 
   wstring time_limit;
@@ -70,9 +70,9 @@ public:
   ~TabCourse(void);
 
   static void runCourseImport(gdioutput& gdi, const wstring &filename,
-                              oEvent *oe, bool addClasses);
+                              oEvent *oe, bool addToClasses, bool createClasses);
 
   static void setupCourseImport(gdioutput& gdi, GUICALLBACK cb);
 
-  friend int CourseCB(gdioutput *gdi, int type, void *data);
+  friend int CourseCB(gdioutput *gdi, GuiEventType type, BaseInfo* data);
 };

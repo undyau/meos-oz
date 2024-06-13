@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -52,11 +52,11 @@ DrawInfo::DrawInfo() {
   extraFactor = 0.1;
   minVacancy = 0;
   maxVacancy = 10;
-  baseInterval = 120;
-  minClassInterval = 120;
-  maxClassInterval = 180;
+  baseInterval = 2 * timeConstMinute;
+  minClassInterval = 2*timeConstMinute;
+  maxClassInterval = 3*timeConstMinute;
   nFields = 10;
-  firstStart = 3600;
+  firstStart = timeConstHour;
   maxCommonControl = 3;
   allowNeighbourSameCourse = true;
   coursesTogether = false;
@@ -510,9 +510,12 @@ private:
       else {
         vector<pRunner> cr;
         oe->getRunners(c_it->getId(), 0, cr, false);
-        for (pRunner r : cr)
+        for (pRunner r : cr) {
+          if (r->getStatus() == StatusNotCompetiting || r->getStatus() == StatusCANCEL)
+            continue;
           if (r->getStartGroup(true) == ci.startGroupId)
             nr++;
+        }
       }
 
       if (ci.nVacant == -1 || !ci.nVacantSpecified || di.changedVacancyInfo) {
@@ -867,7 +870,7 @@ void oEvent::optimizeStartOrder(vector<pair<int, wstring>> &outLines, DrawInfo &
   outLines.emplace_back(0, L"Identifierar X unika inledningar på banorna.#" + itow(di.numDistinctInit));
   outLines.emplace_back(0, L"Största gruppen med samma inledning har X platser.#" + itow(di.numRunnerSameInitMax));
   outLines.emplace_back(0, L"Antal löpare på vanligaste banan X.#" + itow(di.numRunnerSameCourseMax));
-  outLines.emplace_back(0, L"Kortast teoretiska startdjup utan krockar är X minuter.#" + itow(di.minimalStartDepth/60));
+  outLines.emplace_back(0, L"Kortast teoretiska startdjup utan krockar är X minuter.#" + itow(di.minimalStartDepth/timeConstMinute));
   outLines.emplace_back(0, L"");
   //Find last starter
   int last = opt.last;
@@ -878,7 +881,7 @@ void oEvent::optimizeStartOrder(vector<pair<int, wstring>> &outLines, DrawInfo &
     laststart=max(laststart, ci.firstStart+(ci.nRunners-1)*ci.interval);
   }
 
-  outLines.emplace_back(0, L"Faktiskt startdjup: X minuter.#" + itow(((last+1) * di.baseInterval)/60));
+  outLines.emplace_back(0, L"Faktiskt startdjup: X minuter.#" + itow(((last+1) * di.baseInterval)/timeConstMinute));
 
   outLines.emplace_back(1, L"Sista start (nu tilldelad): X.#" +
                         oe->getAbsTime(laststart*di.baseInterval+di.firstStart));
@@ -913,8 +916,8 @@ void oEvent::optimizeStartOrder(vector<pair<int, wstring>> &outLines, DrawInfo &
 }
 
 void oEvent::loadDrawSettings(const set<int> &classes, DrawInfo &drawInfo, vector<ClassInfo> &cInfo) const {
-  drawInfo.firstStart = 3600 * 22;
-  drawInfo.minClassInterval = 3600;
+  drawInfo.firstStart = timeConstHour * 22;
+  drawInfo.minClassInterval = timeConstHour;
   drawInfo.maxClassInterval = 1;
   drawInfo.minVacancy = 10;
   drawInfo.maxVacancy = 1;
@@ -982,7 +985,7 @@ void oEvent::loadDrawSettings(const set<int> &classes, DrawInfo &drawInfo, vecto
 
       cInfo[i].nRunners = pc->getNumRunners(true, true, true) + cInfo[i].nVacant;
 
-      if (cInfo[i].nRunners>0) {
+      if (cInfo[i].nRunners > 0) {
         runnerPerGroup[cInfo[i].unique] += cInfo[i].nRunners;
         runnerPerCourse[cInfo[i].courseId] += cInfo[i].nRunners;
       }
@@ -996,15 +999,20 @@ void oEvent::loadDrawSettings(const set<int> &classes, DrawInfo &drawInfo, vecto
     cInfo[k].nRunnersCourse = runnerPerCourse[cInfo[k].courseId];
   }
 }
-void oEvent::drawRemaining(DrawMethod method, bool placeAfter)
+
+void oEvent::drawRemaining(const set<int>& classSel, DrawMethod method, bool placeAfter)
 {
+  bool all = classSel.size() == 1 && *classSel.begin() == -1;
   DrawType drawType = placeAfter ? DrawType::RemainingAfter : DrawType::RemainingBefore;
 
   for (oClassList::iterator it = Classes.begin(); it !=  Classes.end(); ++it) {
-    vector<ClassDrawSpecification> spec;
-    spec.emplace_back(it->getId(), 0, 0, 0, 0, VacantPosition::Mixed);
-
-    drawList(spec, method, 1, drawType);
+    if (it->isRemoved())
+      continue;
+    if (all || classSel.count(it->getId())) {
+      vector<ClassDrawSpecification> spec;
+      spec.emplace_back(it->getId(), 0, 0, 0, 0, VacantPosition::Mixed);
+      drawList(spec, method, 1, drawType);
+    }
   }
 }
 
@@ -1259,7 +1267,7 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
   }
 
   vector<pair<vector<pRunner>, bool>> uaGroups;
-  unsigned seed = (unsigned)chrono::system_clock::now().time_since_epoch().count();
+  unsigned seed = (unsigned)std::chrono::system_clock::now().time_since_epoch().count();
   auto rnd = std::default_random_engine(seed);
 
   int maxPerGroup = Runners.size();
@@ -1449,10 +1457,10 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
 
     map<int, map<pair<int, int>, int>> classClubCountByGroup;
     for (auto ms : moveFromGroupClassClub) {
-      int groupId = get<0>(ms);
-      int clsId = get<1>(ms);
-      int clubId = get<2>(ms);
-      int cnt = get<3>(ms);
+      int groupId = std::get<0>(ms);
+      int clsId = std::get<1>(ms);
+      int clubId = std::get<2>(ms);
+      int cnt = std::get<3>(ms);
       classClubCountByGroup[groupId][make_pair(clsId, clubId)] = cnt;
     }
 
@@ -1553,7 +1561,7 @@ void oEvent::drawListStartGroups(const vector<ClassDrawSpecification> &spec,
     int leg = spec[0].leg;
     VacantPosition vp = VacantPosition::Mixed;
     DrawInfo di;
-    di.baseInterval = 60;
+    di.baseInterval = timeConstMinute;
     di.allowNeighbourSameCourse = true;
 
     di.extraFactor = 0;
@@ -1770,13 +1778,13 @@ void oEvent::drawList(const vector<ClassDrawSpecification> &spec,
     for (it=Runners.begin(); it != Runners.end(); ++it) {
       int cid = it->getClassId(true);
       if (!it->isRemoved() && clsId2Ix.count(cid)) {
-        if (it->getStatus() == StatusNotCompetiting)
+        if (it->getStatus() == StatusNotCompetiting || it->getStatus() == StatusCANCEL)
           continue;
         int ix = clsId2Ix[cid];
         if (spec[ix].startGroup != 0 && it->getStartGroup(true) != spec[ix].startGroup)
           continue;
         
-        if (it->legToRun() == spec[ix].leg || spec[ix].leg == -1) {
+        if (it->legToRun() == spec[ix].leg || spec[ix].leg == -1 || it->getClassId(false) != cid ) {
           runners.push_back(&*it);
           spec[ix].ntimes++;
         }
@@ -1785,14 +1793,14 @@ void oEvent::drawList(const vector<ClassDrawSpecification> &spec,
   }
   else {
     // Find first/last start in class and interval:
-    vector<int> first(spec.size(), 7*24*3600);
+    vector<int> first(spec.size(), 7*24*timeConstHour);
     vector<int> last(spec.size(), 0);
     set<int> cinterval;
-    int baseInterval = 10*60;
+    int baseInterval = 10*timeConstMinute;
 
     for (it=Runners.begin(); it != Runners.end(); ++it) {
       if (!it->isRemoved() && clsId2Ix.count(it->getClassId(true))) {
-        if (it->getStatus() == StatusNotCompetiting)
+        if (it->getStatus() == StatusNotCompetiting || it->getStatus() == StatusCANCEL)
           continue;
 
         int st = it->getStartTime();
@@ -1826,10 +1834,10 @@ void oEvent::drawList(const vector<ClassDrawSpecification> &spec,
 
       spec[k].interval = baseInterval;
 
-      if (last[k] == 0 || spec[k].firstStart<=0 ||  baseInterval == 10*60) {
+      if (last[k] == 0 || spec[k].firstStart<=0 ||  baseInterval == 10*timeConstMinute) {
         // Fallback if incorrect specification.
-        spec[k].firstStart = 3600;
-        spec[k].interval = 2*60;
+        spec[k].firstStart = timeConstHour;
+        spec[k].interval = 2*timeConstMinute;
       }
     }
   }
@@ -1860,7 +1868,7 @@ void oEvent::drawList(const vector<ClassDrawSpecification> &spec,
     for (size_t k = 0; k < runners.size(); k++) {
       if (runners[k]->isVacant()) {
         vacant.push_back(runners[k]);
-        swap(runners[k], runners.back());
+        std::swap(runners[k], runners.back());
         runners.pop_back();
         k--;
       }
@@ -1949,9 +1957,9 @@ void oEvent::drawListClumped(int ClassID, int FirstStart, int Interval, int Vaca
     Vacances--;
   }
 
-  for (it=Runners.begin(); it != Runners.end(); ++it)
-    if (it->Class && it->Class->Id==ClassID) nRunners++;
-
+  for (it = Runners.begin(); it != Runners.end(); ++it) {
+    if (it->Class && it->Class->Id == ClassID && !it->isRemoved()) nRunners++;
+  }
   if (nRunners==0) return;
 
   int *stimes=new int[nRunners];
@@ -1962,28 +1970,29 @@ void oEvent::drawListClumped(int ClassID, int FirstStart, int Interval, int Vaca
   int ginterval;
 
   if (nRunners>=Interval)
-    ginterval=10;
-  else if (Interval/nRunners>60){
-    ginterval=40;
+    ginterval=10 * timeConstSecond;
+  else if (Interval/nRunners>60*timeConstSecond){
+    ginterval=40 * timeConstSecond;
   }
-  else if (Interval/nRunners>30){
-    ginterval=20;
+  else if (Interval/nRunners>30 * timeConstSecond){
+    ginterval=20 * timeConstSecond;
   }
-  else if (Interval/nRunners>20){
-    ginterval=15;
+  else if (Interval/nRunners>20 * timeConstSecond){
+    ginterval=15 * timeConstSecond;
   }
-  else if (Interval/nRunners>10){
-    ginterval=1;
+  else if (Interval/nRunners>10 * timeConstSecond){
+    ginterval=12 * timeConstSecond;
   }
-  else ginterval=10;
+  else ginterval=10 * timeConstSecond;
 
   int nGroups=Interval/ginterval+1; //15 s. per interval.
+  nGroups = min(nGroups, 2*nRunners+1);
   int k;
 
   if (nGroups>0){
 
     int MaxRunnersGroup=max((2*nRunners)/nGroups, 4)+GetRandomNumber(2);
-    int *sgroups=new int[nGroups];
+    vector<int> sgroups(nGroups);
 
     for(k=0;k<nGroups; k++)
       sgroups[k]=FirstStart+((ginterval*k+2)/5)*5;
@@ -2015,11 +2024,11 @@ void oEvent::drawListClumped(int ClassID, int FirstStart, int Interval, int Vaca
       }
     }
 
-    //Permute some of the groups (not first and last group)
+    //Permute some of the groups (not first and last group = group 0 and 1)
     if (nGroups>5){
-      permute(sgroups+2, nGroups-2);
+      permute(sgroups.data() + 2, nGroups - 2); 
 
-      //Remove some random groups (except first and last).
+      //Remove some random groups (except first and last = group 0 and 1).
       for(k=2;k<nGroups; k++){
         if ((nRunners/nGroups)<MaxRunnersGroup && nGroups>5){
           sgroups[k]=sgroups[nGroups-1];
@@ -2029,11 +2038,10 @@ void oEvent::drawListClumped(int ClassID, int FirstStart, int Interval, int Vaca
     }
 
     //Premute all groups;
-    permute(sgroups, nGroups);
+    permute(sgroups.data(), nGroups);
 
-    int *counters=new int[nGroups];
-    memset(counters, 0, sizeof(int)*nGroups);
-
+    vector<int> counters(nGroups);
+    
     stimes[0]=FirstStart;
     stimes[1]=FirstStart+Interval;
 
@@ -2066,10 +2074,6 @@ void oEvent::drawListClumped(int ClassID, int FirstStart, int Interval, int Vaca
       stimes[k]=sgroups[g];
       counters[g]++;
     }
-
-    delete[] sgroups;
-    delete[] counters;
-
   }
   else{
     for(k=0;k<nRunners; k++) stimes[k]=FirstStart;
@@ -2081,7 +2085,7 @@ void oEvent::drawListClumped(int ClassID, int FirstStart, int Interval, int Vaca
   k=0;
 
   for (it = Runners.begin(); it != Runners.end(); ++it) {
-    if (it->Class && it->Class->Id == ClassID) {
+    if (it->Class && it->Class->Id == ClassID && !it->isRemoved()) {
       it->setStartTime(stimes[k++], true, oBase::ChangeType::Update, false);
       it->StartNo = k;
       it->synchronize();
@@ -2131,7 +2135,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
     return;
   }
 
-  if (baseInterval<1 || baseInterval>60*60)
+  if (baseInterval<timeConstSecond || baseInterval>timeConstHour)
     throw std::exception("Felaktigt tidsformat för intervall");
 
   int iFirstStart = getRelativeTime(firstStart);
@@ -2198,7 +2202,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
     for (oClassList::iterator it = Classes.begin(); it!=Classes.end(); ++it) {
       if (it->getStart() != start)
         continue;
-      if (it->hasFreeStart())
+      if (it->hasFreeStart() || it->hasRequestStart())
         continue;
 
       maxRunners = max(maxRunners, runnersPerClass[&*it]);
@@ -2243,7 +2247,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
           continue;
         if (notDrawn.count(it->getId()) == 0)
           continue; // Only not drawn classes
-        if (it->hasFreeStart())
+        if (it->hasFreeStart() || it->hasRequestStart())
           continue;
 
         di.classes[it->getId()] = ClassInfo(&*it);
@@ -2301,7 +2305,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
           continue;
         if (notDrawn.count(it->getId()) == 0)
           continue; // Only not drawn classes
-        if (it->hasFreeStart())
+        if (it->hasFreeStart() || it->hasRequestStart())
           continue;
         //int classID, int leg, int firstStart, int interval, int vacances, oEvent::VacantPosition vp)
         spec.emplace_back(it->getId(), 0, 0, 120, 1, VacantPosition::Mixed);
@@ -2327,7 +2331,7 @@ void oEvent::automaticDrawAll(gdioutput &gdi,
   for (oClassList::iterator it = Classes.begin(); it!=Classes.end(); ++it) {
     if (needsCompletion.count(it->getId())==0)
       continue;
-    if (it->hasFreeStart())
+    if (it->hasFreeStart() || it->hasRequestStart())
       continue;
 
     gdi.addStringUT(0, lang.tl(L"Lottar efteranmälda: ") + it->getName());
@@ -2407,7 +2411,7 @@ void oEvent::drawPersuitList(int classId, int firstTime, int restartTime,
         times[k].first = adjustedTimes[k];
     }
     else {
-      times[k].first = 3600 * 24 * 7 + runner[k]->inputStatus;
+      times[k].first = timeConstHour * 24 * 7 + runner[k]->inputStatus;
       if (runner[k]->isVacant())
         times[k].first += 10; // Vacansies last
     }
@@ -2417,7 +2421,7 @@ void oEvent::drawPersuitList(int classId, int firstTime, int restartTime,
 
   int delta = times[0].first;
 
-  if (delta >= 3600*24*7)
+  if (delta >= timeConstHour*24*7)
     delta = 0;
 
   int reverseDelta = 0;
@@ -2455,4 +2459,122 @@ void oEvent::drawPersuitList(int classId, int firstTime, int restartTime,
     r->synchronize(true);
   }
   reCalculateLeaderTimes(classId);
+}
+
+int oEvent::requestStartTime(int runnerId, int afterThisTime, int minTimeInterval,
+                             int lastAllowedTime, int maxParallel,
+                             bool allowSameCourse, bool allowSameCourseNeighbour, 
+                             bool allowSameFirstControl, bool allowClubNeighbour) {
+  synchronizeList({ oListId::oLRunnerId, oListId::oLClassId, oListId::oLCourseId });
+  pRunner runner = getRunner(runnerId, 0);
+  if (!runner || !runner->Class)
+    return -1;
+  
+  assert(minTimeInterval > 0);
+  pCourse crs = runner->getCourse(false);
+  pControl firstC = !allowSameFirstControl && crs ? crs->getControl(0) : nullptr;
+  wstring start = crs ? crs->getStart() : L"";
+
+  set<int> usedStart;
+  set<int> usedStartClass;
+  set<int> usedClassClub;
+  map<int, int> countStartSlots;
+  int timeDivider = std::min(minTimeInterval, timeConstMinute);
+  int slotDist = minTimeInterval / timeDivider;
+  int closestStartSlotClass = numeric_limits<int>::max();
+  int desiredSlot = afterThisTime / timeDivider;
+
+  for (const oRunner &r : Runners) {
+    if (r.isRemoved() || r.getStatus() == StatusNotCompetiting || r.getStatus() == StatusCANCEL)
+      continue;
+
+    if (r.getStartTime() <= 0)
+      continue;
+
+    // If needs to be inserted in map, otherwise just compute closest
+    bool neededInMap = r.getStartTime() >= afterThisTime - timeDivider * slotDist;
+     
+    pCourse otherCrs = r.getCourse(false);
+    int slot = r.getStartTime() / timeDivider;
+    if (maxParallel > 0 && (!otherCrs || otherCrs->getStart() == start))
+      if (neededInMap)
+        ++countStartSlots[slot];
+
+    if (r.Class == runner->Class) {
+      if (abs(slot - desiredSlot) < abs(closestStartSlotClass-desiredSlot))
+        closestStartSlotClass = slot;
+      if (neededInMap) {
+        usedStart.insert(slot);
+        usedStartClass.insert(slot);
+        if (!allowClubNeighbour && r.Club == runner->Club && r.Club && r.getClubId() != oe->getVacantClubIfExist(true)) {
+          usedClassClub.insert(slot);
+        }
+      }
+    }
+    else if (!allowSameCourse && otherCrs == crs) {
+      usedStart.insert(slot);
+      if (allowSameCourseNeighbour) {
+        if (abs(slot - slotDist) < abs(closestStartSlotClass - desiredSlot))
+          closestStartSlotClass = slot;
+
+        if (neededInMap)
+          usedStartClass.insert(slot);
+      }
+    }
+    else if (!allowSameFirstControl && otherCrs && otherCrs->getControl(0) == firstC) {
+      if (neededInMap)
+        usedStart.insert(slot);
+    }
+  }
+
+  if (closestStartSlotClass < 10000) {
+    if (closestStartSlotClass > desiredSlot) {
+      int off = (closestStartSlotClass - desiredSlot) % slotDist;
+      if (off > 0) {
+        afterThisTime += off * timeDivider;
+      }
+    }
+    else if (closestStartSlotClass < desiredSlot) {
+      int off = (desiredSlot - closestStartSlotClass) % slotDist;
+      if (off > 0) {
+        int slotAdjust = slotDist - off;
+        afterThisTime += slotAdjust * timeDivider;
+      }
+    }
+  }
+  for (int startTime = afterThisTime; startTime <= lastAllowedTime; startTime += timeDivider) {
+    int slot = startTime / timeDivider;
+    if (usedStart.count(slot))
+      continue;
+    if (maxParallel > 0) {
+      auto res = countStartSlots.find(slot);
+      if (res != countStartSlots.end() && res->second >= maxParallel)
+        continue;
+    }
+
+    if (usedClassClub.count(slot - slotDist)) {
+      startTime += (slotDist - 1) * timeDivider;
+      continue;
+    }
+    if (usedClassClub.count(slot + slotDist)) {
+      startTime += (2 * slotDist - 1) * timeDivider;
+      continue;
+    }
+
+    bool ok = true;
+    for (int j = 1; j < slotDist; j++) {
+      if (usedStartClass.count(slot + j)) {
+        ok = false;
+        startTime += (j + slotDist - 1) * timeDivider; // Jump forward (optimize)
+        break;
+      }
+      if (usedStartClass.count(slot - j)) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) 
+      return startTime;
+  }
+  return -1; // No time found
 }

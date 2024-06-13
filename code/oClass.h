@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2022 Melin Software HB
+    Copyright (C) 2009-2024 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <unordered_map>
 #include "inthashmap.h"
 class oClass;
 typedef oClass* pClass;
@@ -40,7 +41,7 @@ enum StartTypes {
   STTime=0,
   STChange,
   STDrawn,
-  STHunting,
+  STPursuit,
   ST_max
 };
 enum { nStartTypes = ST_max };
@@ -101,12 +102,15 @@ struct oLegInfo {
   LegTypes legMethod;
   bool isParallel() const {return legMethod == LTParallel || legMethod == LTParallelOptional;}
   bool isOptional() const {return legMethod == LTParallelOptional || legMethod == LTExtra || legMethod == LTIgnore;}
-  //Interpreteation depends. Can be starttime/first start
-  //or number of earlier legs to consider.
+  //Interpreteation depends. Can be starttime/first start (if styp==STTime || styp==STPursuit)
+  // or number of earlier legs to consider.
   int legStartData;
   int legRestartTime;
   int legRopeTime;
   int duplicateRunner;
+
+  /** Return true if start data should be interpreted as a time.*/
+  bool isStartDataTime() const { return startMethod == STTime || startMethod == STPursuit; }
 
   // Transient, deducable data
   int trueSubLeg;
@@ -257,9 +261,20 @@ protected:
   inthashmap *tLegTimeToPlace;
   inthashmap *tLegAccTimeToPlace;
 
+  struct PlaceTime {
+    int leader = -1;
+    map<int, int> timeToPlace;
+  };
+
+  vector<unordered_map<int, PlaceTime>> teamLegCourseControlToLeaderPlace;
+  
   void insertLegPlace(int from, int to, int time, int place);
   void insertAccLegPlace(int courseId, int controlNo, int time, int place);
 
+  /** Get relay/team accumulated leader time/place at control. */
+  int getAccLegControlLeader(int teamLeg, int courseControlId) const;
+  int getAccLegControlPlace(int teamLeg, int courseControlId, int time) const;
+     
   // For sub split times
   int tLegLeaderTime;
   mutable int tNoTiming;
@@ -277,8 +292,8 @@ protected:
   // Used to force show of full multi course dialog
   bool tShowMultiDialog;
 
-  static const int dataSize = 512;
-  int getDISize() const {return dataSize;}
+  static constexpr int dataSize = 512+64;
+  int getDISize() const final {return dataSize;}
 
   BYTE oData[dataSize];
   BYTE oDataOld[dataSize];
@@ -354,7 +369,7 @@ protected:
   mutable pair<int, map<string, int>> tTypeKeyToRunnerCount;
 
   enum CountKeyType {
-    All,
+    AllCompeting,
     Finished,
     ExpectedStarting,
     DNS,
@@ -379,9 +394,9 @@ public:
   /** The master class in a qualification/final scheme. */
   const pClass getParentClass() const { return parentClass; }
 
-  const QualificationFinal *getQualificationFinal() const {
+  const shared_ptr<QualificationFinal> &getQualificationFinal() const {
     reinitialize(false);
-    return qualificatonFinal.get();
+    return qualificatonFinal;
   }
 
   void clearQualificationFinal() const;
@@ -401,11 +416,11 @@ public:
 
   /** Returns the number of possible final classes.*/
   int getNumQualificationFinalClasses() const;
-  void loadQualificationFinalScheme(const wstring &fileName);
+  void loadQualificationFinalScheme(const QualificationFinal &scheme);
 
   void updateFinalClasses(oRunner *causingResult, bool updateStartNumbers);
 
-  static void initClassId(oEvent &oe);
+  static void initClassId(oEvent &oe, const set<int>& classes);
 
   // Return true if forking in the class is locked
   bool lockedForking() const;
@@ -571,6 +586,10 @@ public:
   // Get the linear leg number of the preceeding leg
   int getPreceedingLeg(int leg) const;
 
+  // Get result defining leg (for parallel legs, the last leg in the currrent parallel set)
+  int getResultDefining(int leg) const;
+
+
   /// Get a string 1, 2a, etc describing the number of the leg
   wstring getLegNumber(int leg) const;
 
@@ -597,10 +616,15 @@ public:
 
   void setFreeStart(bool freeStart);
   bool hasFreeStart() const;
+  
+  void setRequestStart(bool freeStart);
+  bool hasRequestStart() const;
 
   void setDirectResult(bool directResult);
   bool hasDirectResult() const;
-
+  bool isValidLeg(int legIndex) const {
+    return legIndex == -1 || legIndex == 0 || (legIndex > 0 && legIndex<int(MultiCourse.size()));
+  }
   bool isCourseUsed(int Id) const;
   wstring getLength(int leg) const;
 
@@ -611,7 +635,7 @@ public:
   bool hasTrueMultiCourse() const;
 
   unsigned getNumStages() const {return MultiCourse.size();}
-  /** Get the set of true legs, identifying parallell legs etc. Returns indecs into
+  /** Get the set of true legs, identifying parallell legs etc. Returns indices into
    legInfo of the last leg of the true leg (first), and true leg (second).*/
   struct TrueLegInfo {
   protected:
@@ -625,7 +649,9 @@ public:
 
   void getTrueStages(vector<TrueLegInfo> &stages) const;
 
-  unsigned getLastStageIndex() const {return max<signed>(MultiCourse.size(), 1)-1;}
+  unsigned getLastStageIndex() const {
+    return std::max<int>(MultiCourse.size(), 1) - 1;
+  }
 
   void setNumStages(int no);
 
@@ -644,6 +670,9 @@ public:
 
   const wstring &getName() const {return Name;}
   void setName(const wstring &name, bool manualSet);
+
+  const wstring& getLongName() const;
+  void setLongName(const wstring& name);
 
   void Set(const xmlobject *xo);
   bool Write(xmlparser &xml);
@@ -713,7 +742,7 @@ public:
 
   // Automatically setup forkings using the specified courses.
   // Returns <number of forkings created, number of courses used>
-  pair<int, int> autoForking(const vector< vector<int> > &inputCourses);
+  pair<int, int> autoForking(const vector< vector<int> > &inputCourses, int numToGenerateMax);
 
   bool hasUnorderedLegs() const;
   void setUnorderedLegs(bool order);
@@ -721,6 +750,8 @@ public:
   // Returns 0 for no parallel selection (= normal mode)
   pCourse selectParallelCourse(const oRunner &r, const SICard &sic);
   void getParallelRange(int leg, int &parLegRangeMin, int &parLegRangeMax) const;
+  void getParallelOptionalRange(int leg, int& parLegRangeMin, int& parLegRangeMax) const;
+
   bool hasAnyCourse(const set<int> &crsId) const;
 
   GeneralResult *getResultModule() const;
