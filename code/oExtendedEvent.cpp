@@ -100,11 +100,9 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
     gdi.addString("", 0, L"No control card number for " + name);
 
   wstring birthDate;
-  int birthYear;
   xPers.getObjectString("BirthDate", birthDate);
   if (birthDate.empty())
     birthDate = L"1998-01-01";  // Force to be a senior at least
-  birthYear = std::stoi(birthDate.c_str());
 
   // Don't over-write existing
   pRunner existing = getRunnerByName(name);
@@ -121,7 +119,7 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
     return false;
     }
 
-  return !!addRunner(name, club, cl->getId(), cardNo, birthYear, true);
+  return !!addRunner(name, club, cl->getId(), cardNo, birthDate, true);
 }
 
 void oExtendedEvent::importXML_SeasonTickets(gdioutput & gdi, const wstring & competitorFile, const wstring& classesFile)
@@ -249,7 +247,8 @@ void oExtendedEvent::exportCourseOrderedIOFSplits(IOFVersion version, const wcha
   }
 
   // Do the export
-  oEvent::exportIOFSplits(version, file, oldStylePatrolExport, /*USe UTC*/false, classes, leg, true, true, true, false);
+  pair<string, string> preferredIdTypes;
+  oEvent::exportIOFSplits(version, file, oldStylePatrolExport, /*USe UTC*/false, classes, preferredIdTypes, leg, true, true, true, false, false);
 
   // Reassign all runners back to original classes
   for (oRunnerList::iterator j = Runners.begin(); j != Runners.end(); j++) {
@@ -296,7 +295,7 @@ void oEvent::calculateCourseRogainingResults()
       it->tTotalPlace.update(*oe, 0, false);
       it->tPlace.update(*this, 0, false);
     }
-    else if(it->getStatusComputed()==StatusOK) {
+    else if(it->getStatusComputed(false)==StatusOK) {
       cPlace++;
 
       int cmpRes = 3600 * 24 * 7 * it->tRogainingPoints - it->getRunningTime(false);
@@ -312,7 +311,7 @@ void oEvent::calculateCourseRogainingResults()
         it->tPlace.update(*this, 0, false);
     }
     else
-      it->tPlace.update(*this, 99000 + it->getStatusComputed(), false);
+      it->tPlace.update(*this, 99000 + it->getStatusComputed(false), false);
   }
 }
 
@@ -332,9 +331,9 @@ void oExtendedEvent::prepData4SssUpload(wstring& data)
   removeTempFile(resultCsv);
   data = string_replace(data, L"&", L"and");
   if (getIsSydneySummerSeries())
-    data = L"Name=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Title=" + Name + L"&Subtitle=" + SssSeriesPrefix + to_wstring(SssEventNum) + L"&Data=" + data + L"&Serial=" + to_wstring(incUploadCounter());
+    data = L"Name=" + SssSeriesPrefix + std::to_wstring(SssEventNum) + L"&Title=" + Name + L"&Subtitle=" + SssSeriesPrefix + std::to_wstring(SssEventNum) + L"&Data=" + data + L"&Serial=" + std::to_wstring(incUploadCounter());
   else
-    data = L"Name=" + SssAltName + L"&Title=" + Name + L"&Subtitle=" + SssAltName + L"&Data=" + data + L"&Serial=" + to_wstring(incUploadCounter());
+    data = L"Name=" + SssAltName + L"&Title=" + Name + L"&Subtitle=" + SssAltName + L"&Data=" + data + L"&Serial=" + std::to_wstring(incUploadCounter());
   }
 
 void oExtendedEvent::uploadSssUnattended()
@@ -416,7 +415,7 @@ void oExtendedEvent::readExtraXml(const xmlparser &xml)
   if(xo) SssEventNum=xo.getInt();
 
   xo=xml.getObject("SssSeriesPrefix");
-  if(xo) SssSeriesPrefix=xo.getw();
+  if(xo) SssSeriesPrefix=xo.getWStr();
 }
 
 wstring oExtendedEvent::loadCsvToString(wstring file)
@@ -558,7 +557,7 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
     row[9]=ws2s(it->getStartTimeS());
     if(row[9]=="-") row[9]="";
 
-    row[10]=ws2s(it->getFinishTimeS());
+    row[10]=ws2s(it->getFinishTimeS(false, SubSecond::Off));
     if(row[10]=="-") row[10]="";
 
     row[11]= formatOeCsvTime(it->getRunningTime(false));
@@ -601,7 +600,7 @@ bool oExtendedEvent::exportOrCSV(const wchar_t *file, bool byClass)
   row[43] = ws2s(it->getPlaceS());
   row[44] = ws2s(it->getStartTimeS());
   if(row[44]=="-") row[44]="";
-  row[45]=ws2s(it->getFinishTimeS());
+  row[45]=ws2s(it->getFinishTimeS(false, SubSecond::Off));
   if(row[45]=="-") row[45]="";
 
 

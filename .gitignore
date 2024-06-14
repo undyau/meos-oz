@@ -292,3 +292,4 @@ __pycache__/
 # MEOS-OZ specific
 untranslated.txt
 English_translated.txt
+/code/English_spellcheck.txt

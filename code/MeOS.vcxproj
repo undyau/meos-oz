@@ -205,6 +205,7 @@
     <ClCompile Include="oEventSpeaker.cpp" />
     <ClCompile Include="oEventSQL.cpp" />
     <ClCompile Include="oevent_transfer.cpp" />
+    <ClCompile Include="oExtendedEvent.cpp" />
     <ClCompile Include="oFreeImport.cpp" />
     <ClCompile Include="oFreePunch.cpp" />
     <ClCompile Include="oImportExport.cpp" />
@@ -214,6 +215,7 @@
     <ClCompile Include="oPunch.cpp" />
     <ClCompile Include="oReport.cpp" />
     <ClCompile Include="oRunner.cpp" />
+    <ClCompile Include="oSSSQuickStart.cpp" />
     <ClCompile Include="oTeam.cpp" />
     <ClCompile Include="oTeamEvent.cpp" />
     <ClCompile Include="parser.cpp" />
@@ -299,6 +301,7 @@
     <ClInclude Include="oDataContainer.h" />
     <ClInclude Include="oEvent.h" />
     <ClInclude Include="oEventDraw.h" />
+    <ClInclude Include="oExtendedEvent.h" />
     <ClInclude Include="oFreeImport.h" />
     <ClInclude Include="oFreePunch.h" />
     <ClInclude Include="oListInfo.h" />
@@ -307,6 +310,7 @@
     <ClInclude Include="oPunch.h" />
     <ClInclude Include="oRunner.h" />
     <ClInclude Include="ospeaker.h" />
+    <ClInclude Include="oSSSQuickStart.h" />
     <ClInclude Include="oTeam.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="pdfwriter.h" />

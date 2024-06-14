@@ -2402,8 +2402,8 @@ bool oRunner::operator<(const oRunner &c) const {
       int id2 = crs2 ? crs2->getId() : 0;
       return id1 < id2;
     }
-    RunnerStatus stat = getStatusComputed();
-    RunnerStatus cstat = c.getStatusComputed();
+    RunnerStatus stat = getStatusComputed(false);
+    RunnerStatus cstat = c.getStatusComputed(false);
 		if(stat != cstat)
       return RunnerStatusOrderMap[stat] < RunnerStatusOrderMap[cstat];
 		else {
@@ -5261,7 +5261,7 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
           }
 
           if (!punchTime.empty()) {
-          gdi.addStringUT(cy, cx + c4, getLegPlaceAcc(it->tIndex) == 1 ? boldSmall | textRight : fontSmall | textRight, punchTime);
+          gdi.addStringUT(cy, cx + c4, getLegPlaceAcc(it->tIndex, false) == 1 ? boldSmall | textRight : fontSmall | textRight, punchTime);
           }
           any = true;
         }
@@ -5503,7 +5503,7 @@ void oRunner::printLabel(gdioutput &gdi) const {
       if (rogaining)
         gdi.addStringUT(cy, cx+c2, boldLarge, itos(getRogainingPoints(false, false)));
       else
-        gdi.addStringUT(cy, cx+c2, boldLarge, getRunningTimeS(false));
+        gdi.addStringUT(cy, cx+c2, boldLarge, getRunningTimeS(false, oe->useSubSecond() ? SubSecond::On : SubSecond::Auto));
       }
     else
       gdi.addStringUT(cy, cx+c2, boldLarge,  getStatusS(true, false));
