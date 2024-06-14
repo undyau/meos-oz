@@ -1,0 +1,6 @@
+Use Linux VM to run KDiff3
+Extract an archive of current MeOS-OZ develop as folder "mine"
+Extract an archive of latest MeOS as folder "theirs"
+Extract an archive from MeOS of tag at large merge point as "base"
+Create empty folder "merged"
+Run the 3 way merge
