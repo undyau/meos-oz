@@ -19,11 +19,10 @@ oSSSQuickStart::~oSSSQuickStart(void)
 
 bool oSSSQuickStart::ConfigureEvent(gdioutput &gdi)
 {
-// retrieve competition from install or web
+// retrieve competition from install
 wstring file = getTempFile();
 if (!GetEventTemplateFromInstall(file))
-  if (!GetEventTemplateFromWeb(file))
-    return false;
+  return false;
 
 // If the competition already exists (say from Eventor) then just add course, controls etc
 if (!m_Event.empty())
@@ -196,9 +195,9 @@ bool oSSSQuickStart::GetEventTemplateFromInstall(wstring& a_File)
 
       wstring templateFile(ownPth);
       if (m_Event.getPropertyString("Organizer",L"") == L"Big Foot Orienteers")
-        templateFile += L"\\sss201230.xml";
+        templateFile += L"\\sss201230.meosxml";
       else
-        templateFile += L"\\sss101130.xml";
+        templateFile += L"\\sss101130.meosxml";
 
       if (!fileExists(templateFile.c_str()))
         return false;
@@ -207,34 +206,6 @@ bool oSSSQuickStart::GetEventTemplateFromInstall(wstring& a_File)
     }
     else
       return false;
-}
-
-bool oSSSQuickStart::GetEventTemplateFromWeb(wstring& a_File)
-{
-  wstring url;
-  if (m_Event.getPropertyString("Organizer", L"") == L"Big Foot Orienteers")
-    url = L"http://sportident.itsdamp.com/sss201230.xml";
-  else
-    url = L"http://sportident.itsdamp.com/sss101130.xml";
-
-  Download dwl;
-  dwl.initInternet();
-  std::vector<pair<wstring,wstring>> headers;
-
-  try {
-    dwl.downloadFile(url, a_File, headers);
-  }
-  catch (std::exception &) {
-    removeTempFile(a_File);
-    throw;
-  }
-
-  dwl.createDownloadThread();
-  while (dwl.isWorking()) {
-    Sleep(100);
-  }
-
-  return true;
 }
 
 void oSSSQuickStart::CustomiseClasses()

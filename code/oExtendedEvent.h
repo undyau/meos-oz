@@ -26,7 +26,6 @@ public:
   time_t getLastSssUploadTime() { return LastAutoUploadSssTime; }
   bool setAutoUploadSss(bool automatic);
   void checkForPeriodicEvents();
-  void loadHireCards();
   bool preserveExistingRunnersAsIs(bool preserve);
   bool addXmlRunner(gdioutput & gdi, xmlobject & xo);
   bool getPreserveExistingRunnersAsIs() { return PreserveExistingRunnersAsIs; }

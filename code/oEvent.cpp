@@ -3969,7 +3969,6 @@ void oEvent::newCompetition(const wstring &name)
 
   Name = name;
   oEventData->initData(this, sizeof(oData));
-  static_cast<oExtendedEvent*>(this)->loadHireCards();
 
   if (!name.empty() && name != L"-")
     getMergeTag();
