@@ -101,7 +101,7 @@ else
   for (const auto &e : lines) outFile << e << "\n";
   outFile.close();
 
-  if(m_Event.open(file2, true, false)) 
+  if(m_Event.open(file2, true, false, true)) 
     {
     m_Event.updateTabs();
     gdi.setWindowTitle(m_Event.getTitleName());
