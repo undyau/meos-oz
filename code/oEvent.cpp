@@ -460,7 +460,7 @@ void oEvent::initProperties() {
   getPropertyInt("DirectPort", 21338);
   getPropertyInt("UseHourFormat", 1);
   getPropertyInt("UseDirectSocket", true);
-  getPropertyInt("UseEventorUTC", 0);
+  getPropertyInt("UseEventorUTC", 1);
   getPropertyInt("UseHourFormat", 1);
   getPropertyInt("NameMode", FirstLast);
 }

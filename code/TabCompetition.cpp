@@ -3180,7 +3180,9 @@ void TabCompetition::getEventorCompetitions(gdioutput &gdi,
         dayOffset = 1;
       }
       ci.firstStart = formatTimeHMS(nt, SubSecond::Off);
-      //TODO: Take dayoffset into account
+      if (dayOffset)
+        ci.Date = addOrSubtractDays(ci.Date, dayOffset);
+
     }
 
     xmlEvents[k].getObjectString("WebURL", ci.url);
