@@ -1092,7 +1092,7 @@ public:
   static int convertAbsoluteTime(const wstring &m);
 
   /// Get clock time from relative time
-  const wstring &getAbsTime(DWORD relativeTime, SubSecond mode = SubSecond::Auto, bool byClass = true) const;
+  const wstring &getAbsTime(DWORD relativeTime, SubSecond mode = SubSecond::Auto, bool oldStyle = false) const;
   
   wstring getAbsDateTimeISO(DWORD relativeTime, bool includeDate, bool useGMT) const;
 
