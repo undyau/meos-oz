@@ -225,7 +225,7 @@ struct StartGroupInfo {
 
 class oEvent : public oBase
 {
-  friend class oSSSQuickStart;   //Trying to minimise code chanes to oEvent, but this is a bit ugly
+  friend class oSSSQuickStart;   //Trying to minimise code changes to oEvent, but this is a bit ugly
 
 protected:
   // Revision number for data modified on this client.

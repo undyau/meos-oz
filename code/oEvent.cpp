@@ -1252,7 +1252,6 @@ bool oEvent::open(const xmlparser &xml) {
   if (xo) Annotation = xo.getWStr();
 
   xo=xml.getObject("ZeroTime");
-  ZeroTime=0;
   if (xo) ZeroTime=xo.getRelativeTime();
 
   xo=xml.getObject("Id");
