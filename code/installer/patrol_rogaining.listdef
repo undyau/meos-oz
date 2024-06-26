@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.5">
+<MeOSListDefinition version="3.8">
 <ListName>Patrol Team Rogaining</ListName>
 <Tag>patrol_team_rogaining</Tag>
-<UID>A-7941583486858019635B1030030353</UID>
 <SortOrder>CustomSort</SortOrder>
 <ListType>Team</ListType>
 <SubListType>Runner</SubListType>
@@ -12,9 +11,9 @@
 <MeOSResultCalculationSet>
 <Name>Patrol Rogaining</Name>
 <Tag>ms-patrol-rogaining</Tag>
-<Description>Rogaining results for a patrol</Description>
+<Description>Rogaining results for a patrol of two or more competitors.</Description>
 <Origin>Rogaining patrol (2018-01-18)</Origin>
-<Date>2019-12-03 06:45:17</Date>
+<Date>2022-01-29 23:28:29</Date>
 <Rule name="RunnerPoints">
 <Method>OutputNumbers[0] = PointReduction;&#13;&#10;return Points;</Method>
 </Rule>
@@ -23,6 +22,9 @@
 </Rule>
 <Rule name="TeamScore">
 <Method>if (Status==StatusOK)&#13;&#10;  return Time - 1000000 * ComputedPoints;&#13;&#10;else&#13;&#10;  return 100000+Status;&#13;&#10;</Method>
+</Rule>
+<Rule name="TeamTime">
+<Method>t = 0;&#13;&#10;for(i = 0; i &lt; RunnerTime.size(); i++) {&#13;&#10;  if (t&lt;RunnerTime[i])&#13;&#10;    t = RunnerTime[i];&#13;&#10;}&#13;&#10;return t;</Method>
 </Rule>
 </MeOSResultCalculationSet>
 <HideLegSelection>1</HideLegSelection>
@@ -81,11 +83,13 @@
 <BlockWidth>20</BlockWidth>
 </Block>
 <Block Type="TeamRogainingPoint">
+<ResultModule>ms-patrol-rogaining</ResultModule>
 <Align BlockAlign="true">Poäng</Align>
 <Font>Bold</Font>
 <TextAdjust>Center</TextAdjust>
 </Block>
 <Block Type="TeamTimeStatus">
+<ResultModule>ms-patrol-rogaining</ResultModule>
 <Align BlockAlign="true">Tid</Align>
 </Block>
 <Block Type="ResultModuleTimeTeam">

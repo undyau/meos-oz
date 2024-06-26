@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.5">
+<MeOSListDefinition version="3.9">
 <ListName>Classes together</ListName>
 <Tag>classestogether</Tag>
 <SortOrder>CustomSort</SortOrder>
@@ -12,10 +12,10 @@
 <SupportTo>1</SupportTo>
 <Filter name="FilterPrelResult"/>
 <Filter name="FilterNoCancel"/>
-<HeadFont scale="100" above="0"/>
-<SubHeadFont scale="100" above="0"/>
-<ListFont scale="100" above="0"/>
-<SubListFont scale="100" above="0"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
 <Head>
 <Line>
 <Block Type="CmpName">
@@ -40,6 +40,11 @@
 </Block>
 <Block Type="String">
 <Text>Klubb</Text>
+<ResultModule>atcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Klass</Text>
 <ResultModule>atcontrol</ResultModule>
 <Align BlockAlign="true">None</Align>
 </Block>
@@ -70,7 +75,12 @@
 <ResultModule>atcontrol</ResultModule>
 <Align BlockAlign="true">Klubb</Align>
 </Block>
+<Block Type="ClassName">
+<ResultModule>atcontrol</ResultModule>
+<Align BlockAlign="true">Klass</Align>
+</Block>
 <Block Type="RunnerTimeStatus">
+<ResultModule>atcontrol</ResultModule>
 <Align BlockAlign="true">Tid</Align>
 </Block>
 <Block Type="RunnerTimeAfter">

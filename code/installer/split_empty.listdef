@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.9">
+<ListName>Empty Results Split Print</ListName>
+<Tag>split_result_empty</Tag>
+<SplitPrint>
+<Split>true</Split>
+<Speed>true</Speed>
+<Result>true</Result>
+<Analysis>true</Analysis>
+<Heading>true</Heading>
+<NumClsResult>3</NumClsResult>
+</SplitPrint>
+<SortOrder>SortNameOnly</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="100" above="0"/>
+<SubListFont scale="100" above="0"/>
+<Head>
+</Head>
+<SubHead>
+</SubHead>
+<List>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

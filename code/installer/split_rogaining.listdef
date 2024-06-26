@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.9">
+<ListName>Individual Rogaining Split Print</ListName>
+<Tag>split_result_rogaining</Tag>
+<SplitPrint>
+<Split>true</Split>
+<Speed>true</Speed>
+<Result>true</Result>
+<Analysis>true</Analysis>
+<Heading>true</Heading>
+<NumClsResult>3</NumClsResult>
+</SplitPrint>
+<SortOrder>ClassPoints</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>CoursePunches</SubListType>
+<Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+<Font>MediumPlus</Font>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Resultat</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerPlace">
+<Text>X. </Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerCompleteName">
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerRogainingPoint">
+<Text>, X p.</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Text> (X)</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

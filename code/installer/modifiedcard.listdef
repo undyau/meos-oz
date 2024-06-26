@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MeOSListDefinition version="4.0">
+<ListName>Modified card data</ListName>
+<Tag>modifiedcard</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<HideLegSelection>1</HideLegSelection>
+<Filter name="EFilterModifiedCard"/>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="100" above="0"/>
+<SubListFont scale="100" above="0"/>
+<Head>
+<Line>
+<Block Type="String">
+<Text>Manuellt ändrad brickdata</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerCompleteName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

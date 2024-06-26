@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.9">
+<ListName>Klubbstartlista, lag</ListName>
+<Tag>teamforking</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>ClubTeam</ListType>
+<SubListType>Runner</SubListType>
+<HideLegSelection>1</HideLegSelection>
+<SubFilter name="FilterNotVacant"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="5">arial</ListFont>
+<SubListFont scale="140" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClubName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamBib">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+<Line>
+<Block Type="RunnerLegNumberAlpha">
+<Align BlockAlign="true">TeamName</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerCard">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubList>
+</MeOSListDefinition>

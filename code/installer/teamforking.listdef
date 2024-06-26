@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="3.9">
+<ListName>Gafflingar lagvis</ListName>
+<Tag>teamforking</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Team</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="100" above="0"/>
+<SubListFont scale="100" above="0"/>
+<Head>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="String">
+<Text>Startnummer</Text>
+<Align BlockAlign="true">None</Align>
+<Font>SmallFont</Font>
+</Block>
+<Block Type="TeamLegName">
+<Text>Sträcka X</Text>
+<Leg>-2</Leg>
+<Align BlockAlign="true">None</Align>
+<Font>SmallFont</Font>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="TeamStartNo">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamCourseName">
+<Leg>-2</Leg>
+<Align BlockAlign="true">TeamLegName</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

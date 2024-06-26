@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.5">
+<MeOSListDefinition version="3.9">
 <ListName>Lagändringblankett</ListName>
 <Tag>teamchanges</Tag>
-<SortOrder>SortNameOnly</SortOrder>
+<SortOrder>ClubClassStartTime</SortOrder>
 <ListType>Team</ListType>
 <SubListType>Runner</SubListType>
-<HeadFont scale="100" above="0"/>
-<SubHeadFont scale="150" above="0"/>
-<ListFont scale="100" above="0"/>
-<SubListFont scale="100" above="0"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="150" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
 <Head>
 </Head>
 <SubHead>

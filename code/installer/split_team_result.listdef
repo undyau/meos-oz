@@ -1,13 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.6">
-<ListName>Patrol result</ListName>
-<Tag>patrolresult</Tag>
+<MeOSListDefinition version="3.9">
+<ListName>Relay/Team Results Split Print</ListName>
+<Tag>split_result_team</Tag>
+<SplitPrint>
+<Split>true</Split>
+<Speed>true</Speed>
+<Result>true</Result>
+<Analysis>true</Analysis>
+<Heading>true</Heading>
+<NumClsResult>3</NumClsResult>
+</SplitPrint>
 <SortOrder>ClassResult</SortOrder>
 <ListType>Team</ListType>
-<SubListType>None</SubListType>
+<SubListType>CoursePunches</SubListType>
 <Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
 <HeadFont scale="100" above="0">arial</HeadFont>
 <SubHeadFont scale="100" above="0">arial</SubHeadFont>
 <ListFont scale="100" above="0">arial</ListFont>
@@ -15,30 +24,20 @@
 <Head>
 <Line>
 <Block Type="CmpName">
-<Text>Resultat - X</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>
 <Line>
 <Block Type="CmpDate">
 <Align BlockAlign="true">None</Align>
+<Font>MediumPlus</Font>
 </Block>
 </Line>
 </Head>
 <SubHead>
 <Line>
-<Block Type="ClassName">
-<Align BlockAlign="true">None</Align>
-</Block>
-<Block Type="ClassResultFraction">
-<Align BlockAlign="true">None</Align>
-</Block>
 <Block Type="String">
-<Text>Tid</Text>
-<Align BlockAlign="true">None</Align>
-</Block>
-<Block Type="String">
-<Text>Efter</Text>
+<Text>Resultat</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>
@@ -46,19 +45,22 @@
 <List>
 <Line>
 <Block Type="TeamPlace">
-<Align BlockAlign="true">CmpName</Align>
-</Block>
-<Block Type="PatrolNameNames">
-<Align BlockAlign="true">ClassName</Align>
+<Text>X. </Text>
+<Align BlockAlign="true">None</Align>
 </Block>
 <Block Type="TeamName">
 <Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="RunnerLegTeamLeaderName">
+<Text> (X)</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
 </Block>
 <Block Type="TeamTimeStatus">
-<Align BlockAlign="true">Tid</Align>
-</Block>
-<Block Type="TeamTimeAfter">
-<Align BlockAlign="true">Efter</Align>
+<Text>, X</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
 </Block>
 </Line>
 </List>
