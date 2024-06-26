@@ -22,7 +22,10 @@ bool oSSSQuickStart::ConfigureEvent(gdioutput &gdi)
 // retrieve competition from install
 wstring file = getTempFile();
 if (!GetEventTemplateFromInstall(file))
+{
+  MessageBox(0, L"SSS template file (SSS*.meosxml) is missing from installation.\nCan't initialise SSS.", L"MeOS", MB_OK | MB_ICONEXCLAMATION);
   return false;
+}
 
 // If the competition already exists (say from Eventor) then just add course, controls etc
 if (!m_Event.empty())
