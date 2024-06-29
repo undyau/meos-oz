@@ -2807,7 +2807,9 @@ void TabList::splitPrintSettings(oEvent &oe, gdioutput &gdi, bool setupPrinter,
    
     if (setupPrinter) 
       gdi.addButton("PrinterSetup", "Skrivare...", ListsCB, "Skrivarinställningar");
-  
+    if (returnMode == TSITab)
+      gdi.addButton("LabelPrinterSetup", "Etikettskrivare...", ListsCB, "Skrivarinställningar för etiketter");
+
     gdi.dropLine(2.8);
     
     gdi.fillDown();
@@ -2842,14 +2844,11 @@ void TabList::splitPrintSettings(oEvent &oe, gdioutput &gdi, bool setupPrinter,
   else if (setupPrinter) {
     gdi.dropLine(0.2);
     gdi.addButton("PrinterSetup", "Skrivare...", ListsCB, "Skrivarinställningar");
+    if (returnMode == TSITab)
+      gdi.addButton("LabelPrinterSetup", "Etikettskrivare...", ListsCB, "Skrivarinställningar för etiketter");
+    gdi.popX();
   }
-  gdi.popX();
-  gdi.dropLine(2);
-
-  if (returnMode == TSITab) {
-    gdi.addButton("LabelPrinterSetup", "Etikettskrivare...", ListsCB, "Skrivarinställningar för etiketter");
-  }
-
+  
   gdi.popX();
   
   RECT rc;
