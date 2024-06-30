@@ -4,7 +4,7 @@
 <meosdata version="4.0">
 <Name>Sydney Summer Series</Name>
 <Date>2024-06-15</Date>
-<ZeroTime>2160</ZeroTime>
+<ZeroTime>57600</ZeroTime>
 <NameId>meos_20240615_183822_355</NameId>
 <IsSydneySummerSeries>1</IsSydneySummerSeries>
 <SssEventNum>22</SssEventNum>

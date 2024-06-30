@@ -4,7 +4,7 @@
 <meosdata version="4.0">
 <Name>Sydney Summer Series</Name>
 <Date>2016-10-19</Date>
-<ZeroTime>2160</ZeroTime>
+<ZeroTime>57600</ZeroTime>
 <NameId>meos_20121108_124210_3DB</NameId>
 <IsSydneySummerSeries>1</IsSydneySummerSeries>
 <SssSeriesPrefix>sss</SssSeriesPrefix>
