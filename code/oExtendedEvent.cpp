@@ -475,6 +475,7 @@ string my_conv_is(int i)
 
 string formatOeCsvTime(int rt)
 {
+  rt /= 10; // Lose the sub-second detail
   if(rt>0 && rt<3600*48) {
     char bf[16];
     sprintf_s(bf, 16, "%02d:%02d", (rt/60), rt%60);
