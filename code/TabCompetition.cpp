@@ -1168,7 +1168,7 @@ int TabCompetition::competitionCB(gdioutput &gdi, GuiEventType type, BaseInfo *d
           return 0;
       }
 
-      if (oe->getNumRunners() > 0 && !static_cast<oExtendedEvent*>(oe)->getPreserveExistingRunnersAsIs())
+      if (oe->getNumRunners() > 0)
           static_cast<oExtendedEvent*>(oe)->preserveExistingRunnersAsIs(gdi.ask(lang.tl(L"Bevara befintliga detaljer om konkurrenter som redan finns i MeOS?")));
 
       gdi.enableEditControls(false);
