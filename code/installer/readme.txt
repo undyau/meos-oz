@@ -1,3 +1,6 @@
+  11 June 2024 4.0.1543.1
+- Merge changes from 4.0.1543.1
+
   12 Feb 2023 3.8.1306.1
 - Crash connecting to MySQL server - wrong DLL was installed in
   version 3.8.1306.0
