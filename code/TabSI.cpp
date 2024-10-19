@@ -3258,6 +3258,8 @@ bool TabSI::processCard(gdioutput& gdi, pRunner runner, const SICard& csic, bool
       else
         rout.statusline += lang.tl(L",     Prel. bomtid: ") + runner->getMissedTimeS();
     
+    rout.rentCard = runner->isRentalCard() || oe->isHiredCard(sic.CardNumber);
+    
     if (!silent) {
       rout.render(gdi, rout.computeRC(gdi));
       gdi.scrollToBottom();
