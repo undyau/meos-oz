@@ -22,5 +22,3 @@ MeOS - A Much Easier Orienteering System
 - Last hire sticks file is automatically loaded at start-up
 - Late entries from Eventor entries imported without touching existing data
 - Import another Eventor event's entries as a "season ticket list"
-
-### Note: Support for rental/hire SI sticks changed to the regular MeOS method in 3.7.1188

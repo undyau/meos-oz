@@ -1,3 +1,7 @@
+  19 October 2024 4.0.1543.2
+- Repair rental card download logic so they are flagged.
+- Set pre-requisites for install as they were previously.
+
   11 June 2024 4.0.1543.1
 - Merge changes from 4.0.1543.1
 
