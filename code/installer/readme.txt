@@ -1,3 +1,7 @@
+  07 November 2024
+- For score events, include points and penalty detail in results even if score
+  is zero, provided penalty is non-zero.
+
   19 October 2024 4.0.1543.2
 - Repair rental card download logic so they are flagged.
 - Set pre-requisites for install as they were previously.

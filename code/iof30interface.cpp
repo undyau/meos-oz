@@ -3644,7 +3644,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
     xml.write("Status", formatStatus(status, r.getFinishTime()>0));
 
     int rg = r.getRogainingPoints(true, false);
-    if (rg > 0) {
+    if (rg > 0 || r.getRogainingReduction(true) > 0) {  // Rogaining points can be zero with sufficient penalty
       xml.write("Score", "type", L"Score", itow(rg));
       xml.write("Score", "type", L"Penalty", itow(r.getRogainingReduction(true)));
     }
