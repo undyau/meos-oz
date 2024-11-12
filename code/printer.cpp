@@ -32,6 +32,8 @@
 #include "gdiimpl.h"
 #include <algorithm>
 #include "meosexception.h"
+#include <winrt/Windows.Foundation.h> // Include the WinRT headers
+#include <winrt/base.h>               // For winrt::hresult_error
 
 extern gdioutput *gdi_main;
 static bool bPrint;
@@ -363,6 +365,7 @@ bool gdioutput::startDoc(PrinterObject &po)
   // Initialize the members of a DOCINFO structure.
   DOCINFO di;
   int nError;
+  ZeroMemory(&di, sizeof(DOCINFO));
   di.cbSize = sizeof(DOCINFO);
 
   wchar_t sb[256];
@@ -373,7 +376,14 @@ bool gdioutput::startDoc(PrinterObject &po)
   di.lpszDatatype = (LPTSTR) NULL;
   di.fwType = 0;      // Begin a print job by calling the StartDoc function.
 
-  nError = StartDoc(po.hDC, &di);
+  using namespace winrt;
+  try {
+    nError = StartDoc(po.hDC, &di);
+  }
+  catch (const winrt::hresult_error& ex) {
+    // ignore and carry on
+    alert(ex.message().c_str());
+  }
 
   if (nError <= 0) {
     nError=GetLastError();
