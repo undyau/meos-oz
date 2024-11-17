@@ -1,4 +1,7 @@
-  07 November 2024
+  18 November 2024 4.0.1543.4
+- Prevent hang after using custom print job with Epsom TM 88 IV printer.
+
+  07 November 2024 4.0.1543.3
 - For score events, include points and penalty detail in results even if score
   is zero, provided penalty is non-zero.
 
