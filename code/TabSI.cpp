@@ -3253,7 +3253,7 @@ bool TabSI::processCard(gdioutput& gdi, pRunner runner, const SICard& csic, bool
       lang.tl(L"Tid: ") + getTimeString(runner);
     if (!placeS.empty())
       rout.statusline += lang.tl(L",      Prel. placering: ") + placeS;
-      if (runner->getCourse(false)->hasRogaining())
+      if (runner->getCourse(false) && runner->getCourse(false)->hasRogaining())
         rout.statusline += lang.tl(L",     Poäng: ") + itow(runner->getRogainingPoints(false, false));
       else
         rout.statusline += lang.tl(L",     Prel. bomtid: ") + runner->getMissedTimeS();
