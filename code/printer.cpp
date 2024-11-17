@@ -149,7 +149,7 @@ void gdioutput::printSetup(PrinterObject &po)
   pd.hDevNames = po.hDevNames;
 
   pd.Flags = PD_RETURNDC|PD_USEDEVMODECOPIESANDCOLLATE|PD_PRINTSETUP;
-  pd.hwndOwner = hWndAppMain;
+  pd.hwndOwner = NULL;  // Trick Windows into showing old dialog
   pd.hDC = (HDC) po.hDC;
   pd.nFromPage = 1;
   pd.nToPage = 1;
@@ -215,7 +215,7 @@ void gdioutput::print(pEvent oe, Table *t, bool printMeOSHeader, bool noMargin, 
   pd.hDevMode = po.hDevMode;
   pd.hDevNames = po.hDevNames;
   pd.Flags = PD_RETURNDC;
-  pd.hwndOwner = hWndAppMain;
+  pd.hwndOwner = NULL;  // Trick Windows into showing old dialog
   pd.hDC = (HDC)NULL;
   pd.nFromPage = 1;
   pd.nToPage = 1;
@@ -298,7 +298,7 @@ void gdioutput::print(PrinterObject &po, pEvent oe, bool printMeOSHeader, bool n
     pd.hDevMode = 0;
     pd.hDevNames = 0;
     pd.Flags = PD_RETURNDEFAULT;
-    pd.hwndOwner = hWndAppMain;
+    pd.hwndOwner = NULL;  // Trick Windows into showing old dialog
     pd.hDC = (HDC) NULL;
     pd.nFromPage = 1;
     pd.nToPage = 1;
