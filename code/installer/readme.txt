@@ -1,5 +1,6 @@
   18 November 2024 4.0.1543.4
-- Prevent hang after using custom print job with Epsom TM 88 IV printer.
+- Prevent hang after using custom print job with Epsom TM 
+- Don't crash when reading SI class if not course is allocated.
 
   07 November 2024 4.0.1543.3
 - For score events, include points and penalty detail in results even if score
