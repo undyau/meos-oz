@@ -293,3 +293,5 @@ __pycache__/
 untranslated.txt
 English_translated.txt
 /code/English_spellcheck.txt
+/code/installer/Prerequisites/**
+/code/installer/meos-setup.exe
