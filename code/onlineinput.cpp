@@ -89,7 +89,7 @@ int OnlineInput::processButton(gdioutput &gdi, ButtonInfo &bi) {
   else if (bi.id == "UseROC") {
     useROCProtocol = gdi.isChecked(bi.id);
     if (useROCProtocol) {
-      gdi.setText("URL", L"http://roc.olresultat.se/getpunches.asp");      
+      gdi.setText("URL", L"https://roc.olresultat.se/getpunches.asp");      
     }
     else {
       gdi.check("UseUnitId", false);

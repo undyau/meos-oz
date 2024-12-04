@@ -318,7 +318,7 @@ void oExtendedEvent::prepData4SssUpload(wstring& data)
 
 void oExtendedEvent::uploadSssUnattended()
 {
-  wstring url = getPropertyString("SssServer", L"http://sportident.itsdamp.com/liveresult.php");
+  wstring url = getPropertyString("SssServer", L"https://sportident.itsdamp.com/liveresult.php");
   wstring data;
   prepData4SssUpload(data);
   Download dwl;

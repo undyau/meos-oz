@@ -222,7 +222,7 @@ void TabCompetition::loadSssUploadPage(gdioutput &gdi)
   gdi.dropLine();
   gdi.addString("", italicText, "Check the results in the Lists tab before doing the upload");
   gdi.dropLine();
-  string tmp = oe->getPropertyString("SssServer", "http://sportident.itsdamp.com/liveresult.php");
+  string tmp = oe->getPropertyString("SssServer", "https://sportident.itsdamp.com/liveresult.php");
   wstring defaultSssServer;
   string2Wide(tmp, defaultSssServer);
 
