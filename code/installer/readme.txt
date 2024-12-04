@@ -1,3 +1,6 @@
+  05 December 2024 4.0.1543.5
+- Update urls to use https for online punches and results
+
   18 November 2024 4.0.1543.4
 - Prevent hang after using custom print job with Epsom TM 
 - Don't crash when reading SI class if not course is allocated.
