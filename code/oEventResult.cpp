@@ -1227,3 +1227,58 @@ void oEvent::computePreliminarySplitResults(const set<int> &classes) const {
     }
   }
 }
+
+
+void oEvent::calculateCourseRogainingResults()
+{
+    sortRunners(CoursePoints);
+    oRunnerList::iterator it;
+
+    int cPlace = 0;
+    int vPlace = 0;
+    int cTime = numeric_limits<int>::min();;
+    bool useResults = false;
+    bool isRogaining = false;
+    bool invalidClass = false;
+    pCourse cCourse(nullptr);
+
+    for (it = Runners.begin(); it != Runners.end(); ++it) {
+        if (it->isRemoved())
+            continue;
+
+        if (it->getCourse(false) != cCourse) {
+            cCourse = it->getCourse(false);
+            useResults = it->Class ? !it->Class->getNoTiming() : false;
+            cPlace = 0;
+            vPlace = 0;
+            cTime = numeric_limits<int>::min();
+            isRogaining = it->Class ? it->Class->isRogaining() : false;
+            invalidClass = it->Class ? it->Class->getClassStatus() != oClass::ClassStatus::Normal : false;
+        }
+
+        if (!isRogaining)
+            continue;
+
+        if (invalidClass) {
+            it->tTotalPlace.update(*oe, resultKey(), 0, false);
+            it->tPlace.update(*this, resultKey(), 0, false);
+        }
+        else if (it->getStatusComputed(false) == StatusOK) {
+            cPlace++;
+
+            int cmpRes = 3600 * 24 * 7 * it->tRogainingPoints - it->getRunningTime(false);
+
+            if (cmpRes != cTime)
+                vPlace = cPlace;
+
+            cTime = cmpRes;
+
+            if (useResults)
+                it->tPlace.update(*this, resultKey(), vPlace, false);
+            else
+                it->tPlace.update(*this, resultKey(), 0, false);
+        }
+        else
+            it->tPlace.update(*this, resultKey(), 99000 + it->getStatusComputed(false), false);
+    }
+}

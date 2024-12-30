@@ -1435,7 +1435,7 @@ protected:
   mutable int useSubsecondsVersion = -1;
 
 public:
-  void calculateCourseRogainingResults(); // implemented in oExtendedEvent.cpp
+  void calculateCourseRogainingResults(); // implemented in oEventResult.cpp
 
   /** Do some operation and disable (global) reevaluate/update */
   template<typename OP>
