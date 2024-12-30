@@ -25,17 +25,17 @@
 
 //ABCDEFGHIJKLMNOPQ
 int getMeosBuild() {
-  string revision("$Rev: 1369 $");
+  string revision("$Rev: 1404 $");
   return 174 + atoi(revision.substr(5, string::npos).c_str());
 }
 
 wstring getMeosDate() {
-  wstring date(L"$Date: 2024-06-16 09:55:06 +0200 (sön, 16 jun 2024) $");
+  wstring date(L"$Date: 2024-09-09 22:37:46 +0200 (mån, 09 sep 2024) $");
   return date.substr(7,10);
 }
 
 wstring getBuildType() {
-  return L"Update 1"; // No parantheses (...)
+  return L"Update 3"; // No parantheses (...)
 }
 
 wstring getMajorVersion() {
@@ -43,7 +43,7 @@ wstring getMajorVersion() {
 }
 
 int getMinorVersion() {   // Used by MEOS-OZ only
-  return 5;
+  return 0;
   }
 
 wstring getMeosFullVersion() {

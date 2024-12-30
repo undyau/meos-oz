@@ -21,6 +21,7 @@
 ************************************************************************/
 
 #include "stdafx.h"
+
 #include <algorithm>
 #include <cassert>
 

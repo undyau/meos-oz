@@ -299,7 +299,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   lang.get().addLangResource(L"Svenska", L"103");
   lang.get().addLangResource(L"Deutsch", L"105");
   lang.get().addLangResource(L"Dansk", L"106");
-  lang.get().addLangResource(L"Ceský", L"108");
+  lang.get().addLangResource(L"Český", L"108");
   lang.get().addLangResource(L"Français", L"110");
   lang.get().addLangResource(L"Español", L"111");
   lang.get().addLangResource(L"Russian", L"107");

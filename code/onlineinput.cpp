@@ -362,7 +362,7 @@ void OnlineInput::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
     dwl.downloadFile(url + q, result, key);
     dwl.downLoadNoThread();
 
-      if (!useROCProtocol) {
+    if (!useROCProtocol) {
       xmlobject res;
       xmlparser xml;
       try {

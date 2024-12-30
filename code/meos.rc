@@ -206,7 +206,7 @@ BEGIN
             VALUE "FileDescription", "meos"
             VALUE "FileVersion", "4.0.1543.5"
             VALUE "InternalName", "meos"
-            VALUE "LegalCopyright", "Copyright � 2007-2024"
+            VALUE "LegalCopyright", "Copyright © 2007-2024"
             VALUE "OriginalFilename", "MeOS.exe"
             VALUE "ProductName", "  meos"
             VALUE "ProductVersion", "4.0.1543.5"

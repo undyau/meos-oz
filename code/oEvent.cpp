@@ -884,7 +884,7 @@ bool oEvent::save(const wstring &fileIn, bool isAutoSave) {
   xml.write("Annotation", Annotation);
   xml.write("Id", Id);
   writeExtraXml(xml);
-  xml.write("Updated", Modified.getStamp());
+  xml.write("Updated", getStamp());
 
   oEventData->write(this, xml);
 

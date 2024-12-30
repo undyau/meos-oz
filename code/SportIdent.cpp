@@ -2030,7 +2030,6 @@ void SportIdent::addPunch(DWORD Time, int Station, int Card, int Mode) {
     Time -= (Time % timeConstSecond);
 
   SICard sic(ConvertedTimeStatus::Hour24);
-  memset(&sic, 0, sizeof(sic));
   sic.CardNumber = Card;
   sic.StartPunch.Code = -1;
   sic.CheckPunch.Code = -1;

@@ -4630,6 +4630,7 @@ OpFailStatus MeosSQL::synchronizeUpdate(oBase *obj) {
     return syncUpdate((oFreePunch *)obj, false);
   }
   else if (typeid(*obj) == typeid(oEvent)) {
+
     return SyncUpdate((oEvent *)obj);
   }
   else if (typeid(*obj) == typeid(oExtendedEvent)) {
