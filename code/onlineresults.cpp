@@ -504,6 +504,9 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
             addedHeader = true;
             wstring result = getTempFile();
             dwl.postFile(url, t, result, key, pw);
+            struct _stat st;
+            _wstat(t.c_str(), &st);
+            bytesExported += st.st_size;
             removeTempFile(t);
 
             pwMain.setProgress(1000);
