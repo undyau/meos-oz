@@ -1,6 +1,7 @@
   30 December 2024 4.0.1578.0
- - Merge changes from 4.0.1578 MeOS (a.k.a 4.0 rel 3)
+ - Merge changes from 4.0.1578 Update 3 MeOS
  - Use club long name on season ticket import
+ - Export of IOF XML results to online server was broken
 
   05 December 2024 4.0.1543.5
 - Update urls to use https for online punches and results

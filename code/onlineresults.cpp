@@ -478,8 +478,37 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
         bool forceNoZip = false;
 
         bool moreToWrite = true;
-        string tmp;
+        string tmp("OK");
         const int total = max<int>(xmlbuff.size(), 1u);
+
+        if (dataType == DataType::IOF2 || dataType == DataType::IOF3) {
+            if (!forceNoZip && (zipFile || forceZIP)) {
+                wstring zipped = getTempFile();
+                zip(zipped.c_str(), 0, vector<wstring>(1, t));
+                removeTempFile(t);
+                t = zipped;
+            }
+
+            if (!addedHeader) {
+                if (zipFile) {
+                    forceZIP = true;
+                    pair<wstring, wstring> mk3(L"Content-Type", L"application/zip");
+                    key.push_back(mk3);
+                }
+                else {
+                    forceNoZip = true;
+                    pair<wstring, wstring> mk3(L"Content-Type", L"text/plain");
+                    key.push_back(mk3);
+                }
+            }
+            addedHeader = true;
+            wstring result = getTempFile();
+            dwl.postFile(url, t, result, key, pw);
+            removeTempFile(t);
+
+            pwMain.setProgress(1000);
+            moreToWrite = false;
+        }
 
         while(moreToWrite) {
 

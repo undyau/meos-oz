@@ -18,4 +18,6 @@
 18. Test with server mode
 19. Test hire stick auto detect in server mode
 20. Test ROC control when Sweden/Australia on different days
+21. Test online export of IOF XML results to url
+22. Test online export of IOF XML results to file
 
