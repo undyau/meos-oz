@@ -52,7 +52,7 @@ bool oExtendedEvent::addXmlRunner(gdioutput & gdi, xmlobject& xo)
   wstring club;
   xmlobject xclub = xo.getObject("Organisation");
   if (xclub)
-    xclub.getObjectString("ShortName", club);
+    xclub.getObjectString("Name", club);
 
   wstring className;
   xmlobject xclass = xo.getObject("Class");
