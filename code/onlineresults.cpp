@@ -451,7 +451,9 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
         gdi.addInfoBox("", L"Kunde inte skriva resultat till X#" + fn);
       else if (!sendToURL) {
         ic.commitComplete();
-        bytesExported +=xmlSize;
+        struct _stat st;
+        _wstat(t.c_str(), &st);
+        bytesExported += st.st_size;
         removeTempFile(t);
       }
 
