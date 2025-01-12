@@ -171,6 +171,8 @@ class InfoBaseCompetitor : public InfoBase {
     int status;
     int startTime;
     int runningTime;
+    int points = -1;
+    int penalty = -1;
     wstring bib;
     wstring nationality;
     void serialize(xmlbuffer &xml, bool diffOnly, int course) const;
