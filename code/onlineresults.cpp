@@ -470,9 +470,9 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
         dwl.initInternet();
         ProgressWindow pw(0);
         vector<pair<wstring,wstring> > key;
-    		pair<wstring, wstring> mk1(L"competition", itow(cmpId));
+    	pair<wstring, wstring> mk1(L"competition", itow(cmpId));
         key.push_back(mk1);
-		    pair<wstring, wstring> mk2(L"pwd", passwd);
+		pair<wstring, wstring> mk2(L"pwd", passwd);
         key.push_back(mk2);
 
         bool addedHeader = false;
@@ -595,6 +595,22 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
 
           if (tmp != "OK")
             break;
+
+          if (cmpId == 0) {
+              bool found(false);
+              cmpId = res.getObjectInt("competition");
+              for (auto it = begin(key); it != end(key); ++it) {
+                  if (it->first == L"competition") {
+                      found = true;
+                      it->second = itow(cmpId);
+                  }     
+              }
+
+              if (!found) {
+                  pair<wstring, wstring> mk1(L"competition", itow(cmpId));
+                  key.push_back(mk1);
+              }
+          }
         }
 
         if (tmp == "OK")
