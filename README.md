@@ -22,3 +22,4 @@ MeOS - A Much Easier Orienteering System
 - Last hire sticks file is automatically loaded at start-up
 - Late entries from Eventor entries imported without touching existing data
 - Import another Eventor event's entries as a "season ticket list"
+- Support for direct export to liveresults.page using MOP 2, including score events
