@@ -244,6 +244,33 @@ void OnlineInput::status(gdioutput &gdi)
   gdi.popX();
 }
 
+void GetActualTransitionDate(SYSTEMTIME& time) 
+{
+    std::tm transition = {};
+    transition.tm_year = time.wYear - 1900; // tm_year is years since 1900
+    transition.tm_mon = time.wMonth - 1; // tm_mon is 0-based
+
+    // Find the first occurrence of wDayOfWeek in the month
+    std::tm firstDay = transition;
+    firstDay.tm_mday = 1;
+    std::mktime(&firstDay); // Normalize
+
+    int firstWeekday = firstDay.tm_wday; // Get the weekday of 1st of the month
+    int diff = (time.wDayOfWeek - firstWeekday + 7) % 7; // Days until first wDayOfWeek
+    int transitionDay = 1 + diff + (time.wDay - 1) * 7; // Compute exact day
+
+    // If the transition day exceeds the month's days, get the last occurrence
+    std::tm lastDay = transition;
+    lastDay.tm_mday = 31;
+    std::mktime(&lastDay); // Normalize to get actual last day of the month
+
+    if (time.wDay == 5 && transitionDay > lastDay.tm_mday) {
+        transitionDay -= 7; // Adjust to last occurrence
+    }
+
+    time.wDay = transitionDay;
+}
+
 const std::wstring getRocDate() {
   // Need current date in Sweden to trick ROC into giving us the punches
   // Otherwise if we use the Australian date, we won't get punches in the morning
@@ -272,6 +299,11 @@ const std::wstring getRocDate() {
   {
     w_european_tz_data.DaylightDate.wYear = utc.wYear;
     w_european_tz_data.StandardDate.wYear = utc.wYear;
+
+    // Transition dates use custom values for wDay - replace with regular dates
+    GetActualTransitionDate(w_european_tz_data.StandardDate);
+    GetActualTransitionDate(w_european_tz_data.DaylightDate);
+
     __int64 system_time = SystemTimeToInt64TenthSecond(utc);
     __int64 swedish_dst_start = SystemTimeToInt64TenthSecond(w_european_tz_data.DaylightDate);
     __int64 swedish_standard_start = SystemTimeToInt64TenthSecond(w_european_tz_data.StandardDate);
