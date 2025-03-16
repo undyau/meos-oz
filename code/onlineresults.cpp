@@ -144,7 +144,7 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, State state) {
 
   gdi.addCheckbox("IncludeCourse", "Inkludera bana", 0, includeCourse);
 
-  gdi.addCheckbox("Zip", "Packa stora filer (zip)", 0, zipFile, false);
+  gdi.addCheckbox("Zip", "Packa stora filer (zip)", 0, zipFile);
   if (oe.hasPrevStage()) {
     gdi.addCheckbox("IncludeTotal", "Inkludera resultat från tidigare etapper", 0, includeTotal);
     InfoCompetition &ic = getInfoServer();
