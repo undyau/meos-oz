@@ -23,3 +23,4 @@ MeOS - A Much Easier Orienteering System
 - Late entries from Eventor entries imported without touching existing data
 - Import another Eventor event's entries as a "season ticket list"
 - Support for direct export to liveresults.page using MOP 2, including score events
+- Support for Radio Online Control usage from different time zone.

@@ -1,3 +1,8 @@
+  17 March 2025 4.0.1578.1
+ - Bug when using Radio Online Control in start/end month of Swedish daylight 
+   savings. Could cause punches to not be retrieved when Sweden was on a 
+   different day.
+
   16 February 2025 4.0.1578.0
  - Merge changes from 4.0.1578 Update 3 MeOS
  - Use club long name on season ticket import

@@ -43,7 +43,7 @@ wstring getMajorVersion() {
 }
 
 int getMinorVersion() {   // Used by MEOS-OZ only
-  return 0;
+  return 1;
   }
 
 wstring getMeosFullVersion() {
