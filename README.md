@@ -24,3 +24,15 @@ MeOS - A Much Easier Orienteering System
 - Import another Eventor event's entries as a "season ticket list"
 - Support for direct export to liveresults.page using MOP 2, including score events
 - Support for Radio Online Control usage from different time zone.
+
+## Building MeOS-OZ
+### Prerequisites
+- Visual Studio
+- Inno Setup
+
+### Compilation
+The supplied solution file for Visual Studio is used to build the x86 version
+of MeOS using DLLs from the vanilla MeOS installation or GitHub.
+
+### Building the setup executable
+Inno Setup software is used for packaging - input file is installer\meos.iss.
