@@ -5219,7 +5219,6 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
         if (it->tRogainingIndex >= 0) {
           const pControl c = pc->getControl(it->tRogainingIndex);
           string point = c ? itos(c->getRogainingPoints()) + "p." : "";
-          cumulativePoints += c ? c->getRogainingPoints() : 0;
 
           gdi.addStringUT(cy, cx + c1 + gdi.scaleLength(10 / 2), fontSmall, point);
           any = true;
@@ -5240,8 +5239,6 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
             wstring punchTime = formatTime(pt - st, SubSecond::Off);
             gdi.addStringUT(cy, cx + c5_accleg, fontSmall | textRight, punchTime);
           }
-
-          gdi.addStringUT(cy, cx + c4 + 40, fontSmall, itos(cumulativePoints));
 
           cy += int(gdi.getLineHeight() * 0.9);
           continue;

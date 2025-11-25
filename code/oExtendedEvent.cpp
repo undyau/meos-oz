@@ -228,7 +228,7 @@ void oExtendedEvent::exportCourseOrderedIOFSplits(IOFVersion version, const wcha
 
   // Do the export
   pair<string, string> preferredIdTypes;
-  oEvent::exportIOFSplits(version, file, oldStylePatrolExport, /*USe UTC*/false, classes, preferredIdTypes, leg, true, true, true, false, false);
+  oEvent::exportIOFSplits(version, file, oldStylePatrolExport, /*USe UTC*/false, classes, preferredIdTypes, leg, false, true, true, true, false, false);
 
   // Reassign all runners back to original classes
   for (oRunnerList::iterator j = Runners.begin(); j != Runners.end(); j++) {
