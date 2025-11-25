@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -73,6 +73,8 @@ class IOF30Interface {
   bool unrollLoops;
   // Include data on stage number
   bool includeStageRaceInfo;
+
+  bool preferShortName;
 
   int classIdOffset = 0;
   int courseIdOffset = 0;
@@ -214,6 +216,9 @@ class IOF30Interface {
   void writeAssignedFee(xmlparser &xml, const oAbstractRunner &tr, int paidForCard) const;
   void writeRentalCardService(xmlparser &xml, int cardFee, bool paid) const;
 
+  void writeTeamForkings(xmlparser& xml) const;
+  void writeTeamForking(xmlparser& xml, const oTeam& t) const;
+
   void getProps(vector<wstring> &props) const;
 
   void writeClassResult(xmlparser &xml, const oClass &c, const vector<pRunner> &r,
@@ -237,7 +242,8 @@ class IOF30Interface {
 
 
   void getRunnersToUse(const pClass cls, vector<pRunner> &rToUse,
-                       vector<pTeam> &tToUse, int leg, bool includeUnknown) const;
+                       vector<pTeam> &tToUse, int leg, 
+                       bool includeUnknown, bool skipVacant) const;
 
   void writeClassStartList(xmlparser &xml, const oClass &c, const vector<pRunner> &r,
                            const vector<pTeam> &t);
@@ -351,7 +357,8 @@ public:
 
   void writeResultList(xmlparser &xml, const set<int> &classes, int leg,
                        bool useUTC, bool teamsAsIndividual, 
-                       bool unrollLoops, bool includeStageInfo);
+                       bool unrollLoops, bool includeStageInfo,
+                       bool withPartialResult);
 
   void writeStartList(xmlparser &xml, const set<int> &classes, bool useUTC, 
                       bool teamsAsIndividual, bool includeStageInfo);
@@ -363,4 +370,7 @@ public:
   void writeRunnerDB(const RunnerDB &db, xmlparser &xml) const;
 
   void writeClubDB(const RunnerDB &db, xmlparser &xml) const;
+
+  void writeForkings(xmlparser& xml) const;
+
 };

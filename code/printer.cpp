@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,8 +32,6 @@
 #include "gdiimpl.h"
 #include <algorithm>
 #include "meosexception.h"
-#include <winrt/Windows.Foundation.h> // Include the WinRT headers
-#include <winrt/base.h>               // For winrt::hresult_error
 
 extern gdioutput *gdi_main;
 static bool bPrint;
@@ -149,7 +147,7 @@ void gdioutput::printSetup(PrinterObject &po)
   pd.hDevNames = po.hDevNames;
 
   pd.Flags = PD_RETURNDC|PD_USEDEVMODECOPIESANDCOLLATE|PD_PRINTSETUP;
-  pd.hwndOwner = NULL;  // Trick Windows into showing old dialog
+  pd.hwndOwner = hWndAppMain;
   pd.hDC = (HDC) po.hDC;
   pd.nFromPage = 1;
   pd.nToPage = 1;
@@ -215,7 +213,7 @@ void gdioutput::print(pEvent oe, Table *t, bool printMeOSHeader, bool noMargin, 
   pd.hDevMode = po.hDevMode;
   pd.hDevNames = po.hDevNames;
   pd.Flags = PD_RETURNDC;
-  pd.hwndOwner = NULL;  // Trick Windows into showing old dialog
+  pd.hwndOwner = hWndAppMain;
   pd.hDC = (HDC)NULL;
   pd.nFromPage = 1;
   pd.nToPage = 1;
@@ -298,7 +296,7 @@ void gdioutput::print(PrinterObject &po, pEvent oe, bool printMeOSHeader, bool n
     pd.hDevMode = 0;
     pd.hDevNames = 0;
     pd.Flags = PD_RETURNDEFAULT;
-    pd.hwndOwner = NULL;  // Trick Windows into showing old dialog
+    pd.hwndOwner = hWndAppMain;
     pd.hDC = (HDC) NULL;
     pd.nFromPage = 1;
     pd.nToPage = 1;
@@ -365,7 +363,6 @@ bool gdioutput::startDoc(PrinterObject &po)
   // Initialize the members of a DOCINFO structure.
   DOCINFO di;
   int nError;
-  ZeroMemory(&di, sizeof(DOCINFO));
   di.cbSize = sizeof(DOCINFO);
 
   wchar_t sb[256];
@@ -376,14 +373,7 @@ bool gdioutput::startDoc(PrinterObject &po)
   di.lpszDatatype = (LPTSTR) NULL;
   di.fwType = 0;      // Begin a print job by calling the StartDoc function.
 
-  using namespace winrt;
-  try {
-    nError = StartDoc(po.hDC, &di);
-  }
-  catch (const winrt::hresult_error& ex) {
-    // ignore and carry on
-    alert(ex.message().c_str());
-  }
+  nError = StartDoc(po.hDC, &di);
 
   if (nError <= 0) {
     nError=GetLastError();

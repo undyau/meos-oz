@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@ class OnlineInput :
   public AutoMachine
 {
 protected:
+  map<int, oPunch::SpecialPunch> specialPunches;
+  oEvent* oe = nullptr;
   wstring url;
   int cmpId;
   wstring unitId;
@@ -39,19 +41,23 @@ protected:
   int bytesImported;
   DWORD lastSync;
 
-  bool useROCProtocol;
+  enum class Type {
+    MIP,
+    ROC,
+    SICenter,
+  };
+  Type serverType = Type::MIP;
   bool useUnitId;
 
   deque<wstring> info;
-  map<int, oPunch::SpecialPunch> specialPunches;
-
+  
   void addInfo(const wstring &line) {
     if (info.size() >= 10)
       info.pop_back();
     info.push_front(line);
   }
 
-  void fillMappings(gdioutput &gdi) const;
+  void fillMappings(oEvent& oe, gdioutput &gdi);
 
   void processCards(gdioutput &gdi, oEvent &oe, const xmlList &cards);
   void processTeamLineups(oEvent &oe, const xmlList &updates);
@@ -60,6 +66,7 @@ protected:
 
   void processPunches(oEvent &oe, const xmlList &punches);
   void processPunches(oEvent &oe, list< vector<wstring> > &rocData);
+  void processPunchesSICenter(oEvent& oe, const wstring& filename);
 
   bool hasSaveMachine() const final {
     return true;
@@ -68,19 +75,25 @@ protected:
   void saveMachine(oEvent &oe, const wstring &guiInterval) final;
   void loadMachine(oEvent &oe, const wstring &name) final;
 
+  time_t getZeroTimeMSLinuxEpoch() const;
+  int mapPunch(int code) const;
+
 public:
   int processButton(gdioutput &gdi, ButtonInfo &bi);
+  int processListBox(gdioutput& gdi, ListBoxInfo& bi);
 
   void updateLabel(gdioutput& gdi);
 
   void save(oEvent &oe, gdioutput &gdi, bool doProcess) final;
   void settings(gdioutput &gdi, oEvent &oe, State state) final;
-  static void controlMappingView(gdioutput& gdi, GUICALLBACK cb, int widgetId);
-  OnlineInput *clone() const {return new OnlineInput(*this);}
+  static void controlMappingView(gdioutput& gdi, oEvent *oe, GUICALLBACK cb, int widgetId);
+  shared_ptr<AutoMachine> clone() const final { 
+    return make_shared<OnlineInput>(*this);
+  }
   void status(gdioutput &gdi) final;
   void process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) final;
   OnlineInput() : AutoMachine("Onlineinput", Machines::mOnlineInput), cmpId(0), importCounter(1),
-                    bytesImported(0), lastSync(0), lastImportedId(0), useROCProtocol(false), useUnitId(false) {}
-  ~OnlineInput();
+                    bytesImported(0), lastSync(0), lastImportedId(0), useUnitId(false) {}
+  ~OnlineInput() = default;
   friend class TabAuto;
 };

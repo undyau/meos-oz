@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,6 +34,12 @@ enum RunnerStatus {
   StatusOK = 1, StatusDNS = 20, StatusCANCEL = 21, StatusOutOfCompetition = 15, StatusMP = 3,
   StatusDNF = 4, StatusDQ = 5, StatusMAX = 6, StatusNoTiming = 2,
   StatusUnknown = 0, StatusNotCompetiting = 99
+};
+
+enum class DynamicRunnerStatus {
+  StatusInactive,
+  StatusActive,
+  StatusFinished
 };
 
 /** Returns true for a status that might or might not indicate a result. */
@@ -84,6 +90,7 @@ enum SortOrder {
   SortByEntryTime,
   CoursePoints,
   ClubClassStartTime,
+  SortByBib,
   Custom,
   SortEnumLastItem
 };
@@ -128,6 +135,8 @@ protected:
   int tStartTime;
 
   int FinishTime;
+  bool finishTimeWasSet = false;
+
   mutable int tComputedTime = 0;
 
   RunnerStatus status;
@@ -265,6 +274,7 @@ public:
     FlagNoTiming = 512, // No timing requested
     FlagNoDatabase = 1024, // Do not store in databse
     FlagPayBeforeResult = 2048, // Require payment before result
+    FlagUnnamed = 2 << 12
   };
 
   bool hasFlag(TransferFlags flag) const;
@@ -438,7 +448,8 @@ public:
 
   virtual RunnerStatus getStatusComputed(bool allowUpdate) const = 0;
   RunnerStatus getStatus() const { return tStatus;}
-  
+  virtual DynamicRunnerStatus getDynamicStatus() const = 0;
+
   /** Status OK, including NoTiming/OutOfCompetition*/
   bool isStatusOK(bool computed, bool allowUpdate) const;
 
@@ -454,13 +465,20 @@ public:
     }
     return ok;
   }
+  
+  /** Return true if competitor/team has a time and a readout card (if expected) */
+  virtual bool runnerHasResult() const {
+    return getRunningTime(false) > 0;
+  }
+
   // Returns true if the competitor has a definite result
   bool hasResult() const {
     RunnerStatus st = getStatusComputed(true);
     if (st == StatusUnknown || st == StatusNotCompetiting)
       return false;
-    if (isPossibleResultStatus(st))
-      return getRunningTime(false) > 0;
+    if (isPossibleResultStatus(st)) {
+      return runnerHasResult();
+    }
     else
       return true;
   }
@@ -600,6 +618,7 @@ protected:
 
   int cardNumber;
   pCard Card;
+  bool cardWasSet = false;
 
   vector<pRunner> multiRunner;
   vector<int> multiRunnerId;
@@ -768,6 +787,17 @@ protected:
   int getBuiltinAdjustment() const override;
 
 public:
+
+  bool runnerHasResult() const final {
+    if (Card == nullptr) {
+      if (pCourse crs = getCourse(false); crs != nullptr)
+        return false; // A card is expected but not present
+    }
+    return getRunningTime(false) > 0;
+  }
+  
+  DynamicRunnerStatus getDynamicStatus() const final;
+
   /// Second external ID (local and WRE etc)
   
   /// Set a second external identifier (0 if none)
@@ -797,13 +827,12 @@ public:
   
   /** Return true if the race is completed (or definitely never will be started), e.g., not in forest*/
   bool hasFinished() const {
-    if (tStatus == StatusUnknown)
-      return false;
-    else if (isPossibleResultStatus(tStatus)) {
-      return Card || FinishTime > 0;
-    }
-    else
+    if (Card != nullptr || FinishTime > 0)
       return true;
+    else if (tStatus == StatusUnknown)
+      return false;
+    else
+      return !isStatusUnknown(false, false);
   }
 
   /** Returns a check time (or zero for no time). */
@@ -910,7 +939,22 @@ public:
   int getRaceRunningTime(bool computedTime, int leg, bool allowUpdate) const;
 
   // Get the complete name, including team and club.
-  wstring getCompleteIdentification(bool includeExtra = true) const;
+  enum class IDType {
+    OnlyThis,
+    ParallelLeg,
+    ParallelLegExtra,
+  };
+
+  enum class NameType {
+    Default,
+    Compact,
+    CompactClub
+  };
+
+  wstring getCompleteIdentification(IDType type, NameType compactName = NameType::Default) const;
+
+  /** Return compact name 'H. Abrams'*/
+  wstring getCompactName() const;
 
   /// Get total status for this running (including team/earlier races)
   RunnerStatus getTotalStatus(bool allowUpdate = true) const override;
@@ -997,7 +1041,7 @@ public:
   void setFinishTime(int t) override;
   int getTimeAfter(int leg, bool allowUpdate) const override;
   int getTimeAfter() const;
-  int getTimeAfterCourse() const;
+  int getTimeAfterCourse(bool considerClass) const;
 
   bool skip() const {return isRemoved() || tDuplicateLeg!=0;}
 
@@ -1071,7 +1115,7 @@ public:
   bool static CompareCardNumber(const oRunner &a, const oRunner &b) { return a.cardNumber < b.cardNumber; }
 
   bool evaluateCard(bool applyTeam, vector<int> &missingPunches, int addPunch, ChangeType changeType);
-  void addPunches(pCard card, vector<int> &missingPunches);
+  void addCard(pCard card, vector<int> &missingPunches);
 
   /** Get split time for a controlId and optionally controlIndex on course (-1 means unknown, uses the first occurance on course)*/
   void getSplitTime(int courseControlId, RunnerStatus &stat, int &rt) const;
@@ -1079,6 +1123,10 @@ public:
   //Returns only Id of a runner-specific course, not classcourse
   int getCourseId() const {if (Course) return Course->Id; else return 0;}
   void setCourseId(int id);
+
+  bool useCoursePool() const {
+    return Class && (Class->hasCoursePool() || getClassRef(true)->hasCoursePool());
+  }
 
   /** Return true if rental card*/
   bool isRentalCard() const;

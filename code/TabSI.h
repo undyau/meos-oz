@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ private:
   bool firstLoadedAfterNew = true;
   PrinterObject splitPrinter;
   PrinterObject labelPrinter;
-  list< pair<unsigned, int> > printPunchRunnerIdQueue;
+  list<pair<uint64_t, int> > printPunchRunnerIdQueue;
   void addToPrintQueue(pRunner r);
   
   enum class SND {
@@ -317,7 +317,7 @@ public:
     wstring dataB;
     wstring textA;
     wstring nationality;
-    int sex = 2; 
+    PersonSex sex = PersonSex::sUnknown; 
     wstring birthDate;
     wstring rank;
 
@@ -325,7 +325,7 @@ public:
     bool rentState;
     bool hasPaid;
     int payMode;
-    DWORD age;
+    uint64_t age;
     int storedClassId;
 
     void clear();

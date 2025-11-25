@@ -6,7 +6,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -205,7 +205,7 @@ class ProgressWindow;
 struct PlaceRunner;
 typedef multimap<int, PlaceRunner> TempResultMap;
 struct TimeRunner;
-
+class CardSystem;
 struct PrintPostInfo;
 
 enum PropertyType {
@@ -551,7 +551,7 @@ public:
 private:
   NameMode currentNameMode;
 
-  unique_ptr<MachineContainer> machineContainer;
+  mutable unique_ptr<MachineContainer> machineContainer;
 
 public:
 
@@ -605,6 +605,9 @@ public:
   void saveImage(uint64_t id) const;
 
   wstring getNameId(int id) const;
+  wstring getNameId() const { return currentNameId; }
+  int getIdFromNameId(const wstring& nameId) const;
+
   const wstring &getFileNameFromId(int id) const;
   void updateListReferences(const string &oldId, const string &newId);
   // Adjust team size to class size and create multi runners.
@@ -658,6 +661,8 @@ public:
                         const wstring &vacances, VacantPosition vp,
                         bool lateBefore, bool allowNeighbourSameCourse, 
                         DrawMethod method, int pairSize);
+
+  int computeMostCommonStartInterval() const;
 
   // Restore a backup by renamning the file to .meos
   void restoreBackup();
@@ -830,7 +835,7 @@ public:
 
   void checkOrderIdMultipleCourses(int ClassId);
 
-  void addBib(int ClassId, int leg, const wstring &firstNumber, bool assignVacant);
+  void addBib(int ClassId, int leg, const wstring &firstNumber, int limit, bool assignVacant);
   void addAutoBib();
 
   //Speaker functions.
@@ -839,7 +844,7 @@ public:
   int getComputerTime() const {return timeConstSecond * ((computerTime+500)/1000);}
   int getComputerTimeMS() const {return computerTime;}
 
-  void updateComputerTime();
+  void updateComputerTime(bool considerDate);
 
   // Get set of controls with registered punches
   void getFreeControls(set<int> &controlId) const;
@@ -898,7 +903,7 @@ public:
   vector<int> getHiredCards() const;
   void clearHiredCards();
 
-  MachineContainer &getMachineContainer();
+  MachineContainer &getMachineContainer() const;
 
 protected:
   // Returns hash key for punch based on control id, and leg. Class is marked as changed if oldHashKey != newHashKey.
@@ -913,6 +918,8 @@ protected:
 
   mutable shared_ptr<map<int, vector<pRunner>>> classIdToRunnerHash;
 
+  mutable shared_ptr<CardSystem> cardSystem;
+  
   mutable set<int>  hiredCardHash;
   mutable int tHiredCardHashDataRevision = -1;
   
@@ -924,7 +931,7 @@ protected:
   virtual void writeExtraXml(xmlparser &xml){};
   virtual void readExtraXml(const xmlparser &xml) {};
   mutable int tLongTimesCached;
-  mutable map<int, pair<int, int> > cachedFirstStart; //First start per classid.
+  mutable map<int, pair<int, int> > cachedFirstStart; //First start by key (see usage).
   map<pair<int, int>, oFreePunch> advanceInformationPunches;
 
   bool calculateTeamResults(vector<const oTeam*> &teams, int leg, ResultType resultType);
@@ -934,6 +941,11 @@ protected:
   mutable bool lastResultCalcPrelState = false;
   mutable bool lastResultCalcSplitResult = false;
 public:
+  const CardSystem& getCardSystem() const;
+
+  bool deprecateOldCards() const;
+  void deprecateOldCards(bool flag);
+
   void updateStartTimes(int delta);
 
   void useDefaultProperties(bool useDefault);
@@ -1002,8 +1014,8 @@ public:
   void updateRunnerDatabase();
   void updateRunnerDatabase(pRunner r, map<int, int> &clubIdMap);
 
-  /** Returns the first start in a class */
-  int getFirstStart(int classId = 0) const;
+  /** Returns the first start in a class (use classId = 0 for global) */
+  int getFirstStart(int classId, bool considerStartPunches) const;
   void convertTimes(pRunner runner, SICard &sic) const;
 
   pCard getCard(int Id) const;
@@ -1027,6 +1039,7 @@ public:
                        const set<int> &classes,
                        const pair<string, string> &preferredIdTypes,
                        int leg,
+                       bool withPartialResult,
                        bool teamsAsIndividual,
                        bool unrollLoops,
                        bool includeStageData,
@@ -1175,7 +1188,7 @@ public:
   pTeam addTeam(const oTeam &t, bool autoAssignStartNo);
   pTeam addTeam(const wstring &pname, int clubId=0, int classId=0);
   pTeam getTeam(int Id) const;
-  pTeam getTeamByName(const wstring &pname) const;
+  pTeam getTeamByName(const wstring &pname, int classId = 0) const;
   const vector<pair<wstring, size_t>> &fillTeams(vector< pair<wstring, size_t>> &out, int classId=0);
   static const vector<pair<wstring, size_t>> &fillStatus(vector< pair<wstring, size_t>> &out);
   const vector<pair<wstring, size_t>> &fillControlStatus(vector< pair<wstring, size_t>> &out) const;
@@ -1229,7 +1242,7 @@ public:
   */
   pRunner getRunnerByBibOrStartNo(const wstring &bib, bool findWithoutCardNo) const;
 
-  pRunner getRunnerByName(const wstring &pname, const wstring &pclub = L"") const;
+  pRunner getRunnerByName(const wstring &pname, const wstring &pclub = L"", int classId = 0) const;
 
   enum FillRunnerFilter {RunnerFilterShowAll = 1,
                          RunnerFilterOnlyNoResult = 2,
@@ -1452,6 +1465,9 @@ public:
     disableRecalculate = origState;
   }
 
+  map<int, oPunch::SpecialPunch> getPunchMapping() const;
+  void definePunchMapping(int code, oPunch::SpecialPunch value);
+
   /** Return true if subseconds are used*/
   bool useSubSecond() const;
 
@@ -1565,3 +1581,14 @@ public:
 
   gdioutput &gdiBase() const {return gdibase;}
 };
+
+template<typename T>
+void DataRevisionCache<T>::update(const oEvent& oe, const T& value) const {
+  data = value;
+  revision = oe.getRevision();
+}
+
+template<typename T>
+bool DataRevisionCache<T>::needsUpdate(const oEvent& oe) const {
+  return revision != oe.getRevision();
+}

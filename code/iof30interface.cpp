@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -61,6 +61,7 @@ IOF30Interface::IOF30Interface(oEvent *oe, bool forceSplitFee, bool useEventorQu
                                 includeStageRaceInfo(true), useEventorQuirks(useEventorQuirks) {
   cachedStageNumber = -1;
   splitLateFee = forceSplitFee || oe->getPropertyInt("SplitLateFees", false) == 1;
+  preferShortName = oe->getPropertyBool("PreferShortClubName", true);
 }
 
 void IOF30Interface::readCourseData(gdioutput &gdi, const xmlobject &xo, bool updateClass,
@@ -1272,7 +1273,7 @@ void IOF30Interface::readEntryList(gdioutput &gdi, xmlobject &xo, bool removeNon
     for (size_t k = 0; k < allR.size(); k++) {
       if (allR[k]->getEntrySource() == entrySourceId && !allR[k]->isEntryTouched() && !allR[k]->getTeam()) {
         entRemoved++;
-        gdi.addString("", 0, L"Tar bort X#" + allR[k]->getCompleteIdentification());
+        gdi.addString("", 0, L"Tar bort X#" + allR[k]->getCompleteIdentification(oRunner::IDType::OnlyThis));
         rids.push_back(allR[k]->getId());
       }
     }
@@ -2344,11 +2345,12 @@ pRunner IOF30Interface::readPersonStart(gdioutput &gdi, pClass pc, xmlobject &xo
 }
 
 
-wstring formatStatus(RunnerStatus st, bool hasTime) {
+wstring formatStatus(RunnerStatus st, const oAbstractRunner *r, bool hasTime) {
   switch (st) {
   case StatusNoTiming:
     if (!hasTime)
       break;
+    //Fallthrough
   case StatusOK:
     return L"OK";
   case StatusDNS:
@@ -2366,9 +2368,18 @@ wstring formatStatus(RunnerStatus st, bool hasTime) {
   case StatusOutOfCompetition:
     if (!hasTime)
       break;
-  case StatusNotCompetiting:
     return L"NotCompeting";
+  case StatusNotCompetiting: 
+    return L"DidNotEnter";
   }
+  if (r) {
+    DynamicRunnerStatus drs = r->getDynamicStatus();
+    if (drs == DynamicRunnerStatus::StatusActive)
+      return L"Active";
+    else if (drs == DynamicRunnerStatus::StatusFinished)
+      return L"Finished";
+  }
+
   return L"Inactive";
 }
 
@@ -2389,6 +2400,8 @@ RunnerStatus parseStatus(const wstring &status) {
     return StatusMAX;
   else if (status == L"NotCompeting")
     return StatusOutOfCompetition;
+  else if (status== L"DidNotEnter")
+    return StatusNotCompetiting;
 
   return StatusUnknown;
 }
@@ -2511,7 +2524,7 @@ pRunner IOF30Interface::readPersonResult(gdioutput &gdi, pClass pc, xmlobject &x
         }
 
         vector<int> mp;
-        rRace->addPunches(card, mp);
+        rRace->addCard(card, mp);
       }
     }
   }
@@ -2664,7 +2677,7 @@ pClub IOF30Interface::readOrganization(gdioutput &gdi, const xmlobject &xclub, b
   xclub.getObjectString("Name", name);
   xclub.getObjectString("ShortName", shortName);
 
-  if (shortName.length() > 4 && shortName.length() < name.length())
+  if (preferShortName && shortName.length() > 4 && shortName.length() < name.length())
     swap(name, shortName);
 
   if (name.length()==0 || !IsCharAlphaNumeric(name[0]))
@@ -3384,18 +3397,22 @@ void IOF30Interface::getProps(vector<wstring> &props) const {
 }
 
 void IOF30Interface::writeResultList(xmlparser &xml, const set<int> &classes,
-                                     int leg,  bool useUTC_, 
-                                     bool teamsAsIndividual_, bool unrollLoops_,
-                                     bool includeStageInfo_) {
-  useGMT = useUTC_;
-  includeStageRaceInfo = includeStageInfo_;
-  teamsAsIndividual = teamsAsIndividual_;
-  unrollLoops = unrollLoops_;
+                                     int leg,  bool useUTC, 
+                                     bool teamsAsIndividual, bool unrollLoops,
+                                     bool includeStageInfo, bool withPartialResult) {
+  this->useGMT = useUTC;
+  this->includeStageRaceInfo = includeStageInfo;
+  this->teamsAsIndividual = teamsAsIndividual;
+  this->unrollLoops = unrollLoops;
+  oe.updateComputerTime(true);
   vector<wstring> props;
   getProps(props);
 
   props.push_back(L"status");
-  props.push_back(L"Complete");
+  if (withPartialResult)
+    props.push_back(L"Snapshot");
+  else
+    props.push_back(L"Complete");
 
   xml.startTag("ResultList", props);
 
@@ -3408,7 +3425,7 @@ void IOF30Interface::writeResultList(xmlparser &xml, const set<int> &classes,
 
   for (size_t k = 0; k < c.size(); k++) {
     if (classes.empty() || classes.count(c[k]->getId())) {
-      getRunnersToUse(c[k], rToUse, tToUse, leg, false);
+      getRunnersToUse(c[k], rToUse, tToUse, leg, withPartialResult, true);
       oe.sortRunners(SortOrder::ClassResult, rToUse);
       oe.sortTeams(SortOrder::ClassResult, -1, false, tToUse);
 
@@ -3426,7 +3443,6 @@ void IOF30Interface::writeClassResult(xmlparser &xml,
                                       const vector<pRunner> &r,
                                       const vector<pTeam> &t) {
   pCourse stdCourse = haveSameCourse(r);
-
   xml.startTag("ClassResult");
   writeClass(xml, c);
   if (stdCourse)
@@ -3618,7 +3634,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
     if (teamMember) {
       xml.write("TimeBehind", "type", L"Leg", formatRelTime(after));
 
-      int afterCourse = r.getTimeAfterCourse();
+      int afterCourse = r.getTimeAfterCourse(true);
       if (afterCourse >= 0)
         xml.write("TimeBehind", "type", L"Course", formatRelTime(afterCourse));
     }
@@ -3642,7 +3658,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
       }
     }
 
-    xml.write("Status", formatStatus(status, r.getFinishTime()>0));
+    xml.write("Status", formatStatus(status, &r, r.getFinishTime()>0));
 
     int rg = r.getRogainingPoints(true, false);
     if (rg > 0 || r.getRogainingReduction(true) > 0) {  // Rogaining points can be zero with sufficient penalty
@@ -3670,7 +3686,7 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
       if (stat == StatusOK && hasTiming)
         xml.write("Position", r.getTotalPlace());
 
-      xml.write("Status", formatStatus(stat, r.getFinishTime() > 0));
+      xml.write("Status", formatStatus(stat, &r, r.getFinishTime() > 0));
       if (r.getClassRef(false)->isRogaining()) {
         xml.write("Score", "type", L"Score", itow(r.getRogainingPoints(true, false)));
       }
@@ -3683,11 +3699,11 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
       if (includeCourse)
         writeCourse(xml, *crs);
 
-      const vector<SplitData> &sp = r.getSplitTimes(doUnroll);
       RunnerStatus st = r.getStatusComputed(true);
       if (r.getStatus()>0 && st != StatusDNS && 
                              st != StatusCANCEL && 
                              st != StatusNotCompetiting) {
+        const vector<SplitData>& sp = r.getSplitTimes(doUnroll);
         int nc = crs->getNumControls();
         bool hasRogaining = crs->hasRogaining();
         int firstControl = crs->useFirstAsStart() ? 1 : 0;
@@ -3742,6 +3758,33 @@ void IOF30Interface::writeResult(xmlparser &xml, const oRunner &rPerson, const o
                 xml.write("Time", formatRelTime(p->getTimeInt() - r.getStartTime()));
               xml.endTag();
             }
+          }
+        }
+      }
+      else if (r.getStatus() == StatusUnknown && r.getDynamicStatus() != DynamicRunnerStatus::StatusInactive) {
+        vector<pFreePunch> punches;
+        oe.getPunchesForRunner(r.getId(), true, punches);
+        int startType = crs->getStartPunchType();
+        int finishType = crs->getFinishPunchType();
+
+        for (pFreePunch p : punches) {
+          if (p->isStart(startType) || p->isFinish(finishType) || p->isCheck())
+            continue;
+
+          int id = p->getCourseControlId();
+          pControl ctrl = nullptr;
+          for (int i = 0; i < crs->getNumControls(); i++) {
+            if (crs->getCourseControlId(i) == id) {
+              ctrl = crs->getControl(i);
+              break;
+            }
+          }
+          if (ctrl) {
+            xml.startTag("SplitTime");
+            xml.write("ControlCode", ctrl->getFirstNumber());
+            if (hasTiming)
+              xml.write("Time", formatRelTime(p->getTimeInt() - r.getStartTime()));
+            xml.endTag();
           }
         }
       }
@@ -3900,6 +3943,21 @@ void IOF30Interface::writePerson(xmlparser &xml, const oRunner &r) {
   xml.write("Given", r.getGivenName());
   xml.endTag();
 
+  if (int by = r.getBirthYear(); by > 1900) {
+    wstring date = r.getBirthDate();
+    if (date.size() > 6)
+      xml.write("BirthDate", date);
+    else
+      xml.write("BirthDate", itow(by) + L"-01-01");
+
+  }
+
+  wstring nat = r.getNationality();
+  if (!nat.empty()) {
+    xml.write("Nationality", "code", nat.c_str());
+  }
+
+
   xml.endTag();
 }
 
@@ -4000,7 +4058,7 @@ void IOF30Interface::writeStartList(xmlparser &xml, const set<int> &classes, boo
 
   for (size_t k = 0; k < c.size(); k++) {
     if (classes.empty() || classes.count(c[k]->getId())) {
-      getRunnersToUse(c[k], rToUse, tToUse, -1, true);
+      getRunnersToUse(c[k], rToUse, tToUse, -1, true, false);
       oe.sortRunners(SortOrder::ClassStartTime, rToUse);
       oe.sortTeams(SortOrder::ClassStartTime, 0, false, tToUse);
       if (!rToUse.empty() || !tToUse.empty()) {
@@ -4012,7 +4070,8 @@ void IOF30Interface::writeStartList(xmlparser &xml, const set<int> &classes, boo
 }
 
 void IOF30Interface::getRunnersToUse(const pClass cls, vector<pRunner> &rToUse,
-                                     vector<pTeam> &tToUse, int leg, bool includeUnknown) const {
+                                     vector<pTeam> &tToUse, int leg,
+                                     bool includeUnknown, bool skipVacant) const {
 
   rToUse.clear();
   tToUse.clear();
@@ -4036,6 +4095,9 @@ void IOF30Interface::getRunnersToUse(const pClass cls, vector<pRunner> &rToUse,
           continue; // For teams, skip presonal results, unless individual relay
 
         if (!includeUnknown && !r[j]->hasResult())
+          continue;
+
+        if (skipVacant && r[j]->isVacant())
           continue;
       }
       rToUse.push_back(r[j]);
@@ -4680,7 +4742,6 @@ void IOF30Interface::bindClassCourse(oClass &pc, const vector< vector<pCourse> >
   }
 }
 
-
 void IOF30Interface::writeCourses(xmlparser &xml) {
   vector<wstring> props;
   getProps(props);
@@ -4719,6 +4780,72 @@ void IOF30Interface::writeCourses(xmlparser &xml) {
 
   xml.endTag();
 
+  xml.endTag();
+}
+
+void IOF30Interface::writeForkings(xmlparser& xml) const {
+  vector<wstring> props;
+  getProps(props);
+  xml.startTag("CourseData", props);
+  xml.startTag("RaceCourseData");
+
+  writeTeamForkings(xml);
+
+  xml.endTag();
+  xml.endTag();
+}
+
+void IOF30Interface::writeTeamForkings(xmlparser& xml) const {
+  vector<pTeam> teams;
+  oe.getTeams(0, teams, true);
+  oe.sortTeams(SortOrder::ClassStartTime, 0, false, teams);
+  for (pTeam t : teams) {
+    if (!t->getClassId(false))
+      continue;
+    writeTeamForking(xml, *t);
+  }
+}
+
+void IOF30Interface::writeTeamForking(xmlparser& xml, const oTeam& t) const {
+  int nr = t.getNumRunners();
+
+  xml.startTag("TeamCourseAssignment"); {
+    wstring bib = t.getBib();
+    if (bib.empty())
+      bib = itow(t.getStartNo());
+
+    xml.write("BibNumber", bib);
+    xml.write("TeamName", t.getName());
+    xml.write("ClassName", t.getClass(false));
+    pClass cls = t.getClassRef(false);
+    wstring family, name;
+
+    for (int ir = 0; ir < nr; ir++) {
+      pRunner r = t.getRunner(ir);
+      if (!r || !r->getCourse(false))
+        continue;
+
+      pCourse crs = r->getCourse(false);
+      if (!crs)
+        continue;
+
+      xml.startTag("TeamMemberCourseAssignment"); {
+        bib = r->getBib();
+        if (!bib.empty())
+          xml.write("BibNumber", bib);
+        writeLegOrder(xml, cls, ir);
+        xml.write("TeamMemberName", r->getName());
+
+        crs->getNameAndFamily(name, family);
+        if (!family.empty()) 
+          xml.write("CourseFamily", family);
+        xml.write("CourseName", name);
+      }
+      xml.endTag();
+
+    }
+
+  }
   xml.endTag();
 }
 

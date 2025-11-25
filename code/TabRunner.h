@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,6 +43,8 @@ private:
 
   void cellAction(gdioutput &gdi, DWORD id, oBase *obj);
 
+  void showCardDetails(gdioutput &gdi, pCard c, bool autoSelect);
+
   void selectRunner(gdioutput &gdi, pRunner r);
 
   void updateCardStatus(const pCard& pc, gdioutput& gdi);
@@ -62,12 +64,24 @@ private:
   DWORD timeToFill;
   int inputId;
 
+
+  pair<wstring, int> getClassCourseDescription(pClass cls, int leg, pClass virtCls, pCourse crs, int crsId);
+
   int searchCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
   int runnerCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
   int punchesCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
   int vacancyCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
 
-  int currentMode;
+  enum class Mode {
+    Form,
+    Table,
+    InForest,
+    Cards,
+    Vacancy,
+    Report,
+  };
+
+  Mode currentMode;
   pRunner save(gdioutput &gdi, int runnerId, bool dontReloadRunners);
   void listRunners(gdioutput &gdi, const vector<pRunner> &r, bool filterVacant) const;
 
@@ -145,6 +159,8 @@ protected:
   void clearCompetitionData();
 public:
 
+  static void autoCompleteRunner(gdioutput& gdi, const RunnerWDBEntry* r);
+
   class CommentHandler : public GuiHandler {
     int runnerId;
     bool isTeam = false;
@@ -175,7 +191,10 @@ public:
   bool loadPage(gdioutput &gdi);
   bool loadPage(gdioutput &gdi, int runnerId);
 
-  static int addExtraFields(const oEvent &oe, gdioutput& gdi, oEvent::ExtraFieldContext context);
+  static int addExtraFields(const oEvent &oe, gdioutput& gdi, bool startNewLine, 
+                            bool oneLine, oEvent::ExtraFieldContext context,
+                            const vector<oEvent::ExtraFields>& exclude = {});
+
   static void saveExtraFields(gdioutput& gdi, oBase &r);
   static void loadExtraFields(gdioutput& gdi, const oBase* r);
 

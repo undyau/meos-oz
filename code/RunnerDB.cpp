@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2025 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -749,8 +749,7 @@ oClub *RunnerDB::getClub(const wstring &name) const
   return 0;
 }
 
-void RunnerDB::saveClubs(const wstring &file)
-{
+void RunnerDB::saveClubs(const wstring &file) {
   xmlparser xml;
 
   xml.openOutputT(file.c_str(), true, "meosclubs");
@@ -1076,13 +1075,13 @@ void RunnerDB::updateAdd(const oRunner &r, map<int, int> &clubIdMap)
   if (dbe == nullptr) {
     dbe = addRunner(r.getName().c_str(), 0, localClubId, r.getCardNo());
     if (dbe)
-      dbe->dbe().setBirthYear(r.getDCI().getInt("BirthYear"));
+      dbe->dbe().setBirthDate(r.getBirthDate());
   }
   else {
     if (dbe->getExtId() == 0) { // Only update entries not in national db.
       dbe->setName(r.getName().c_str());
       dbe->dbe().clubNo = localClubId;
-      dbe->dbe().setBirthYear(r.getDCI().getInt("BirthYear"));
+      dbe->dbe().setBirthDate(r.getBirthDate());
     }
   }
 }
