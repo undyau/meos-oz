@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 
-<MeOSListDefinition version="3.5">
-<ListName>Startlista, banvis</ListName>
-<Tag>startbycourse</Tag>
-<SortOrder>CourseStartTime</SortOrder>
+<MeOSListDefinition version="4.1">
+<ListName>Individual Results Split Print (Narrow)</ListName>
+<Tag>split_result_individual_narrow</Tag>
+<SplitPrint>
+<Split>true</Split>
+<Speed>true</Speed>
+<Result>true</Result>
+<Analysis>true</Analysis>
+<Heading>true</Heading>
+<NoAbsTime>true</NoAbsTime>
+<NumClsResult>3</NumClsResult>
+</SplitPrint>
+<SortOrder>ClassResult</SortOrder>
 <ListType>Runner</ListType>
-<SubListType>None</SubListType>
+<SubListType>CoursePunches</SubListType>
+<Filter name="FilterResult"/>
+<Filter name="FilterNoCancel"/>
 <HeadFont scale="100" above="0">arial</HeadFont>
 <SubHeadFont scale="100" above="0">arial</SubHeadFont>
 <ListFont scale="100" above="0">arial</ListFont>
@@ -14,49 +25,38 @@
 <Head>
 <Line>
 <Block Type="CmpName">
-<Text>Startlista - X</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>
 <Line>
 <Block Type="CmpDate">
 <Align BlockAlign="true">None</Align>
+<Font>MediumPlus</Font>
 </Block>
 </Line>
 </Head>
 <SubHead>
 <Line>
-<Block Type="CourseName">
-<Align BlockAlign="true">None</Align>
-</Block>
-<Block Type="CourseLength">
-<Text>X meter</Text>
-<Align BlockAlign="true">None</Align>
-</Block>
-<Block Type="ClassStartName">
+<Block Type="String">
+<Text>Resultat</Text>
 <Align BlockAlign="true">None</Align>
 </Block>
 </Line>
 </SubHead>
 <List>
 <Line>
-<Block Type="RunnerStart">
-<Align BlockAlign="true">CourseName</Align>
-</Block>
-<Block Type="ClassName">
-<Align BlockAlign="false">None</Align>
-</Block>
-<Block Type="RunnerBib">
+<Block Type="RunnerPlace">
+<Text>X. </Text>
 <Align BlockAlign="true">None</Align>
 </Block>
-<Block Type="RunnerName">
-<Align BlockAlign="true">CourseLength</Align>
-</Block>
-<Block Type="ClubName">
+<Block Type="RunnerCompleteNameCompact">
 <Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
 </Block>
-<Block Type="RunnerCard">
+<Block Type="RunnerTimeStatus">
+<Text>, X</Text>
 <Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
 </Block>
 </Line>
 </List>

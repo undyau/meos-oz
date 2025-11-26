@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="4.1">
+<ListName>Saknad brickavläsning</ListName>
+<Tag>missing_card_readout</Tag>
+<SortOrder>FinishTime</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<Filter name="EFilterTimeNoResult"/>
+<HeadFont scale="100" above="0"/>
+<SubHeadFont scale="100" above="0"/>
+<ListFont scale="100" above="0"/>
+<SubListFont scale="100" above="0"/>
+<Head>
+<Line>
+<Block Type="String">
+<Text>Saknad brickavläsning</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="String">
+<Text> </Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerCompleteName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerFinish">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

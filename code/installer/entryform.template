@@ -96,20 +96,76 @@ button {
 <div id="form">
 <form autocomplete="off">
 <div class="autocomplete" style="width:300px;">
-$Klubb$: <input type="text" name="club" size="20" id="club" placeholder="$Klubb$"><br>
+<label>$Klubb$: <input type="text" name="club" size="20" id="club" placeholder="$Klubb$"></lable><br>
 </div>
 
 <div class="autocomplete" style="width:300px;">
-$Namn$: <input type="text" name="name" size="20" id="name" placeholder="$Namn$"><br>
+<label>$Namn$: <input type="text" name="name" size="20" id="name" placeholder="$Namn$"></label><br>
+</div>
+
+@IF SEX
+<div class="autocomplete" style="width:300px; margin-bottom:0.5em">
+<label><input type="radio" name="sex" value="F" id="woman"> $Kvinna$</label>&nbsp;
+<label><input type="radio" name="sex" value="M" id="man"> $Man$</label>
+</div>
+@ENDIF
+
+@IF BIRTHDATE
+<div class="autocomplete" style="width:300px;">
+<label>$Födelsedatum$:<br> <input type="date" name="birthdate" id="birthdate" placeholder="$BirthDate$"></label>
+</div>
+@ENDIF
+
+<div class="autocomplete" style="width:300px;">
+<label>$Bricknummer$: <input type="text" name="card" size="10" id="card" placeholder="$Bricknummer$"></label>
 </div>
 
 <div class="autocomplete" style="width:300px;">
-$Bricknummer$: <input type="text" name="card" size="10" id="card" placeholder="$Bricknummer$">
+<label>$Klass$: <select id="class"></select></label>
 </div>
 
+@IF PHONE
 <div class="autocomplete" style="width:300px;">
-$Klass$: <select id="class"></select>
+<label>$Telefon$: <input type="tel" name="phone" size="10" id="phone" placeholder="$Telefon$"></label><br>
 </div>
+@ENDIF
+
+@IF NATIONALITY
+<div class="autocomplete" style="width:300px;">
+<label>$Nationalitet$: <input type="text" name="nationality" size="4" id="nationality" placeholder="$Nationalitet$" maxlength="3"></label><br>
+</div>
+@ENDIF
+
+@IF RANK
+<div class="autocomplete" style="width:300px;">
+<label>$Ranking$: <input type="text" name="rank" size="10" id="rank" placeholder="$Ranking$"></label><br>
+</div>
+@ENDIF
+
+@IF BIB
+<div class="autocomplete" style="width:300px;">
+<label>$Nummerlapp$: <input type="number" name="bib" size="4" id="bib" placeholder="100"></label><br>
+</div>
+@ENDIF
+
+@IF DATAA
+<div class="autocomplete" style="width:300px;">
+<label>$DATAA$: <input type="number" name="dataA" size="10" id="dataA" placeholder="0"></label><br>
+</div>
+@ENDIF
+
+@IF DATAB
+<div class="autocomplete" style="width:300px;">
+<label>$DATAB$: <input type="number" name="dataB" size="10" id="dataB" placeholder="0"></label><br>
+</div>
+@ENDIF
+
+@IF TEXTA
+<div class="autocomplete" style="width:300px;">
+<label>$TEXTA$: <input type="text" name="textA" size="10" id="textA"></label><br>
+</div>
+@ENDIF
+
 
 <div class="autocomplete" style="width:300px;margin:10px;">
 <input type="button" value="$Anmäl$" onclick="enter()" style="float:right;">
@@ -154,6 +210,37 @@ function enter() {
   url += "&name=" + encodeURI(document.getElementById("name").value);
   url += "&club=" + encodeURI(document.getElementById("club").value);
   url += "&card=" + encodeURI(document.getElementById("card").value);
+@IF PHONE
+  url += "&phone=" + encodeURI(document.getElementById("phone").value);
+@ENDIF
+@IF RANK
+  url += "&rank=" + encodeURI(document.getElementById("rank").value);
+@ENDIF
+@IF NATIONALITY
+  url += "&nationality=" + encodeURI(document.getElementById("nationality").value);
+@ENDIF
+@IF BIRTHDATE
+  url += "&birthdate=" + encodeURI(document.getElementById("birthdate").value);
+@ENDIF
+@IF SEX
+if (document.getElementById("woman").checked)
+  url += "&sex=F";
+else if (document.getElementById("man").checked)
+  url += "&sex=M";
+@ENDIF
+@IF BIB
+  url += "&bib=" + encodeURI(document.getElementById("bib").value);
+@ENDIF
+@IF DATAA
+  url += "&dataA=" + encodeURI(document.getElementById("dataA").value);
+@ENDIF
+@IF DATAB
+  url += "&dataB=" + encodeURI(document.getElementById("dataB").value);
+@ENDIF
+@IF TEXTA
+  url += "&textA=" + encodeURI(document.getElementById("textA").value);
+@ENDIF
+
   
   var xhttp = new XMLHttpRequest();
   

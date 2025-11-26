@@ -1,0 +1,11 @@
+﻿SportIdent
+4000-499999;30;deprecated;SiCard 5
+4000000-4999999;20;active;pCard
+500000-999999;64;deprecated;SiCard 6
+2003000-2003999;64;deprecated;SiCard 6
+2000000-2002999;30;active;SiCard 8
+2004000-2999999;30;active;SiCard 8
+1000000-1999999;50;active;SiCard 9
+7000000-7999999;128;active;SiCard 10
+8000000-8999999;128;active;SIAC
+9000000-9999999;128;active;SICard 11
