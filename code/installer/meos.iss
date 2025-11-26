@@ -42,7 +42,6 @@ Source: "database.wpersons"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.lxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.listdef"; DestDir: "{app}"; Flags: ignoreversion
 Source: "*.png"; DestDir: "{app}"; Flags: ignoreversion
-Source: "ind_courseresult.lxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sss201230.meosxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sss101130.meosxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Receipt Results.xml"; DestDir: "{app}"; Flags: ignoreversion

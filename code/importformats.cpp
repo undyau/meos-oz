@@ -103,6 +103,8 @@ wstring ImportFormats::getExtension(ExportFormats fm) {
   switch (fm) {
   case IOF30:
   case IOF203:
+  case IOF30BYCOURSE:
+  case IOF203BYCOURSE:
     return L"xml";
   case OE:
     return L"csv";
