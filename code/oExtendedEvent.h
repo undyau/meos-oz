@@ -10,7 +10,6 @@ public:
 
 
   bool SSSQuickStart(gdioutput &gdi);
-  void exportCourseOrderedIOFSplits(IOFVersion version, const wchar_t *file, bool oldStylePatrolExport, const set<int> &classes, int leg);
   void uploadSss(gdioutput &gdi, bool automate);
   void uploadSssUnattended();
   int incUploadCounter();

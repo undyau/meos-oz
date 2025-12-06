@@ -194,53 +194,6 @@ bool oExtendedEvent::SSSQuickStart(gdioutput &gdi)
   return false;
 }
 
-void oExtendedEvent::exportCourseOrderedIOFSplits(IOFVersion version, const wchar_t *file, bool oldStylePatrolExport, const set<int> &classes, int leg)
-{
-  // Create new classes names after courses
-  std::map<int, int> courseNewClassXref;
-  std::map<int, int> runnerOldClassXref;
-  std::set<std::wstring> usedNames;
-
-  for (oClassList::iterator j = Classes.begin(); j != Classes.end(); j++) {
-    usedNames.insert(j->getName());
-  }
-
-  for (oCourseList::iterator j = Courses.begin(); j != Courses.end(); j++) {      
-    std::wstring name = j->getName();
-    if (usedNames.find(name) != usedNames.end()) {
-        name = lang.tl("Course ") + name;
-      }
-    while (usedNames.find(name) != usedNames.end()) {
-        name = name + L"_";
-      }
-
-    usedNames.insert(name);
-    pClass newClass = addClass(name, j->getId());
-    courseNewClassXref[j->getId()] = newClass->getId();
-  }
-  
-  // Reassign all runners to new classes, saving old ones
-  for (oRunnerList::iterator j = Runners.begin(); j != Runners.end(); j++) {
-    runnerOldClassXref[j->getId()] = j->getClassId(false);  
-    int id = j->getCourse(false)->getId();
-    j->setClassId(courseNewClassXref[id], true);
-  }
-
-  // Do the export
-  pair<string, string> preferredIdTypes;
-  oEvent::exportIOFSplits(version, file, oldStylePatrolExport, /*USe UTC*/false, classes, preferredIdTypes, leg, false, true, true, true, false, false);
-
-  // Reassign all runners back to original classes
-  for (oRunnerList::iterator j = Runners.begin(); j != Runners.end(); j++) {
-    j->setClassId(runnerOldClassXref[j->getId()], true);
-  }
-
-  // Delete temporary classes
-  for (std::map<int, int>::iterator j = courseNewClassXref.begin(); j != courseNewClassXref.end(); j++) {
-    removeClass(j->second);
-  }
-}
-
 int oExtendedEvent::incUploadCounter()
 {
   static int s_counter(0);

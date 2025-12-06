@@ -1,3 +1,7 @@
+  06 December 2025
+- Merge changes from MeOS 4.1.1702.
+- Remove support for export results by course.
+
   17 March 2025 4.0.1578.1
  - Bug when using Radio Online Control in start/end month of Swedish daylight 
    savings. Could cause punches to not be retrieved when Sweden was on a 

@@ -6,7 +6,6 @@ MeOS - A Much Easier Orienteering System
 - Source code for the MeOS-OZ project: https://github.com/undyau/meos-oz
 
 ## MeOS-OZ differences from main Meos Project
-- XML export by course
 - Default language English
 - Default Eventor is Australian Eventor
 - Support to print sticky label results

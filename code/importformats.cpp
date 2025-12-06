@@ -54,11 +54,6 @@ void ImportFormats::getExportFormats(vector< pair<wstring, size_t> > &types, boo
   types.push_back(make_pair(lang.tl("IOF " + v + ", version 2.0.3 (xml)"), IOF203));
   types.push_back(make_pair(lang.tl("OE Semikolonseparerad (csv)"), OE));
   types.push_back(make_pair(lang.tl("Webbdokument (html)"), HTML));
-  if (exportFilter)if (exportFilter)
-    {
-    types.push_back(make_pair(lang.tl("IOF Resultat efter bana, version 3.0 (xml)"), IOF30BYCOURSE));
-    types.push_back(make_pair(lang.tl("IOF Resultat efter bana, version 2.0.3 (xml)"), IOF203BYCOURSE));
-    }
 }
 
 void ImportFormats::getExportFilters(bool exportFilters, vector< pair<wstring, wstring> > &ext) {
@@ -103,8 +98,6 @@ wstring ImportFormats::getExtension(ExportFormats fm) {
   switch (fm) {
   case IOF30:
   case IOF203:
-  case IOF30BYCOURSE:
-  case IOF203BYCOURSE:
     return L"xml";
   case OE:
     return L"csv";

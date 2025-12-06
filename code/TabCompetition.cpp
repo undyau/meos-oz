@@ -4825,7 +4825,7 @@ void TabCompetition::checkReadyForResultExport(gdioutput &gdi, const set<int> &c
 void TabCompetition::exportSplitsData(oEvent* oe, const wstring& save,
   const set<int>& allTransfer,
   const ExportSplitsData& data, bool openDocument) {
- 
+
   if (data.filterIndex == ImportFormats::IOF30 || data.filterIndex == ImportFormats::IOF203) {
     oEvent::IOFVersion ver = data.filterIndex == ImportFormats::IOF30 ? oEvent::IOF30 : oEvent::IOF20;
     ClassConfigInfo cnf;
