@@ -610,9 +610,10 @@ bool InfoCompetitor::synchronize(bool useTotalResults, bool useCourse, oRunner &
   int penaltyInput = r.getRogainingReduction(false);
   if (pointsInput != 0 || penaltyInput != 0) {
       if (pointsInput != points || penaltyInput != penalty) {
-          changeTotalSt = true;
           points = pointsInput;
           penalty = penaltyInput;
+          changeTotalSt = true;
+          ch = true;
       }
 
   }
