@@ -1,3 +1,7 @@
+  27 Feb 2026 4.0.1578.2
+ - Make sure that the change flag for MOP2 export is set if points or penalty 
+   change for a score event.
+
   17 March 2025 4.0.1578.1
  - Bug when using Radio Online Control in start/end month of Swedish daylight 
    savings. Could cause punches to not be retrieved when Sweden was on a 
