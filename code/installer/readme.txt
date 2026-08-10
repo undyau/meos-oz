@@ -1,3 +1,7 @@
+  10 Aug 2026 4.0.1578.3
+ - Remove all support for export of results by course. This functionality
+   is effectively available via LiveLox. Function was broken in 4.0.1578.3.
+
   27 Feb 2026 4.0.1578.2
  - Make sure that the change flag for MOP2 export is set if points or penalty 
    change for a score event.

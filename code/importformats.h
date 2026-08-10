@@ -38,9 +38,7 @@ public:
     IOF30 = 1,
     IOF203 = 2,
     OE = 3,
-    HTML = 5,
-    IOF30BYCOURSE = 6,
-    IOF203BYCOURSE = 7
+    HTML = 5
   };
 
   static void getExportFormats(vector< pair<wstring, size_t> > &types, bool exportFilter);

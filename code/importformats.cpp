@@ -54,11 +54,6 @@ void ImportFormats::getExportFormats(vector< pair<wstring, size_t> > &types, boo
   types.push_back(make_pair(lang.tl("IOF " + v + ", version 2.0.3 (xml)"), IOF203));
   types.push_back(make_pair(lang.tl("OE Semikolonseparerad (csv)"), OE));
   types.push_back(make_pair(lang.tl("Webbdokument (html)"), HTML));
-  if (exportFilter)if (exportFilter)
-    {
-    types.push_back(make_pair(lang.tl("IOF Resultat efter bana, version 3.0 (xml)"), IOF30BYCOURSE));
-    types.push_back(make_pair(lang.tl("IOF Resultat efter bana, version 2.0.3 (xml)"), IOF203BYCOURSE));
-    }
 }
 
 void ImportFormats::getExportFilters(bool exportFilters, vector< pair<wstring, wstring> > &ext) {
@@ -73,16 +68,12 @@ void ImportFormats::getExportFilters(bool exportFilters, vector< pair<wstring, w
   ext.push_back(make_pair(L"OE Semikolonseparerad (csv)", L"*.csv"));
   ext.push_back(make_pair(L"OE/French Federation of Orienteering (csv)", L"*.csv"));
   ext.push_back(make_pair(L"Webbdokument (html)", L"*.html"));
-  if (exportFilters)
-    {
-    ext.push_back(make_pair(lang.tl(L"IOF " + v + L", v3.0 (xml)"), L"*.xml"));
-    ext.push_back(make_pair(lang.tl(L"IOF " + v + L", v2.0.3 (xml)"), L"*.xml"));
-    }
 }
 
 ImportFormats::ExportFormats ImportFormats::getDefaultExportFormat(oEvent &oe) {
   int def = IOF30;
-  return (ExportFormats)oe.getPropertyInt("ExportFormat", def);
+  // filter out deprecated old formats that may be in the competition config
+  return (ExportFormats)(oe.getPropertyInt("ExportFormat", def) <= HTML ? oe.getPropertyInt("ExportFormat", def) : def);
 }
 
 ImportFormats::ExportFormats ImportFormats::setExportFormat(oEvent &oe, int raw) {
