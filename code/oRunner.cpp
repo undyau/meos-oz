@@ -5313,7 +5313,7 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
                 legTime += L" (" + itow(pl) + L".)";
               }
             }
-            gdi.addStringUT(cy, cx + c2_legtime, getLegPlace(controlLegIndex) == 1 ? boldSmall | textRight : fontSmall | textRight, legTime);
+            gdi.addStringUT(cy, cx + c2_legtime, fontSmall | textRight, legTime);
             accLegTime = formatTime(getRunningTime(true), SubSecond::Off);
 
             if (includeAccLegPlace) {
@@ -5327,7 +5327,7 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
             gdi.addStringUT(cy, cx + c4_abstime, fontSmall, oe->getAbsTime(it->getTimeInt() + adjust, SubSecond::Off));
           any = true;
           if (sp > 0) {
-            gdi.addStringUT(cy, cx + c5_accleg, getLegPlaceAcc(it->tIndex, false) == 1 ? boldSmall | textRight : fontSmall | textRight, accLegTime);
+            gdi.addStringUT(cy, cx + c5_accleg, fontSmall | textRight, accLegTime);
           }
           controlLegIndex = pc->getNumControls();
         }
@@ -5375,7 +5375,7 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
                 }
               }
               
-              gdi.addStringUT(cy, cx + c2_legtime, fontSmall | textRight, legTime);
+              gdi.addStringUT(cy, cx + c2_legtime, getLegPlace(controlLegIndex) == 1 ? boldSmall | textRight : fontSmall | textRight, legTime);
 
               if (includeTimeLoss) {
                 int loss = getLegTimeAfter(controlLegIndex);
@@ -5409,7 +5409,7 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
           }
 
           if (!accLegTime.empty()) {
-            gdi.addStringUT(cy, cx + c5_accleg, fontSmall | textRight, accLegTime);
+            gdi.addStringUT(cy, cx + c5_accleg, getLegPlaceAcc(it->tIndex, false) == 1 ? boldSmall | textRight : fontSmall | textRight, accLegTime);
           }
           any = true;
         }
