@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,13 +25,12 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
-#include "meos.h"
 #include "csvparser.h"
 #include "oEvent.h"
 #include "SportIdent.h"
 #include "meos_util.h"
 #include "localizer.h"
-#include "importformats.h"
+#include "xmlparser.h"
 
 #include "meosexception.h"
 #include <locale>
@@ -85,8 +84,13 @@ csvparser::CSV csvparser::iscsv(const wstring &file) {
     fin.getline(bf, 2048);
     isCSVType = strlen(bf) >= 3;
   }
-
+  bf[2047] = 0;
   fin.close();
+
+  string rawIn = bf;
+
+  if (rawIn.find("<?xml") != string::npos)
+    return CSV::NoCSV;
 
   vector<char *> sp;
   split(bf, sp);
@@ -220,6 +224,7 @@ bool csvparser::importOS_CSV(oEvent &oe, const wstring &file) {
 
           //r->setCardNo(atoi(sp[rindex+OSRcard]), false);
           r->setStartTime(oe.convertAbsoluteTime(sp[rindex + OSRstart]), true, oBase::ChangeType::Update);
+          r->storeDefaultStartTime();
           r->setFinishTime(oe.convertAbsoluteTime(sp[rindex + OSRfinish]));
 
           if (sp[rindex + OSRstatus].length() > 0)
@@ -352,6 +357,7 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
   enum {OEstno=0, OEcard=1, OEid=2, OEsurname=3, OEfirstname=4,
       OEbirth=5, OEsex=6, OEstart=9,  OEfinish=10, OEstatus=12,
       OEclubno=13, OEclub=14, OEclubcity=15, OEnat=16, OEclassno=17, OEclass=18, OEbib=23,
+      OEtextB = 24, OEtextC = 25,
       OErent=35, OEfee=36, OEpaid=37, OEcourseno=38, OEcourse=39,
       OElength=40};
 
@@ -443,6 +449,7 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
       pr->setCardNo( wtoi(sp[OEcard]), false );
 
       pr->setStartTime(event.convertAbsoluteTime(sp[OEstart]), true, oBase::ChangeType::Update);
+      pr->storeDefaultStartTime();
       pr->setFinishTime(event.convertAbsoluteTime(sp[OEfinish]));
 
       if (sp[OEstatus].length()>0)
@@ -480,6 +487,12 @@ bool csvparser::importOE_CSV(oEvent &event, const wstring &file) {
 
       if (sp.size()>OEbib && needBib)
         pr->setBib(sp[OEbib], 0, false);
+
+      if (sp.size() > OEtextB)
+        DI.setString("TextA", sp[OEtextB]); // TextA in csv used for bib
+
+      if (sp.size() > OEtextC)
+        DI.setString("Annotation", sp[OEtextC]); // TextA in csv used for bib
 
       if (sp.size()>=38) {//ECO
         DI.setInt("Fee", wtoi(sp[OEfee]));
@@ -543,8 +556,16 @@ bool csvparser::outputRow(const string &row)
   fout << row << endl;
   return true;
 }
-bool csvparser::outputRow(const vector<string> &out)
-{
+
+bool csvparser::outputRow(const vector<wstring>& out) {
+  vector<string> outUTF(out.size());
+  for (int i = 0; i < out.size(); i++)
+    outUTF[i] = gdioutput::toUTF8(out[i]);
+
+  return outputRow(outUTF);
+}
+
+bool csvparser::outputRow(const vector<string> &out) {
   int size=out.size();
 
   for(int i=0;i<size;i++){
@@ -753,15 +774,15 @@ bool csvparser::importOCAD_CSV(oEvent &event, const wstring &file, bool addClass
           pc->setLegLengths(legLengths);
 
         if (!Class.empty() && addClasses) {
-          pClass cls = event.getBestClassMatch(Class);
+          pClass cls = event.getClass(Class);
           if (!cls)
             cls = event.addClass(Class);
 
-          if (cls->getNumStages()==0) {
+          if (cls->getNumStages() == 0) {
             cls->setCourse(pc);
           }
           else {
-            for (size_t i = 0; i<cls->getNumStages(); i++)
+            for (size_t i = 0; i < cls->getNumStages(); i++)
               cls->addStageCourse(i, pc->getId(), -1);
           }
 
@@ -1053,7 +1074,7 @@ bool csvparser::checkSIConfigLine(const oEvent &oe, const CSVLineWrapper &sp, SI
     }
   }
  
-  if ( (finish > 0 && finish != NOTIME) || punches.size() > 2) {
+  if ( (finish > 0 && finish != NOTIME) || punches.size() > 0 || (start > 0 && start != NOTIME)) {
     card.clear(0);
     card.CardNumber = cardNo;
     if (start > 0 && start != NOTIME) {
@@ -1297,7 +1318,7 @@ void csvparser::parse(const wstring &file, list<vector<wstring>> &data) {
     throw meosException(L"Failed to read file, " + file);
 
   bool isUTF8 = false;
-  bool firstLine = true;
+  bool detectType = true;
   vector<wchar_t *> sp;
   vector<wchar_t> wbf_a;
   wbf_a.resize(size_t(flen)+1);
@@ -1305,7 +1326,8 @@ void csvparser::parse(const wstring &file, list<vector<wstring>> &data) {
   wstring w;
   while(std::getline(fin, rbf)) {
     const char *bf = rbf.c_str();
-    if (firstLine) {
+    if (detectType) {
+      detectType = false;
       if (rbf.length() > 3 && rbf[0] == -17 && rbf[1] == -69 && rbf[2] == -65) {
         isUTF8 = true;
         bf += 3;
@@ -1315,6 +1337,22 @@ void csvparser::parse(const wstring &file, list<vector<wstring>> &data) {
         vector<wchar_t>().swap(wbf_a);
         parseUnicode(file, data);
         return;
+      }
+      else {
+        // Auto detect UTF-8
+        isUTF8 = true;
+        while (std::getline(fin, rbf)) {
+          if (rbf.length() > 0) {
+            int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, rbf.c_str(), rbf.length(), nullptr, 0);
+            if (wlen <= 0) {
+              isUTF8 = false;
+              break;
+            }
+          }
+        }
+        fin.clear();
+        fin.seekg(0);
+        continue;
       }
     }
    
@@ -1329,7 +1367,6 @@ void csvparser::parse(const wstring &file, list<vector<wstring>> &data) {
       wchar_t *wbfL = const_cast<wchar_t *>(w.c_str());
       split(wbfL, sp);
     }
-    firstLine = false;
     
     if (!sp.empty()) {
       data.push_back(vector<wstring>());
@@ -1549,7 +1586,7 @@ int csvparser::importRanking(oEvent &oe, const wstring &file, vector<wstring> &p
       continue;
     if (res != name2RankDup.end()) {
       if (res->second.second)
-        problems.push_back(r->getCompleteIdentification());
+        problems.push_back(r->getCompleteIdentification(oRunner::IDType::OnlyThis));
       else {
         res->second.second = true;
         r->getDI().setInt("Rank", res->second.first);

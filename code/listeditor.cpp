@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -33,7 +33,6 @@
 #include "gdifonts.h"
 #include "oEvent.h"
 #include "tabbase.h"
-#include "CommDlg.h"
 #include "generalresult.h"
 #include "gdiconstants.h"
 #include "autocomplete.h"
@@ -73,9 +72,10 @@ int ListEditor::load(const MetaListContainer &mlc, int index, bool autoSaveCopy)
   
   if (mlc.isInternal(index)) {
     currentIndex = -1;
+    wstring lname = currentList->getLocalizedListName();
     currentList->clearTag();
     wstring cpy = lang.tl(L" Kopia (X)#" + getLocalDate());
-    currentList->setListName(currentList->getListName() + cpy);
+    currentList->setListName(lname + cpy);
 
     if (autoSaveCopy) {
       oe->getListContainer().addExternal(*currentList);
@@ -116,7 +116,7 @@ void ListEditor::show(gdioutput &gdi) {
   else
     gdi.addString("", boldLarge, "Listredigerare");
 
-  gdi.setOnClearCb(editListCB);
+  gdi.setOnClearCb("edit_list", editListCB);
   gdi.setData("ListEditorClz", this);
   gdi.dropLine(0.5);
   gdi.fillRight();
@@ -283,7 +283,8 @@ void ListEditor::renderListPreview(gdioutput &gdi) {
     gdi.dropLine();
 
     currentList->interpret(oe, gdi, par, li);
-    
+    li.setNoTransform();
+
     if (splitPrintR) {
       auto& sp = *li.getSplitPrintInfo();
       li.getParam().filterMaxPer = sp.numClassResults;
@@ -470,7 +471,7 @@ int ListEditor::editList(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
       }
     }
     else if (bi.id == "NewImage") {
-      vector<pair<wstring, wstring>> ext = { make_pair(L">Bilder", L"*.png") };
+      vector<pair<wstring, wstring>> ext = { make_pair(L"Bilder", L"*.png") };
       wstring fn = gdi.browseForOpen(ext, L"png");
       if (!fn.empty()) {
         bool transparent = gdi.isChecked("TransparentWhite");
@@ -557,9 +558,15 @@ int ListEditor::editList(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
       statusSplitPrint(gdi, gdi.isChecked(bi.id));
     }
     else if (bi.id == "Cancel") {
-      gdi.restore("EditList");
-      gdi.enableInput("EditList");
-      gdi.enableInput("SplitPrint");
+      if (gdi.hasData("DoRedraw")) {
+        gdi.clearPage(false);
+        show(gdi);
+      }
+      else {
+        gdi.restore("EditList");
+        gdi.enableInput("EditList");
+        gdi.enableInput("SplitPrint");
+      }
     }
     else if (bi.id == "CancelNew") {
       gdi.clearPage(false);
@@ -663,6 +670,12 @@ int ListEditor::editList(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
         spInfo->withSpeed = gdi.isChecked("Speed");
         spInfo->withResult = gdi.isChecked("Result");
         spInfo->withAnalysis = gdi.isChecked("Analysis");
+        spInfo->withAbsTime = gdi.isChecked("AbsTime");
+        spInfo->withControlCode = gdi.isChecked("ControlCode");
+        spInfo->withLegPlace = gdi.isChecked("LegPlace");
+        spInfo->withAccLegPlace = gdi.isChecked("AccLegPlace");
+        spInfo->withTimeLoss = gdi.isChecked("TimeLoss");
+
         auto res = gdi.getSelectedItem("NumResult");
         if (res.second)
           spInfo->numClassResults = res.first;
@@ -768,7 +781,7 @@ int ListEditor::editList(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
 
       savedFileName.clear();
       gdi.clearPage(true);
-      gdi.setOnClearCb(editListCB);
+      gdi.setOnClearCb("edit_list", editListCB);
       gdi.setData("ListEditorClz", this);
 
       gdi.pushX();
@@ -798,7 +811,8 @@ int ListEditor::editList(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
 
       if (bi.id == "DoOpenCopy") {
         currentIndex = -1;
-        currentList->clearTag();
+        if (currentList)
+          currentList->clearTag();
         lastSaved = NotSaved;
         makeDirty(gdi, MakeDirty, MakeDirty);
       }
@@ -1160,7 +1174,7 @@ void ListEditor::editListPost(gdioutput &gdi, const MetaListPost &mlp, int id) {
   gdi.registerEvent("SearchRunner", editListCB).setKeyCommand(KC_FIND);
   gdi.registerEvent("SearchRunnerBack", editListCB).setKeyCommand(KC_FINDBACK);
 
-  gdi.addInput("SearchText", getSearchString(), 26, editListCB, L"",
+  gdi.addInput("SearchText", getSearchString(), 20, editListCB, L"",
                L"Sök symbol.").isEdit(false)
               .setBgColor(colorLightCyan).ignore(true);
   
@@ -1287,7 +1301,7 @@ void ListEditor::editListPost(gdioutput &gdi, const MetaListPost &mlp, int id) {
   gdi.setData("CurrentId", id);
   gdi.addButton("Remove", "Radera", editListCB, "Ta bort listposten");
   gdi.addButton("Cancel", "Avbryt", editListCB).setCancel();
-
+  gdi.setData("DoRedraw", 1);
   gdi.updatePos(gdi.getCX(), gdi.getCY(), gdi.scaleLength(20), 0);
   gdi.addButton("Apply", "OK", editListCB).setDefault();
 
@@ -1615,6 +1629,8 @@ const wchar_t *ListEditor::getIndexDescription(EPostType type) {
     return L"Index in X[index]#OutputNumbers";
   else if (MetaList::isAllStageType(type))
     return L"Applicera för specifik etapp:";
+  else if (type == lTeamAnnotation || type == lRunnerAnnotation)
+    return L"Text på visst radnummer:";
   else
     return L"Applicera för specifik sträcka:";
 }
@@ -1697,6 +1713,9 @@ bool ListEditor::legStageTypeIndex(gdioutput &gdi, EPostType type, int leg) {
         gdi.setText("Leg", ix);
       }
       gdi.setInputStatus("Leg", leg != -1);
+    }
+    else {
+      gdi.setTextTranslate("TUseLeg", getIndexDescription(type));
     }
   }
   
@@ -1866,15 +1885,16 @@ void ListEditor::editListProp(gdioutput &gdi, bool newList) {
   if (!newList) {
     gdi.dropLine(0.8);
     gdi.setCX(gdi.getCX()+20);
-    gdi.addButton("ApplyListProp", "OK", editListCB);
-    gdi.addButton("Cancel", "Avbryt", editListCB);
+    gdi.addButton("ApplyListProp", "OK", editListCB).setDefault();
+    gdi.setData("DoRedraw", 1);
+    gdi.addButton("Cancel", "Avbryt", editListCB).setCancel();
   }
   else {
     gdi.setCX(x1);
     gdi.setCY(gdi.getHeight());
     gdi.dropLine();
-    gdi.addButton("ApplyListProp", "Skapa", editListCB);
-    gdi.addButton("CancelNew", "Avbryt", editListCB);
+    gdi.addButton("ApplyListProp", "Skapa", editListCB).setDefault();
+    gdi.addButton("CancelNew", "Avbryt", editListCB).setCancel();
   }
 
   gdi.dropLine(3);
@@ -1943,11 +1963,22 @@ void ListEditor::splitPrintList(gdioutput& gdi) {
   gdi.dropLine(0.5);
   gdi.fillRight();
   gdi.addCheckbox("Split", "Inkludera sträcktider", nullptr, isSP ? sp->includeSplitTimes : true);
+
+  gdi.addCheckbox("AbsTime", "Inkludera klocktid", nullptr, isSP ? sp->withAbsTime : true);
+  gdi.addCheckbox("ControlCode", "Inkludera kontrollkod", nullptr, isSP ? sp->withControlCode : true);
+  gdi.addCheckbox("LegPlace", "Inkludera sträckplacering", nullptr, isSP ? sp->withLegPlace : true);
+  gdi.addCheckbox("AccLegPlace", "Inkludera placering", nullptr, isSP ? sp->withAccLegPlace : true);
+  int maxX = gdi.getCX();
+
+  gdi.dropLine(2.5);
+  gdi.popX();
+  gdi.addCheckbox("TimeLoss", "Inkludera tidsförlust", nullptr, isSP ? sp->withTimeLoss : true);
   gdi.addCheckbox("Speed", "Inkludera tempo", nullptr, isSP ? sp->withSpeed : true);
+
   gdi.addCheckbox("Result", "Inkludera individuellt resultat", nullptr, isSP ? sp->withResult : true);
   gdi.addCheckbox("Analysis", "Inkludera bomanalys", nullptr, isSP ? sp->withAnalysis : true);
 
-  int maxX = gdi.getCX();
+  maxX = max(maxX, gdi.getCX());
 
   gdi.setCX(x1 + margin);
   gdi.dropLine(2);
@@ -1967,8 +1998,9 @@ void ListEditor::splitPrintList(gdioutput& gdi) {
 
   gdi.dropLine(0.8);
   gdi.setCX(gdi.getCX() + gdi.scaleLength(40));
-  gdi.addButton("ApplySplitList", "OK", editListCB);
-  gdi.addButton("Cancel", "Avbryt", editListCB);
+  gdi.addButton("ApplySplitList", "OK", editListCB).setDefault();
+  gdi.addButton("Cancel", "Avbryt", editListCB).setCancel();
+  gdi.setData("DoRedraw", 1);
 
   gdi.dropLine(3);
   int maxY = gdi.getCY();

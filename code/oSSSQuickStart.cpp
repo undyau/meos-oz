@@ -3,6 +3,7 @@
 #include "Download.h"
 #include "gdioutput.h"
 #include "csvparser.h"
+#include "xmlparser.h"
 #include "meos_util.h"
 #include "generalresult.h"
 #include "metalist.h"

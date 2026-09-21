@@ -1,3 +1,6 @@
+  Sep 2026 5.0.1851.0
+ - Merge changes from MeOS 5.0 Update 3 (upstream 4.0 Update 3 -> 5.0 Update 3).
+
   10 Aug 2026 4.0.1578.3
  - Remove all support for export of results by course. This functionality
    is effectively available via LiveLox. Function was broken in 4.0.1578.3.

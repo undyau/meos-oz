@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -73,12 +73,21 @@ void oPunch::appendCodeString(string &dst) const {
     ubo[0] = 0;
 
   char bf[48];
-  if (timeConstSecond > 1 && punchTime != -1) {
+  if (timeConstSecond == 10 && punchTime != -1) {
     if (punchTime >= 0)
       sprintf_s(bf, 32, "%d-%d.%d%s%s;", type, punchTime / timeConstSecond,
         punchTime % timeConstSecond, ubf, ubo);
     else {
       sprintf_s(bf, 32, "%d--%d.%d%s%s;", type, (-punchTime) / timeConstSecond, 
+        (-punchTime) % timeConstSecond, ubf, ubo);
+    }
+  }
+  else if (timeConstSecond == 100 && punchTime != -1) {
+    if (punchTime >= 0)
+      sprintf_s(bf, 32, "%d-%d.%02d%s%s;", type, punchTime / timeConstSecond,
+        punchTime % timeConstSecond, ubf, ubo);
+    else {
+      sprintf_s(bf, 32, "%d--%d.%02d%s%s;", type, (-punchTime) / timeConstSecond,
         (-punchTime) % timeConstSecond, ubf, ubo);
     }
   }
@@ -105,10 +114,21 @@ void oPunch::decodeString(const char *s) {
     if (timeConstSecond > 1 && *s == '.') {
       ++s;
       int tenth = *s - '0';
-      while ((*s >= '0' && *s <= '9')) // Eat more decimal digits (unused)
-        ++s;
+      int hundredth = -1;
 
-      if (tenth > 0 && tenth < 10) {
+      if (timeConstSecond > 10)
+        tenth *= 10;
+
+      while ((*s >= '0' && *s <= '9')) { // Eat more decimal digits (unused)
+        ++s;
+        if (hundredth == -1) {
+          hundredth = *s - '0';
+          if (timeConstSecond >= 100 && hundredth >= 0 && hundredth < 10)
+            tenth += hundredth;
+        }
+      }
+
+      if (tenth > 0 && tenth < timeConstSecond) {
         if (t >= 0 && *timeS != '-')
           punchTime = timeConstSecond * t + tenth;
         else
@@ -159,17 +179,16 @@ wstring oPunch::getString() const {
   }
   ct = time.c_str();
   
-  wstring typeS = getType();
+  wstring typeS = getType(nullptr);
   const wchar_t *tp = typeS.c_str();
 
-  if (type==oPunch::PunchStart)
-    swprintf_s(bf, L"%s\t%s", tp, ct);
-  else if (type==oPunch::PunchFinish)
-    swprintf_s(bf, L"%s\t%s", tp, ct);
-  else if (type==oPunch::PunchCheck)
-    swprintf_s(bf, L"%s\t%s", tp, ct);
-  else
-  {
+  if (type == oPunch::PunchStart || type == oPunch::PunchCheck || type == oPunch::PunchFinish) {
+    if (false && punchUnit > 0)
+      swprintf_s(bf, L"%s/%d\t%s", tp, punchUnit, ct);
+    else
+      swprintf_s(bf, L"%s\t%s", tp, ct);
+  }
+  else {
     if (isUsed)
       swprintf_s(bf, L"%d\t%s", type, ct);
     else
@@ -274,14 +293,14 @@ bool oPunch::canRemove() const
   return true;
 }
 
-const wstring &oPunch::getType() const {
-  return getType(type);
+const wstring &oPunch::getType(const oCourse *crs) const {
+  return getType(type, crs);
 }
 
-const wstring &oPunch::getType(int t) {
-  if (t==oPunch::PunchStart)
+const wstring &oPunch::getType(int t, const oCourse* crs) {
+  if (t==oPunch::PunchStart || (crs && t == crs->getStartPunchType()))
     return lang.tl("Start");
-  else if (t==oPunch::PunchFinish)
+  else if (t==oPunch::PunchFinish || (crs && t == crs->getFinishPunchType()))
     return lang.tl("Mål");
   else if (t==oPunch::PunchCheck)
     return lang.tl("Check");
@@ -330,4 +349,8 @@ int oPunch::getOriginalTime() const {
   if (punchUnit > 0)
     return pt + oe->getUnitAdjustment(oPunch::SpecialPunch(type), punchUnit);
   return pt + tTimeAdjust.first; // Adjustment "wrong time" at control
+}
+
+const oControl *oPunch::getRogainingControl(const oCourse &crs) const {
+  return crs.getControl(tRogainingIndex);
 }

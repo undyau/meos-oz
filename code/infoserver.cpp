@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -97,6 +97,7 @@ InfoBaseCompetitor::InfoBaseCompetitor(int id) : InfoBase(id) {
   status = 0;
   startTime = 0;
   runningTime = 0;
+  preliminary = false;
 }
 
 InfoCompetitor::InfoCompetitor(int id) : InfoBaseCompetitor(id) {
@@ -109,10 +110,17 @@ InfoTeam::InfoTeam(int id) : InfoBaseCompetitor(id) {
 }
 
 
-bool InfoCompetition::synchronize(oEvent &oe, bool onlyCmp, const set<int> &includeCls, const set<int> &ctrls, bool allowDeletion) {
+bool InfoCompetition::synchronize(oEvent &oe, const wstring &cmpName, 
+                                  SynchType whatSynch, const set<int> &includeCls,
+                                  const set<int> &ctrls,
+                                  const set<int>& trueRadio, 
+                                  bool allowDeletion) {
   bool changed = false;
-  if (oe.getName() != name) {
-    name = oe.getName();
+
+  const wstring& tmpName = cmpName.empty() ? oe.getName() : cmpName;
+
+  if (tmpName != name) {
+    name = tmpName;
     changed = true;
   }
 
@@ -139,7 +147,7 @@ bool InfoCompetition::synchronize(oEvent &oe, bool onlyCmp, const set<int> &incl
   if (changed)
     needCommit(*this);
   
-  if (onlyCmp)
+  if (whatSynch == SynchType::OnlyCmp)
     return changed;
 
   vector<pControl> ctrl;
@@ -153,16 +161,16 @@ bool InfoCompetition::synchronize(oEvent &oe, bool onlyCmp, const set<int> &incl
       if (!ctrls.count(ids[j])) 
         continue;
       knownId.insert(wid);
-      map<int, InfoRadioControl>::iterator res = controls.find(wid);
+      auto res = controls.find(wid);
       if (res == controls.end())
         res = controls.insert(make_pair(wid, InfoRadioControl(wid))).first;
-      if (res->second.synchronize(*ctrl[k], ids.size() > 1 ? j+1 : 0))
+      if (res->second.synchronize(*ctrl[k], trueRadio.count(ids[j]), ids.size() > 1 ? j + 1 : 0))
         needCommit(res->second);
     }  
   }
 
   // Check if something was deleted
-  for (map<int, InfoRadioControl>::iterator it = controls.begin(); it != controls.end();) {
+  for (auto it = controls.begin(); it != controls.end();) {
     if (!knownId.count(it->first)) {
       controls.erase(it++);
       forceComplete = true;
@@ -199,10 +207,50 @@ bool InfoCompetition::synchronize(oEvent &oe, bool onlyCmp, const set<int> &incl
   }
   knownId.clear();
 
+  if (whatSynch == SynchType::CmpAndClass)
+    return !toCommit.empty() || forceComplete || !deleteMap.empty();
+
+  // Get runners and teams to use. Compute clubs to include
+  unordered_set<int> usedClubs;
+  vector<pTeam> t, tToUse;
+
+  oe.getTeams(0, t, false);
+  for (pTeam tk : t) {
+    int cid = tk->getClassId(true);
+    if (!includeCls.count(cid))
+      continue;
+    if (cid != 0 && tk->getClassRef(false)->getQualificationFinal() != nullptr)
+      continue;
+
+    if (int cid = tk->getClubId(); cid != 0)
+      usedClubs.insert(cid);
+    tToUse.push_back(tk);
+  }
+
+  vector<pRunner> r, rToUse;
+  oe.getRunners(0, 0, r, false);
+  for (pRunner rk : r) {
+    int cid = rk->getClassId(true);
+    if (!includeCls.count(cid))
+      continue;
+    if (cid != 0 && rk->getClassRef(true)->getQualificationFinal() != nullptr)
+      continue;
+    if (rk->isVacant())
+      continue;
+
+    if (int cid = rk->getClubId(); cid != 0)
+      usedClubs.insert(cid);
+    rToUse.push_back(rk);
+  }
+
+  // Clubs
   vector<pClub> clb;
   oe.getClubs(clb, false);
   for (size_t k = 0; k < clb.size(); k++) {
     int wid = clb[k]->getId();
+    if (!usedClubs.count(wid))
+      continue;
+
     knownId.insert(wid);
     map<int, InfoOrganization>::iterator res = organizations.find(wid);
     if (res == organizations.end())
@@ -227,26 +275,18 @@ bool InfoCompetition::synchronize(oEvent &oe, bool onlyCmp, const set<int> &incl
   }
   knownId.clear();
 
-  vector<pTeam> t;
-  oe.getTeams(0, t, false);
-  for (size_t k = 0; k < t.size(); k++) {
-    int cid = t[k]->getClassId(true);
-    if (!includeCls.count(cid))
-      continue;
-    if (cid != 0 && t[k]->getClassRef(false)->getQualificationFinal() != nullptr)
-      continue;
-
-    int wid = t[k]->getId();
+  for (pTeam tk : tToUse) {
+    int wid = tk->getId();
     knownId.insert(wid);
     map<int, InfoTeam>::iterator res = teams.find(wid);
     if (res == teams.end())
       res = teams.insert(make_pair(wid, InfoTeam(wid))).first;
-    if (res->second.synchronize(*t[k]))
+    if (res->second.synchronize(*tk))
       needCommit(res->second);
   }
 
   // Check if something was deleted
-  for (map<int, InfoTeam>::iterator it = teams.begin(); it != teams.end();) {
+  for (auto it = teams.begin(); it != teams.end();) {
     if (!knownId.count(it->first)) {
       int tid = it->first;
       teams.erase(it++);
@@ -261,21 +301,13 @@ bool InfoCompetition::synchronize(oEvent &oe, bool onlyCmp, const set<int> &incl
   }
   knownId.clear();
 
-  vector<pRunner> r;
-  oe.getRunners(0, 0, r, false);
-  for (size_t k = 0; k < r.size(); k++) {
-    int cid = r[k]->getClassId(true);
-    if (!includeCls.count(cid))
-      continue;
-    if (cid != 0 && r[k]->getClassRef(true)->getQualificationFinal() != nullptr)
-      continue;
-
-    int wid = r[k]->getId();
+  for (pRunner rk : rToUse) {
+    int wid = rk->getId();
     knownId.insert(wid);
-    map<int, InfoCompetitor>::iterator res = competitors.find(wid);
+    auto res = competitors.find(wid);
     if (res == competitors.end())
-      res = competitors.insert(make_pair(wid, InfoCompetitor(wid))).first;
-    if (res->second.synchronize(*this, *r[k]))
+      res = competitors.emplace(wid, InfoCompetitor(wid)).first;
+    if (res->second.synchronize(*this, *rk))
       needCommit(res->second);
   }
 
@@ -301,13 +333,14 @@ void InfoCompetition::needCommit(InfoBase &obj) {
   toCommit.push_back(&obj);
 }
 
-bool InfoRadioControl::synchronize(oControl &c, int number) {
+bool InfoRadioControl::synchronize(oControl &c, bool trueRadio, int number) {
   wstring n = c.hasName() ? c.getName() : c.getString();
   if (number > 0)
     n = n + L"-" + itow(number);
-  if (n == name)
+  if (n == name && this->trueRadio == trueRadio)
     return false;
   else {
+    this->trueRadio = trueRadio;
     name = n;
     modified();
   }
@@ -315,8 +348,10 @@ bool InfoRadioControl::synchronize(oControl &c, int number) {
 }
 
 void InfoRadioControl::serialize(xmlbuffer &xml, bool diffOnly) const {
-  vector< pair<string, wstring> > prop;
-  prop.push_back(make_pair("id", itow(getId())));
+  vector<pair<string, wstring>> prop;
+  prop.emplace_back("id", itow(getId()));
+  if (!trueRadio)
+    prop.emplace_back("offline", L"true");
   xml.write("ctrl", prop, name);
 }
 
@@ -325,9 +360,28 @@ bool InfoClass::synchronize(bool includeCourses, oClass &c, const set<int> &ctrl
   int no = c.getSortIndex();
   bool mod = false;
   
-  vector< vector<int> > rc;
+  vector<vector<int>> rc;
   size_t s = c.getNumStages();
   
+  int maps = c.getNumberMaps();
+  int cLength = c.getCourse() ? c.getCourse()->getLength() : 0;
+  int cClimb = c.getCourse() ? c.getCourse()->getClimb() : 0;
+
+  if (numMaps != maps) {
+    numMaps = maps;
+    mod = true;
+  }
+
+  if (cLength != length) {
+    length = cLength;
+    mod = true;
+  }
+
+  if (cClimb != climb) {
+    climb = cClimb;
+    mod = true;
+  }
+
   if (includeCourses) {
     set<int> crsSet;
     for (size_t i = 0; i <= s; i++) {
@@ -373,9 +427,11 @@ bool InfoClass::synchronize(bool includeCourses, oClass &c, const set<int> &ctrl
     pCourse pc = c.getCourse(true); // Get a course representative for the leg.
     rc.push_back(vector<int>());
     if (pc) {
+      int offStart = pc->useFirstAsStart() ? 1 : 0;
+      int offEnd = pc->useLastAsFinish() ? 1 : 0;
       vector<pControl> ctrl;
       pc->getControls(ctrl);
-      for (size_t j = 0; j < ctrl.size(); j++) {
+      for (size_t j = offStart; j < ctrl.size() - offEnd; j++) {
         if (ctrls.count(pc->getCourseControlId(j))) {
           rc.back().push_back(pc->getCourseControlId(j));
         }
@@ -400,16 +456,23 @@ bool InfoClass::synchronize(bool includeCourses, oClass &c, const set<int> &ctrl
 }
 
 void InfoClass::serialize(xmlbuffer &xml, bool diffOnly) const {
-  vector< pair<string, wstring> > prop;
-  prop.push_back(make_pair("id", itow(getId())));
-  prop.push_back(make_pair("ord", itow(sortOrder)));
+  vector<pair<string, wstring> > prop;
+  prop.emplace_back("id", itow(getId()));
+  prop.emplace_back("ord", itow(sortOrder));
   wstring def;
   packIntInt(radioControls, def);
-  prop.push_back(make_pair("radio", def));
+  prop.emplace_back("radio", def);
   if (courses.size() > 0) {
     packInt(courses, def);
-    prop.push_back(make_pair("crs", def));
+    prop.emplace_back("crs", def);
   }
+  if (numMaps > 0)
+    prop.emplace_back("maps", itow(numMaps));
+  if (length > 0)
+    prop.emplace_back("len", itow(length));
+  if (climb > 0)
+    prop.emplace_back("climb", itow(climb));
+
   xml.write("cls", prop, name);
 }
 
@@ -426,6 +489,7 @@ void InfoMeosStatus::serialize(xmlbuffer &xml, bool diffOnly) const {
   prop.push_back(make_pair("version", getMeosCompectVersion()));
   prop.push_back(make_pair("eventNameId", eventNameId));
   prop.push_back(make_pair("onDatabase", itow(onDatabase)));		// 1 is true, 0 is false
+  prop.push_back(make_pair("eventId", itow(eventId)));
 
   xml.write("status", prop, L"");
 }
@@ -467,6 +531,10 @@ void InfoBaseCompetitor::serialize(xmlbuffer &xml, bool diffOnly, int course) co
   prop.emplace_back("org", itow(organizationId));
   prop.emplace_back("cls", itow(classId));
   prop.emplace_back("stat", itow(status));
+
+  if (preliminary)
+    prop.emplace_back("prel", L"true");
+
   prop.emplace_back("st", itow(startTime));
   prop.emplace_back("rt", itow(runningTime));
   if (points != -1) {
@@ -513,17 +581,25 @@ bool InfoBaseCompetitor::synchronizeBase(oAbstractRunner &bc) {
   }
 
   RunnerStatus s = bc.getStatusComputed(true);
-
+  bool prel = false;
   int rt = bc.getRunningTime(true) * (10/timeConstSecond);
   if (rt > 0) {
-    if (s == RunnerStatus::StatusUnknown)
+    if (s == RunnerStatus::StatusUnknown) {
       s = RunnerStatus::StatusOK;
-
-    if (s == RunnerStatus::StatusNoTiming)
-      rt = 0;
+      prel = true;
+    }
+    else if (s == RunnerStatus::StatusNoTiming) {
+      rt = 0;      
+    }
   }
-  else if (isPossibleResultStatus(s))
+  else if (isPossibleResultStatus(s)) {
     s = StatusUnknown;
+  }
+
+  if (prel != preliminary) {
+    preliminary = prel;
+    ch = true;
+  }
 
   if (status != s) {
     status = s;
@@ -556,7 +632,9 @@ bool InfoBaseCompetitor::synchronizeBase(oAbstractRunner &bc) {
 bool InfoCompetitor::synchronize(bool useTotalResults, bool useCourse, oRunner &r) {
   bool ch = synchronizeBase(r);
   bool isQF = r.getClassRef(false) && r.getClassRef(false)->getQualificationFinal() != nullptr;
-  changeTotalSt = r.getEvent()->hasPrevStage() || (r.getLegNumber()>0 && !isQF); // Always write full attributes
+  bool singleStage = r.getClassRef(false) && r.getClassRef(false)->isSingleStageOnly();
+  
+  changeTotalSt = (!singleStage && r.getEvent()->hasPrevStage()) || (!isQF && r.getLegNumber()>0); // Always write full attributes
   
   int s = StatusOK;
   int legInput = 0;
@@ -574,7 +652,7 @@ bool InfoCompetitor::synchronize(bool useTotalResults, bool useCourse, oRunner &
     ch = true;
 
   pTeam t = r.getTeam();
-  if (useTotalResults) {
+  if (useTotalResults && !singleStage) {
     legInput = r.getTotalTimeInput() * (10 / timeConstSecond);
     s = r.getTotalStatusInput();
   }
@@ -583,7 +661,7 @@ bool InfoCompetitor::synchronize(bool useTotalResults, bool useCourse, oRunner &
     pClass cls = t->getClassRef(true);
     if (cls) {
       LegTypes lt = cls->getLegType(ltu);
-      while (ltu > 0 && (lt == LTParallelOptional || lt == LTParallel|| lt == LTExtra || lt == LTIgnore) ) {
+      while (ltu > 0 && (lt == LTParallelOptional || lt == LTParallel || lt == LTExtra || lt == LTIgnore) ) {
         ltu--;
         lt = cls->getLegType(ltu);
       }
@@ -593,6 +671,11 @@ bool InfoCompetitor::synchronize(bool useTotalResults, bool useCourse, oRunner &
       s = t->getLegStatus(ltu - 1, true, false);
     }
   }
+
+  if (status == StatusUnknown && s == StatusOK)
+    s = StatusUnknown;
+  else
+    s = max(s, status);
 
   if (totalStatus != s) {
     totalStatus = s;
@@ -745,6 +828,7 @@ bool InfoTeam::synchronize(oTeam &t) {
 void InfoTeam::serialize(xmlbuffer &xml, bool diffOnly) const {
   vector< pair<string, wstring> > prop;
   prop.push_back(make_pair("id", itow(getId())));
+
   xmlbuffer &sub = xml.startTag("tm", prop);
   InfoBaseCompetitor::serialize(sub, diffOnly, 0);
   wstring def;
@@ -762,7 +846,7 @@ const vector<int> &InfoCompetition::getControls(int classId, int legNumber) cons
       legNumber = res->second.linearLegNumberToActual[legNumber];
     else
       legNumber = 0;
-    const vector< vector<int> > &c = res->second.radioControls;
+    const vector<vector<int>> &c = res->second.radioControls;
     if (size_t(legNumber) < c.size())
       return c[legNumber];
   }
@@ -808,9 +892,8 @@ void InfoCompetition::getDiffXML(xmlbuffer &xml) {
     xml.endTag();
   }
 
-  for (list<InfoBase *>::iterator it = toCommit.begin(); it != toCommit.end(); ++it) {
-    (*it)->serialize(xml, true);
-  }
+  for (auto &info : toCommit) 
+    info->serialize(xml, true);
 }
 
 void InfoCompetition::commitComplete() {
@@ -885,12 +968,16 @@ void xmlbuffer::write(const char *tag,
 
 void xmlbuffer::startXML(xmlparser &xml, const wstring &dest) {
   xml.openOutput(dest.c_str(), false);
+  startTagXML(xml);
+}
+
+void xmlbuffer::startTagXML(xmlparser &xml) {
   if (complete) {
     xml.startTag("MOPComplete", "xmlns", "http://www.melin.nu/mop");
     complete = false;
   }
   else
-  xml.startTag("MOPDiff", "xmlns", "http://www.melin.nu/mop");
+    xml.startTag("MOPDiff", "xmlns", "http://www.melin.nu/mop");
 }
 
 bool xmlbuffer::commit(xmlparser &xml, int count) {

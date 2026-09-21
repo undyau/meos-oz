@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ private:
   bool firstLoadedAfterNew = true;
   PrinterObject splitPrinter;
   PrinterObject labelPrinter;
-  list< pair<unsigned, int> > printPunchRunnerIdQueue;
+  list<pair<uint64_t, int> > printPunchRunnerIdQueue;
   void addToPrintQueue(pRunner r);
   
   enum class SND {
@@ -274,7 +274,7 @@ private:
     wstring warnings;
     wstring cardno;
     wstring statusline;
-    vector<int> MP;
+    vector<pair<int, pControl>> MP;
     GDICOLOR color;
     bool rentCard = false;
     int runnerId = 0;
@@ -286,6 +286,9 @@ private:
 
   list<StoredReadout> readCards;
   void renderReadCard(gdioutput &gdi, int maxNumber);
+
+
+  pair<pCourse, pClass> getRenderCourse(gdioutput& gdi) const;
 
 protected:
   void clearCompetitionData() final;
@@ -299,6 +302,8 @@ public:
   bool showDatabase() const;
 
   static vector<AutoCompleteRecord> getRunnerAutoCompelete(RunnerDB &db, const vector< pair<RunnerWDBEntry *, int>> &rw, pClub dbClub);
+
+  static void generateTestCard(SICard& sic, const vector<int>& testControls, int checkTime, int startTime, int finishTime);
 
   void handleAutoComplete(gdioutput &gdi, AutoCompleteInfo &info) override;
 
@@ -317,7 +322,7 @@ public:
     wstring dataB;
     wstring textA;
     wstring nationality;
-    int sex = 2; 
+    PersonSex sex = PersonSex::sUnknown; 
     wstring birthDate;
     wstring rank;
 
@@ -325,7 +330,7 @@ public:
     bool rentState;
     bool hasPaid;
     int payMode;
-    DWORD age;
+    uint64_t age;
     int storedClassId;
 
     void clear();
@@ -337,7 +342,7 @@ public:
   void generatePayModeWidget(gdioutput &gdi) const;
   static bool writePayMode(gdioutput &gdi, int amount, oRunner &r);
 
-  static SportIdent &getSI(const gdioutput &gdi);
+  static SportIdent &getSI();
   void printerSetup(gdioutput &gdi);
   void labelPrinterSetup(gdioutput &gdi);
 

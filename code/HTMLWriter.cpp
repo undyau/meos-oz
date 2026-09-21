@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -49,21 +49,70 @@ wstring getMeosCompectVersion();
 map <string, shared_ptr<HTMLWriter>> HTMLWriter::tCache;
 extern wchar_t exePath[MAX_PATH];
 
+static string getColor(int color) {
+  int r = color & 0xFF;
+  int g = (color >> 8) & 0xFF;
+  int b = (color >> 16) & 0xFF;
+  char bf[32];
+  sprintf_s(bf, "%02x%02x%02x", r, g, b);
+  return bf;
+}
+
 static void generateStyles(const gdioutput &gdi, std::ostream &fout, double scale, bool withTbl, const list<TextInfo> &TL,
-                           map< pair<gdiFonts, string>, pair<string, string> > &styles) {
+                           map<pair<gdiFonts, wstring>, pair<string, string>> &styles) {
   fout << "<style type=\"text/css\">\n";
-  fout << "body {background-color: rgb(250,250,255)}\n";
-  fout << "h1 {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 24 * scale << "px;font-weight:normal;white-space:nowrap}\n";
-  fout << "h2 {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 20 * scale << "px;font-weight:normal;white-space:nowrap}\n";
-  fout << "h3 {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 16 * scale << "px;font-weight:normal;white-space:nowrap}\n";
-  fout << "p {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 12 * scale << "px;font-weight:normal}\n";
-  fout << "div {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 12 * scale << "px;font-weight:normal;white-space:nowrap}\n";
+  if (gdi.hasBGColor())
+    fout << "body {background-color: #" << getColor(gdi.getBGColor()) << "}\n";
+  else
+    fout << "body {background-color: rgb(250,250,255)}\n";
+
+  string tcolor;
+  if (gdi.hasFGColor())
+    tcolor = ";color: #" + getColor(gdi.getFGColor());
+
+  fout << "h1 {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 24 * scale << 
+           "px;font-weight:normal;white-space:nowrap" << tcolor <<  "}\n";
+  fout << "h2 {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 20 * scale <<
+           "px;font-weight:normal;white-space:nowrap" << tcolor <<  "}\n";
+  fout << "h3 {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 16 * scale << 
+           "px;font-weight:normal;white-space:nowrap" << tcolor << "}\n";
+  fout << "p {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 12 * scale << 
+           "px;font-weight:normal" << tcolor << "}\n";
+  fout << "div {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 12 * scale << 
+           "px;font-weight:normal;white-space:nowrap" << tcolor << "}\n";
 
   if (withTbl) {
-    fout << "td {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 12 * scale << "px;font-weight:normal;white-space:nowrap}\n";
-    fout << "td.e0 {background-color: rgb(238,238,255)}\n";
-    fout << "td.e1 {background-color: rgb(245,245,255)}\n";
-    fout << "td.header {line-height:" << std::fixed << std::setprecision(2) << 1.8 * scale << ";height:" << std::fixed << std::setprecision(2) << 40 * scale << "px}\n";
+    fout << "td {font-family:arial,sans-serif;font-size:" << std::fixed << std::setprecision(2) << 12 * scale <<
+            "px;font-weight:normal;white-space:nowrap" << tcolor << "}\n";
+    if (gdi.hasBGColor()) {
+      int bgRGB = gdi.getBGColor();
+      HLS bgHLS;
+      bgHLS.RGBtoHLS(bgRGB);
+      HLS e1(bgHLS), e2(bgHLS);
+
+      if (bgHLS.lightness > 180) {
+        e1.lighten(0.98);
+        e2.lighten(1.02);
+      }
+      if (bgHLS.lightness > 80) {
+        e1.lighten(0.9);
+        e2.lighten(1.1);
+      }
+      else {
+        e1.lightness += 30;
+        e2.lightness += 45;
+      }
+
+      fout << "td.e0 {background-color: #" << getColor(e1.HLStoRGB()) << "}\n";
+      fout << "td.e1 {background-color: #" << getColor(e2.HLStoRGB()) << "}\n";
+    }
+    else {
+      fout << "td.e0 {background-color: rgb(238,238,255)}\n";
+      fout << "td.e1 {background-color: rgb(245,245,255)}\n";
+    }
+
+    fout << "td.header {line-height:" << std::fixed << std::setprecision(2) << 1.8 * scale << ";height:" 
+      << std::fixed << std::setprecision(2) << 40 * scale << "px}\n";
     fout << "td.freeheader {line-height:" << std::fixed << std::setprecision(2) << 1.2 * scale << "}\n";
   }
   list<TextInfo>::const_iterator it=TL.begin();
@@ -74,7 +123,7 @@ static void generateStyles(const gdioutput &gdi, std::ostream &fout, double scal
     if (!it->font.empty() || (font == italicMediumPlus)
                           || (font == fontMediumPlus)) {
 
-      if (styles.find(make_pair(font, gdi.narrow(it->font))) != styles.end()) {
+      if (styles.find(make_pair(font, it->font)) != styles.end()) {
         ++it;
         continue;
       }
@@ -118,9 +167,9 @@ static void generateStyles(const gdioutput &gdi, std::ostream &fout, double scal
       fout << element << "." <<  style
            << "{font-family:" << gdi.narrow(faceName) << ";font-size:"
            << fixed << std::setprecision(2) << (scale * iscale * baseSize) 
-           << "px;font-weight:normal;white-space:nowrap}\n";
+           << "px;font-weight:normal;white-space:nowrap" << tcolor << "}\n";
 
-      styles[make_pair(font, gdi.narrow(it->font))] = make_pair(element, style);
+      styles[make_pair(font, it->font)] = make_pair(element, style);
     }
     ++it;
   }
@@ -145,7 +194,7 @@ public:
 template<typename T, typename TI>
 void HTMLWriter::formatTL(ostream &fout,
                           ImageWriter& imageWriter,
-                          const map<pair<gdiFonts, string>, pair<string, string>> &styles,
+                          const map<pair<gdiFonts, wstring>, pair<string, string>> &styles,
                           const T &tl,
                           double &yscale, double &xscale,
                           int &offsetY, int &offsetX) {
@@ -191,7 +240,7 @@ void HTMLWriter::formatTL(ostream &fout,
         xp + "px;top:" + yp + "px\"";
     }
     string starttag, endtag;
-    getStyle(styles, it.getGdiFont(), gdioutput::narrow(it.font), estyle, starttag, endtag);
+    getStyle(styles, it, estyle, starttag, endtag);
 
     if (!it.text.empty())
       fout << starttag << gdioutput::toUTF8(encodeXML(it.text)) << endtag << endl;
@@ -206,12 +255,26 @@ void HTMLWriter::formatTL(ostream &fout,
   }
 }
 
-static void getStyle(const map< pair<gdiFonts, string>, pair<string, string> > &styles,
-                     gdiFonts font, const string &face, const string &extraStyle, string &starttag, string &endtag) {
+namespace {
+  bool sortTL_X(const TextInfo *a, const TextInfo *b) {
+    return a->xp < b->xp;
+  }
+
+  wstring html_table_code(const wstring &in) {
+    if (in.size() == 0)
+      return L"&nbsp;";
+    else {
+      return encodeXML(in);
+    }
+  }
+}
+
+static void getStyle(const map< pair<gdiFonts, wstring>, pair<string, string>> &styles,
+                     const TextInfo &ti, const string &extraStyle, string &starttag, string &endtag) {
   starttag.clear();
   endtag.clear();
   string extra;
-  switch (font) {
+  switch (ti.getGdiFont()) {
     case boldText:
     case boldSmall:
       extra = "b";
@@ -223,17 +286,33 @@ static void getStyle(const map< pair<gdiFonts, string>, pair<string, string> > &
       break;
   }
 
-  pair<gdiFonts, string> key(font, face);
-  map< pair<gdiFonts, string>, pair<string, string> >::const_iterator res = styles.find(key);
+  string colorStyle;
+  if (ti.color != 0) {
+    string color = getColor(ti.color);
+    if (!extraStyle.empty()) {
+      colorStyle = extraStyle;
+      colorStyle.back() = ';';
+    }
+    else
+      colorStyle = " style=\"";
+
+    colorStyle += string("color: #") + color + "\"";
+  }
+  pair<gdiFonts, wstring> key(ti.getGdiFont(), ti.font);
+  auto res = styles.find(key);
 
   if (res != styles.end()) {
-    const pair<string, string> &stylePair = res->second;
+    auto &stylePair = res->second;
 
     if (!stylePair.first.empty()) {
       starttag = "<" + stylePair.first;
       if (!stylePair.second.empty())
         starttag += " class=\""  + stylePair.second + "\"";
-      starttag += extraStyle;
+      
+      if (!colorStyle.empty())
+        starttag += colorStyle;
+      else
+        starttag += extraStyle;
       starttag += ">";
     }
 
@@ -248,7 +327,7 @@ static void getStyle(const map< pair<gdiFonts, string>, pair<string, string> > &
   }
   else {
     string element;
-    switch(font) {
+    switch(ti.getGdiFont()) {
       case boldHuge:
         element="h1";
         break;
@@ -263,11 +342,16 @@ static void getStyle(const map< pair<gdiFonts, string>, pair<string, string> > &
         break;
     }
 
-    if (!extraStyle.empty() && element.empty())
+    if ((!extraStyle.empty() || !colorStyle.empty()) && element.empty() )
       element = "div";
 
     if (element.size()>0) {
-      starttag = "<" + element + extraStyle + ">";
+      starttag = "<" + element;
+      if (!colorStyle.empty())
+        starttag += colorStyle;
+      else
+        starttag += extraStyle;
+      starttag += ">";
     }
 
     if (!extra.empty()) {
@@ -281,139 +365,23 @@ static void getStyle(const map< pair<gdiFonts, string>, pair<string, string> > &
   }
 }
 
-void HTMLWriter::writeHTML(gdioutput &gdi, const wstring &file, 
-                           const wstring &title, int refreshTimeOut, double scale){
-  checkWriteAccess(file);
-  ofstream fout(file.c_str());
-  if (fout.bad())
-    throw std::exception("Bad output stream");
-  
-  wchar_t drive[20];
-  wchar_t dir[MAX_PATH];
-  wchar_t name[MAX_PATH];
-  wchar_t ext[MAX_PATH];
-  _wsplitpath_s(file.c_str(), drive, dir, name, ext);
-  wstring path = wstring(drive) + dir;
-  
-  writeHTML(gdi, fout, title, true, path, refreshTimeOut, scale);
-}
-
-void HTMLWriter::writeHTML(gdioutput& gdi, ostream& fout,
-                           const wstring& title, 
-                           bool includeImages,
-                           const wstring& imageDirectoryDestination, 
-                           int refreshTimeOut, double scale) {
-
-  ImageWriter imgWriter(imageDirectoryDestination, includeImages);
-
-  if (scale <= 0)
-    scale = 1.0;
-
-  fout << "<!DOCTYPE html>" << endl;
-  fout << "<html>\n<head>\n";
-  fout << "<meta charset=\"UTF-8\"/>\n";
-
-  if (refreshTimeOut > 0)
-    fout << "<meta http-equiv=\"refresh\" content=\"" << refreshTimeOut << "\">\n";
-
-  fout << "<title>" << gdioutput::toUTF8(title) << "</title>\n";
-
-  map< pair<gdiFonts, string>, pair<string, string> > styles;
-  generateStyles(gdi, fout, scale, false, gdi.getTL(), styles);
-
-  fout << "</head>\n";
-
-  fout << "<body>\n";
-  double yscale = 1.3 * scale;
-  double xscale = 1.2 * scale;
-  int offsetY = 0, offsetX = 0;
-  HTMLWriter::formatTL<list<TextInfo>, InterpTextInfo>(fout, imgWriter, styles, gdi.getTL(), yscale, xscale, offsetY, offsetX);
-
-  fout << "<p style=\"position:absolute;left:10px;top:" << int(yscale * (gdi.getPageY() - 45)) + offsetY << "px\">";
-
-  char bf1[256];
-  char bf2[256];
-  GetTimeFormatA(LOCALE_USER_DEFAULT, 0, NULL, NULL, bf2, 256);
-  GetDateFormatA(LOCALE_USER_DEFAULT, 0, NULL, NULL, bf1, 256);
-  //fout << "Skapad av <i>MeOS</i>: " << bf1 << " "<< bf2 << "\n";
-  fout << gdioutput::toUTF8(lang.tl("Skapad av ")) + "<a href=\"https://www.melin.nu/meos\" target=\"_blank\"><i>MeOS</i></a>: " << bf1 << " " << bf2 << "\n";
-  fout << "</p>\n";
-
-  fout << "</body>\n";
-  fout << "</html>\n";
-}
-
-wstring html_table_code(const wstring &in)
-{
-  if (in.size()==0)
-    return L"&nbsp;";
-  else {
-    return encodeXML(in);
-  }
-}
-
-bool sortTL_X(const TextInfo *a, const TextInfo *b)
-{
-  return a->xp < b->xp;
-}
-
-
-void HTMLWriter::writeTableHTML(gdioutput &gdi, 
-                                const wstring &file,
-                                const wstring &title, 
-                                int refreshTimeOut, 
-                                double scale) {
-  checkWriteAccess(file);
-  ofstream fout(file.c_str());
-
-  if (fout.bad())
-    return throw std::exception("Bad output stream");
-
-  wchar_t drive[20];
-  wchar_t dir[MAX_PATH];
-  wchar_t name[MAX_PATH];
-  wchar_t ext[MAX_PATH];
-  _wsplitpath_s(file.c_str(), drive, dir, name, ext);
-  wstring path = wstring(drive) + dir;
-
-  writeTableHTML(gdi, fout, title, true, path, false, refreshTimeOut, scale);
-}
-
-void HTMLWriter::writeTableHTML(gdioutput& gdi,
-                                ostream& fout,
-                                const wstring& title,
-                                bool includeImages,
-                                const wstring& imageDirectoryDestination,
-                                bool simpleFormat,
-                                int refreshTimeOut,
-                                double scale) {
-  if (scale <= 0)
-    scale = 1.0;
-
-  ImageWriter imgWriter(imageDirectoryDestination, includeImages);
-
-  fout << "<!DOCTYPE html>" << endl;
-  fout << "<html>\n<head>\n";
-  fout << "<meta charset=\"UTF-8\"/>\n";
-  if (refreshTimeOut > 0)
-    fout << "<meta http-equiv=\"refresh\" content=\"" << refreshTimeOut << "\">\n";
-  fout << "<title>" << gdioutput::toUTF8(title) << "</title>\n";
-
-  map< pair<gdiFonts, string>, pair<string, string> > styles;
-  generateStyles(gdi, fout, scale, true, gdi.getTL(), styles);
-
-  fout << "</head>\n";
-
-  fout << "<body>\n";
-  auto& TL = gdi.getTL();
-  auto it = TL.begin();
-  int MaxX = gdi.getPageX() - 100;
+template<typename T, typename TI>
+void HTMLWriter::formatTable(std::ostream &fout,
+                             ImageWriter &imgWriter,
+                             const map<pair<gdiFonts, wstring>, pair<string, string>> &styles,
+                             const T &tl,
+                             bool simpleFormat,
+                             int marginPercent,
+                             double scale) {
   map<int, int> tableCoordinates;
-
+  auto cit = tl.begin();
   //Get x-coordinates
-  while (it != TL.end()) {
-    tableCoordinates[it->xp] = 0;
-    ++it;
+  int maxX = 0;
+  while (cit != tl.end()) {
+    const TextInfo &ti = TI::ti(*cit);
+    tableCoordinates[ti.xp] = 0;
+    maxX = std::max(maxX, ti.xp + ti.getWidth());
+    ++cit;
   }
 
   int kr = 0;
@@ -422,32 +390,38 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
     mit->second = kr++;
     ++mit;
   }
-  tableCoordinates[MaxX] = kr;
+  tableCoordinates[maxX] = kr;
 
   vector<bool> sizeSet(kr + 1, false);
 
-  fout << "<table cellspacing=\"0\" border=\"0\">\n";
+  string tstyle;
+
+  if (marginPercent > 0)
+    tstyle = " style=\"margin-left: " + itos(marginPercent) + "%\"";
+
+  fout << "<table cellspacing=\"0\" border=\"0\"" << tstyle << ">\n";
 
   int linecounter = 0;
-  it = TL.begin();
+  cit = tl.begin();
 
-  vector< pair<int, vector<const TextInfo*> > > rows;
-  rows.reserve(TL.size() / 3);
+  vector< pair<int, vector<const TextInfo *> > > rows;
+  rows.reserve(tl.size() / 3);
   vector<int> ypRow;
   int minHeight = 100000;
 
-  while (it != TL.end()) {
-    int y = it->yp;
-    vector<const TextInfo*> row;
+  while (cit != tl.end()) {
+    int y = TI::y(*cit);
+    vector<const TextInfo *> row;
 
     int subnormal = 0;
     int normal = 0;
     int header = 0;
     int mainheader = 0;
-    while (it != TL.end() && it->yp == y) {
-      if (!gdioutput::skipTextRender(it->format)) {
-        row.push_back(&*it);
-        switch (it->getGdiFont()) {
+    while (cit != tl.end() && TI::y(*cit) == y) {
+      const TextInfo &it = TI::ti(*cit);
+      if (!gdioutput::skipTextRender(it.format)) {
+        row.push_back(&it);
+        switch (it.getGdiFont()) {
         case fontLarge:
         case boldLarge:
         case boldHuge:
@@ -466,7 +440,7 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
           normal++;
         }
       }
-      ++it;
+      ++cit;
     }
 
     if (row.empty())
@@ -511,12 +485,12 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
   ypRow.clear();
   string lineclass;
   for (size_t gCount = 0; gCount < rows.size(); gCount++) {
-    vector<const TextInfo*>& row = rows[gCount].second;
+    vector<const TextInfo *> &row = rows[gCount].second;
     int type = rows[gCount].first;
     int lastType = gCount > 0 ? rows[gCount - 1].first : 0;
     int nextType = gCount + 1 < rows.size() ? rows[gCount + 1].first : 0;
 
-    vector<const TextInfo*>::iterator rit;
+    vector<const TextInfo *>::iterator rit;
     fout << "<tr>" << endl;
 
     if (simpleFormat) {
@@ -527,7 +501,7 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
     }
     else if (type == 2) {
       linecounter = 0;
-      lineclass = " valign=\"bottom\" class=\"header\"";
+      lineclass = " style=\"vertical-align: bottom\" class=\"header\"";
     }
     else {
       if (type == 3)
@@ -564,8 +538,12 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
         style = " style=\"text-align:right\"";
 
       if (colspan == 1 && !sizeSet[thisCol]) {
-        fout << "  <td" << lineclass << style << " width=\"" << int((k + 1 < row.size()) ?
-          (row[k + 1]->xp - row[k]->xp) : (MaxX - row[k]->xp)) << "\">";
+        int width = int((k + 1 < row.size()) ? (row[k + 1]->xp - row[k]->xp) : (maxX - row[k]->xp));
+        int promille = (1000 * width) / maxX;
+        string prc = itos(promille / 10);
+        if (promille % 10 != 0)
+          prc += "." + itos(promille % 10);
+        fout << "  <td" << lineclass << style << " width=\"" << prc << "%\">";
         sizeSet[thisCol] = true;
       }
       else if (colspan > 1)
@@ -582,7 +560,7 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
       else {
         gdiFonts font = row[k]->getGdiFont();
         string starttag, endtag;
-        getStyle(styles, font, gdioutput::narrow(row[k]->font), "", starttag, endtag);
+        getStyle(styles, *row[k], "", starttag, endtag);
 
         fout << starttag << gdioutput::toUTF8(html_table_code(row[k]->text)) << endtag << "</td>" << endl;
       }
@@ -593,7 +571,122 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
   }
 
   fout << "</table>\n";
+}
 
+void HTMLWriter::writeHTML(gdioutput &gdi, const wstring &file, 
+                           const wstring &title, int refreshTimeOut, double scale){
+  checkWriteAccess(file);
+  ofstream fout(file.c_str());
+  if (fout.bad())
+    throw std::exception("Bad output stream");
+  
+  wchar_t drive[20];
+  wchar_t dir[MAX_PATH];
+  wchar_t name[MAX_PATH];
+  wchar_t ext[MAX_PATH];
+  _wsplitpath_s(file.c_str(), drive, dir, name, ext);
+  wstring path = wstring(drive) + dir;
+  
+  writeHTML(gdi, fout, title, true, path, refreshTimeOut, scale);
+}
+
+void HTMLWriter::writeHTML(gdioutput& gdi, ostream& fout,
+                           const wstring& title, 
+                           bool includeImages,
+                           const wstring& imageDirectoryDestination, 
+                           int refreshTimeOut, double scale) {
+
+  ImageWriter imgWriter(imageDirectoryDestination, includeImages);
+
+  if (scale <= 0)
+    scale = 1.0;
+
+  fout << "<!DOCTYPE html>" << endl;
+  fout << "<html>\n<head>\n";
+  fout << "<meta charset=\"UTF-8\"/>\n";
+
+  if (refreshTimeOut > 0)
+    fout << "<meta http-equiv=\"refresh\" content=\"" << refreshTimeOut << "\">\n";
+
+  fout << "<title>" << gdioutput::toUTF8(title) << "</title>\n";
+
+  map<pair<gdiFonts, wstring>, pair<string, string>> styles;
+  generateStyles(gdi, fout, scale, false, gdi.getTL(), styles);
+
+  fout << "</head>\n";
+
+  fout << "<body>\n";
+  double yscale = 1.3 * scale;
+  double xscale = 1.2 * scale;
+  int offsetY = 0, offsetX = 0;
+  formatTL<list<TextInfo>, InterpTextInfo>(fout, imgWriter, styles, gdi.getTL(), yscale, xscale, offsetY, offsetX);
+
+  fout << "<p style=\"position:absolute;left:10px;top:" << int(yscale * (gdi.getPageY() - 45)) + offsetY << "px\">";
+
+  char bf1[256];
+  char bf2[256];
+  GetTimeFormatA(LOCALE_USER_DEFAULT, 0, NULL, NULL, bf2, 256);
+  GetDateFormatA(LOCALE_USER_DEFAULT, 0, NULL, NULL, bf1, 256);
+  //fout << "Skapad av <i>MeOS</i>: " << bf1 << " "<< bf2 << "\n";
+  fout << gdioutput::toUTF8(lang.tl("Skapad av ")) + "<a href=\"https://www.melin.nu/meos\" target=\"_blank\"><i>MeOS</i></a>: " << bf1 << " " << bf2 << "\n";
+  fout << "</p>\n";
+
+  fout << "</body>\n";
+  fout << "</html>\n";
+}
+
+void HTMLWriter::writeTableHTML(gdioutput &gdi, 
+                                const wstring &file,
+                                const wstring &title, 
+                                int refreshTimeOut, 
+                                double scale) {
+  checkWriteAccess(file);
+  ofstream fout(file.c_str());
+
+  if (fout.bad())
+    return throw std::exception("Bad output stream");
+
+  wchar_t drive[20];
+  wchar_t dir[MAX_PATH];
+  wchar_t name[MAX_PATH];
+  wchar_t ext[MAX_PATH];
+  _wsplitpath_s(file.c_str(), drive, dir, name, ext);
+  wstring path = wstring(drive) + dir;
+
+  writeTableHTML(gdi, fout, title, true, path, false, refreshTimeOut, scale);
+}
+
+void HTMLWriter::writeTableHTML(gdioutput& gdi,
+                                ostream& fout,
+                                const wstring& title,
+                                bool includeImages,
+                                const wstring& imageDirectoryDestination,
+                                bool simpleFormat,
+                                int refreshTimeOut,
+                                double scale) {
+  if (scale <= 0)
+    scale = 1.0;
+
+  ImageWriter imgWriter(imageDirectoryDestination, includeImages);
+
+  fout << "<!DOCTYPE html>" << endl;
+  fout << "<html>\n<head>\n";
+  fout << "<meta charset=\"UTF-8\"/>\n";
+  if (refreshTimeOut > 0)
+    fout << "<meta http-equiv=\"refresh\" content=\"" << refreshTimeOut << "\">\n";
+  fout << "<title>" << gdioutput::toUTF8(title) << "</title>\n";
+
+  map< pair<gdiFonts, wstring>, pair<string, string> > styles;
+  generateStyles(gdi, fout, scale, true, gdi.getTL(), styles);
+
+  fout << "</head>\n";
+
+  fout << "<body>\n";
+  auto& TL = gdi.getTL();
+  auto it = TL.begin();
+  
+  formatTable<list<TextInfo>, InterpTextInfo>(fout, imgWriter, styles, TL, simpleFormat, 0, scale);
+  
   if (!simpleFormat) {
     fout << "<br><p>";
     char bf1[256];
@@ -611,68 +704,162 @@ void HTMLWriter::writeTableHTML(gdioutput& gdi,
 
 extern wchar_t programPath[MAX_PATH];
 
+namespace {
+  bool isWord(const string& str, const string& word, size_t off) {
+    int wlen = word.length();
+    if (str.length() < off + wlen)
+      return true;
+
+    char nextC = str[off + wlen];
+    if (!isalnum(nextC))
+      return true;
+
+    return false;
+  }
+
+  void replaceAll(string& str, const vector<string>& fromV, const string& to, bool forceAppend = false) {
+    bool didApply = false;
+    for (const string& from : fromV) {
+      size_t start_pos = 0;
+      while ((start_pos = str.find(from, start_pos)) != string::npos) {
+        if (isWord(str, from, start_pos)) {
+          didApply = true;
+          str.replace(start_pos, from.length(), to);
+          start_pos += to.length();
+        }
+        else {
+          start_pos += from.length();
+        }
+      }
+    }
+    if (!didApply && forceAppend)
+      str += to; // Append if not set
+  }
+
+  bool findAny(const string& str, const vector<string>& fromV) {
+    for (const string& from : fromV) {
+      size_t start_pos = 0;
+      while ((start_pos = str.find(from, start_pos)) != string::npos) {
+        if (isWord(str, from, start_pos))
+          return true;
+        start_pos += from.length();
+      }
+      
+    }
+    return false;
+  }
+}
+
+void HTMLWriter::parseTagName(const string &str, string &tag, wstring &name) {
+  vector<string> tagName;
+  split(str, "@", tagName);
+  if (tagName.size() == 2) {
+    tag = tagName[0]; 
+    string2Wide(tagName[1], name);
+  }
+  else {
+    throw meosException("Bad template format: " + str);
+  }
+}
+
 void HTMLWriter::enumTemplates(TemplateType type, vector<TemplateInfo> &descriptionFile) {
   vector<wstring> res;
-#ifdef _DEBUG
-  expandDirectory((wstring(programPath) + L".\\..\\Lists\\").c_str(), L"*.template", res);
-#endif
 
   wchar_t listpath[MAX_PATH];
   getUserFile(listpath, L"");
+  expandDirectory(listpath, L"*.meostmpl", res);
   expandDirectory(listpath, L"*.template", res);
+  
+  int userCounter = res.size();
 
-  if (exePath[0])
+#ifdef _DEBUG
+  expandDirectory((wstring(programPath) + L".\\..\\Lists\\").c_str(), L"*.meostmpl", res);
+  expandDirectory((wstring(programPath) + L".\\..\\Lists\\").c_str(), L"*.template", res);
+#endif
+
+  if (exePath[0]) {
+    expandDirectory(exePath, L"*.meostmpl", res);
     expandDirectory(exePath, L"*.template", res);
+  }
+
   set<string> tags;
+  auto fillInUsedFunctions = [](ifstream &file, TemplateInfo& ti) {
+    string str;
+    while (getline(file, str)) {
+      bool isComment = false;
+      int ix = 0;
+      while (ix < str.size()) {
+        if (str[ix] == '%')
+          isComment = true;
+        else if (str[ix] != ' ' && str[ix] != '\t')
+          break;
+        ix++;
+      }
+      if (!isComment) {
+        ti.hasInnerPage = ti.hasInnerPage || findAny(str, { "@INNERPAGE" });
+        ti.hasOuterPage = ti.hasOuterPage || findAny(str, { "@OUTERPAGE" });
+        ti.hasTimer = ti.hasTimer || findAny(str, { "@T", "@TIME" });
+      }
+    }
+  };
 
   tCache.clear();
-  TemplateInfo ti;
   for (wstring &fn : res) {
+    TemplateInfo ti;
+    bool userDefined = --userCounter >= 0;
     ifstream file(fn);
     string str;
     if (getline(file, str)) {
       if (str == "@MEOS EXPORT TEMPLATE" && getline(file, str)) {
-        vector<string> tagName;
-        split(str, "@", tagName);
-        if (tagName.size() == 2) {
-          ti.tag = tagName[0];
-          if (!tags.insert(tagName[0]).second)
-            continue; // Already included
+        parseTagName(str, ti.tag, ti.name);
+        if (!tags.insert(ti.tag).second)
+          continue; // Already included
 
-          string2Wide(tagName[1], ti.name);
-          if (getline(file, str)) {
-            string2Wide(str, ti.desc);
-          }
-          ti.file = fn;
-          if (type == TemplateType::List)
-            descriptionFile.push_back(ti);
-        }
-        else {
-          throw meosException(L"Bad template: " + fn);
+        if (getline(file, str)) 
+          string2Wide(str, ti.desc);
+
+        ti.file = fn;
+        ti.userInstalled = userDefined;
+        if (type == TemplateType::List) {
+          fillInUsedFunctions(file, ti);
+          descriptionFile.push_back(ti);
         }
       }
       else if (str == "@MEOS PAGE" && getline(file, str)) {
-        vector<string> tagName;
-        split(str, "@", tagName);
-        if (tagName.size() == 2) {
-          ti.tag = tagName[0];
-          if (!tags.insert(tagName[0]).second)
-            continue; // Already included
+        parseTagName(str, ti.tag, ti.name);
+        if (!tags.insert(ti.tag).second)
+          continue; // Already included
 
-          string2Wide(tagName[1], ti.name);
-          if (getline(file, str)) {
-            string2Wide(str, ti.desc);
-          }
-          ti.file = fn;
-          if (type == TemplateType::Page)
-            descriptionFile.push_back(ti); 
+        if (getline(file, str)) {
+          string2Wide(str, ti.desc);
         }
-        else {
-          throw meosException(L"Bad template: " + fn);
-        }
+        ti.file = fn;
+
+        ti.userInstalled = userDefined;
+        if (type == TemplateType::Page)
+          descriptionFile.push_back(ti); 
       }
     }
   }
+}
+
+HTMLWriter::TemplateInfo HTMLWriter::getTemplateInfo(TemplateType type, const string& tag, bool acceptMissing) {
+  vector<TemplateInfo> descriptionFile;
+  enumTemplates(type, descriptionFile);
+  int ix = -1;
+  for (size_t k = 0; k < descriptionFile.size(); k++) {
+    if (descriptionFile[k].tag == tag) {
+      ix = k;
+      break;
+    }
+  }
+  if (ix == -1) {
+    if (acceptMissing)
+      return TemplateInfo();
+
+    throw meosException("Unknown template X#" + tag);
+  }
+  return descriptionFile[ix];
 }
 
 const HTMLWriter& HTMLWriter::getWriter(TemplateType type, const string &tag, 
@@ -685,21 +872,10 @@ const HTMLWriter& HTMLWriter::getWriter(TemplateType type, const string &tag,
     return *res->second;
   }
   else {
-    vector<TemplateInfo> descriptionFile;
-    enumTemplates(type, descriptionFile);
-    int ix = -1;
-    for (size_t k = 0; k < descriptionFile.size(); k++) {
-      if (descriptionFile[k].tag == tag) {
-        ix = k;
-        break;
-      }
-    }
-    if (ix == -1)
-      throw std::exception("Internal error");
 
     shared_ptr<HTMLWriter> tmpl = make_shared<HTMLWriter>();
     tmpl->setConditions(options);
-    tmpl->read(descriptionFile[ix].file);
+    tmpl->read(getTemplateFile(type, tag));
 
     tCache[cacheTag] = tmpl;
     return *tmpl;
@@ -774,7 +950,10 @@ void HTMLWriter::read(const wstring &fileName) {
     }
     else if (ok == 1) {
       ok = 2;
-      info = str;
+      parseTagName(str, tag, name);
+      if (getline(file, str)) {
+        info = str;
+      }
       skipLine = true;
     }
     else if (ok == 0 && str == "@MEOS PAGE") {
@@ -801,6 +980,8 @@ void HTMLWriter::read(const wstring &fileName) {
       acc = &separator, skipLine = true;
     else if (trimLine == "@END")
       acc = &end, skipLine = true;
+    else if (trimLine == "@USETABLE")
+      useTables = true, skipLine = true;
     else if (trimLine.length() > 1 && trimLine[0] == '@') {
       string arg;
       auto res = parseFunc(str.substr(1), arg);
@@ -838,6 +1019,11 @@ void HTMLWriter::read(const wstring &fileName) {
 }
 
 HTMLWriter::Function HTMLWriter::parseFunc(const string& str, string& arg) const {
+  if (textCommands.empty()) {
+    for (auto& s : {"STYLE", "TITLE", "DESCRIPTION", "CONTENTS", "PAGE", "NUMPAGE", "NUMCOL", "PERCENTCOMPLETE", "MEOS", "TIME"}) {
+      textCommands.insert(s);
+    }
+  }
   if (str.substr(0, 3) == "IF ") {
     arg = trim(str.substr(3));
     return Function::IF;
@@ -846,7 +1032,7 @@ HTMLWriter::Function HTMLWriter::parseFunc(const string& str, string& arg) const
     return Function::ENDIF;
   else if (str == "END" || str == "INNERPAGE" || str == "OUTERPAGE" || str == "HEAD" || str == "SEPARATOR")
     return Function::NONE;
-  else if (str.length() == 1)
+  else if (str.length() == 1 || textCommands.count(str))
     return Function::TEXTCOMMAND;
   
   throw meosException("Unknown function: " + str);
@@ -854,16 +1040,6 @@ HTMLWriter::Function HTMLWriter::parseFunc(const string& str, string& arg) const
 
 bool HTMLWriter::hasCondition(const string& arg) const {
   return conditions.count(arg) > 0;
-}
-
-namespace {
-  void replaceAll(string& str, const string& from, const string& to) {
-    size_t start_pos = 0;
-    while ((start_pos = str.find(from, start_pos)) != string::npos) {
-      str.replace(start_pos, from.length(), to);
-      start_pos += to.length(); 
-    }
-  }
 }
 
 class InterpPrintTextInfo {
@@ -893,7 +1069,6 @@ void HTMLWriter::generate(gdioutput &gdi,
                           double scale) const {
   int w, h;
   gdi.getTargetDimension(w, h);
-
 
   ImageWriter imgWriter(L"", false);
   
@@ -960,19 +1135,23 @@ void HTMLWriter::generate(gdioutput &gdi,
   }
 
   string output = head;
-  replaceAll(output, "@D", gdioutput::toUTF8(encodeXML(contentDescription)));
-  replaceAll(output, "@T", gdioutput::toUTF8(encodeXML(title)));
-  replaceAll(output, "@M", meos);
-  map<pair<gdiFonts, string>, pair<string, string>> styles;
+
+  if (findAny(output, { "@C", "@CONTENTS" }))
+    throw meosException("Cannot place @CONTENTS in @HEAD section");
+
+  replaceAll(output, { "@D", "@DESCRIPTION"}, gdioutput::toUTF8(encodeXML(contentDescription)));
+  replaceAll(output, { "@T", "@TITLE"}, gdioutput::toUTF8(encodeXML(title)));
+  replaceAll(output, { "@M", "@MEOSVERSION", "@MEOS"}, meos);
+  map<pair<gdiFonts, wstring>, pair<string, string>> styles;
 
   {
     stringstream sout;
-    generateStyles(gdi, sout, scale, false, gdi.getTL(), styles);
-    replaceAll(output, "@S", sout.str());
+    generateStyles(gdi, sout, scale, useTables, gdi.getTL(), styles);
+    replaceAll(output, { "@S", "@STYLE"}, sout.str());
   }
 
   int nPage = (pages.size() + numCol - 1) / numCol;
-  replaceAll(output, "@N", itos(nPage));
+  replaceAll(output, { "@N", "@NUMPAGE" }, itos(nPage));
 
   fout << output;
 
@@ -986,11 +1165,11 @@ void HTMLWriter::generate(gdioutput &gdi,
       if (pages.size() == pix)
         break;
 
-      if (ip > 0) {
+      if (ip > 0 || (innerpage.empty() && numCol == 1 && pix > 0)) {
         // Separator
         output = separator;
-        replaceAll(output, "@P", itos(ipCounter));
-        replaceAll(output, "@L", itos((ip * 100) / numCol));
+        replaceAll(output, { "@P", "@PAGE" }, itos(ipCounter));
+        replaceAll(output, { "@L", "@PERCENTCOMPLETE" }, itos((ip * 100) / numCol));
         
         innerpageoutput += output;
       }
@@ -1001,30 +1180,40 @@ void HTMLWriter::generate(gdioutput &gdi,
       double xscale = 1.2 * scale;
       int offsetY = 0, offsetX = 0;
 
-      formatTL<vector<PrintTextInfo>, InterpPrintTextInfo>(sout, imgWriter, styles, p.text, yscale, xscale, offsetY, offsetX);
-
+      if (!useTables)
+        formatTL<vector<PrintTextInfo>, InterpPrintTextInfo>(sout, imgWriter, styles, p.text, yscale, xscale, offsetY, offsetX);
+      else
+        formatTable<vector<PrintTextInfo>, InterpPrintTextInfo>(sout, imgWriter, styles, p.text, false, marginPercent, xscale);
+      
       output = innerpage;
-      replaceAll(output, "@P", itos(ipCounter++));
-      replaceAll(output, "@L", itos((ip * 100) / numCol));
-      replaceAll(output, "@C", sout.str());
-      replaceAll(output, "@M", meos);
+      replaceAll(output, { "@P", "@PAGE" }, itos(ipCounter++));
+      replaceAll(output, { "@L", "@PERCENTCOMPLETE" }, itos((ip * 100) / numCol));
+      replaceAll(output, { "@M", "@MEOSVERSION", "@MEOS"}, meos);
+      replaceAll(output, { "@C", "@CONTENTS" }, sout.str(), true);
+
       innerpageoutput += output;
     }
 
     string outeroutput = outerpage;
-    replaceAll(outeroutput, "@P", itos(opCounter++));
-    replaceAll(outeroutput, "@C", innerpageoutput);
-    replaceAll(output, "@M", meos);
-    replaceAll(output, "@N", itos(nPage));
+    replaceAll(outeroutput, { "@L", "@PERCENTCOMPLETE" }, itos((opCounter * 100) / nPage));
+    replaceAll(outeroutput, { "@P", "@PAGE" }, itos(opCounter++));
+    replaceAll(outeroutput, { "@M", "@MEOSVERSION", "@MEOS"}, meos);
+    replaceAll(outeroutput, { "@N", "@NUMPAGE" }, itos(nPage));
+    replaceAll(outeroutput, { "@C", "@CONTENTS" }, innerpageoutput, true);
+
     fout << outeroutput << endl;
   }
 
   assert(opCounter - 1 == nPage);
   output = end;
-  replaceAll(output, "@N", itos(opCounter - 1));
-  replaceAll(output, "@I", itos(numCol));
-  replaceAll(output, "@T", itos(interval));
-  replaceAll(output, "@M", meos);
+
+  if (findAny(output, { "@C", "@CONTENTS" } ))
+    throw meosException("Cannot place @CONTENTS in @END section");
+
+  replaceAll(output, { "@N", "@NUMPAGE" }, itos(opCounter - 1));
+  replaceAll(output, { "@I", "@NUMCOL"}, itos(numCol));
+  replaceAll(output, { "@T", "@TIME" }, itos(interval));
+  replaceAll(output, { "@M", "@MEOSVERSION", "@MEOS"}, meos);
   fout << output;
 }
 

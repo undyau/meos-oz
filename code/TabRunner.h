@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,6 +43,8 @@ private:
 
   void cellAction(gdioutput &gdi, DWORD id, oBase *obj);
 
+  void showCardDetails(gdioutput &gdi, pCard c, bool autoSelect);
+
   void selectRunner(gdioutput &gdi, pRunner r);
 
   void updateCardStatus(const pCard& pc, gdioutput& gdi);
@@ -50,6 +52,9 @@ private:
 
   int numReportRow = 1;
   int numReportColumn = 1;
+  int numResults = 0;
+  bool includeSplits = true;
+  bool includeResults = false;
   bool hideReportControls = false;
   bool showReportHeader = true;
   void addToReport(int cardNo, bool punchForShowReport);
@@ -62,12 +67,24 @@ private:
   DWORD timeToFill;
   int inputId;
 
+
+  pair<wstring, int> getClassCourseDescription(pClass cls, int leg, pClass virtCls, pCourse crs, int crsId);
+
   int searchCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
   int runnerCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
   int punchesCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
   int vacancyCB(gdioutput &gdi, GuiEventType type, BaseInfo* data);
 
-  int currentMode;
+  enum class Mode {
+    Form,
+    Table,
+    InForest,
+    Cards,
+    Vacancy,
+    Report,
+  };
+
+  Mode currentMode;
   pRunner save(gdioutput &gdi, int runnerId, bool dontReloadRunners);
   void listRunners(gdioutput &gdi, const vector<pRunner> &r, bool filterVacant) const;
 
@@ -80,10 +97,12 @@ private:
   bool listenToPunches;
   deque<pair<int, bool>> runnersToReport;
 
-  vector<pRunner> unknown_dns;
-  vector<pRunner> known_dns;
-  vector<pRunner> known;
-  vector<pRunner> unknown;
+  vector<int> unknown_dns;
+  vector<int> known_dns;
+  vector<int> known;
+  vector<int> unknown;
+
+  vector<pRunner> getRunners(const vector<int>& ids) const;
   void clearInForestData();
   bool savePunchTime(pRunner r, gdioutput &gdi);
 
@@ -95,15 +114,15 @@ private:
 
   
   static void runnerReport(oEvent &oe, gdioutput &gdi, 
-                           int id, bool compactReport, 
-                           int maxWidth, 
-                           RECT& rc);
+                           int id, int maxWidth, 
+                           bool includeSplits, int numResults, RECT& rc);
 
   static void teamReport(oEvent& oe, gdioutput& gdi,
                          const oTeam *team,
                          bool onlySelectedRunner,
                          const deque<pair<int, bool>> &runners,
                          int maxWidth,
+                         bool includeSplits, int numResults,
                          RECT &rc);
 
 
@@ -123,7 +142,8 @@ private:
   static void autoGrowCourse(gdioutput &gdi);
 
   void loadEconomy(gdioutput &gdi, oRunner &r, gdioutput *gdiMain, TabRunner *mainTab);
-  
+  static void unpairCard(pRunner r);
+
   class EconomyHandler : public GuiHandler {
     int runnerId;
     oEvent *oe;
@@ -144,6 +164,8 @@ private:
 protected:
   void clearCompetitionData();
 public:
+
+  static void autoCompleteRunner(gdioutput& gdi, const RunnerWDBEntry* r);
 
   class CommentHandler : public GuiHandler {
     int runnerId;
@@ -175,7 +197,10 @@ public:
   bool loadPage(gdioutput &gdi);
   bool loadPage(gdioutput &gdi, int runnerId);
 
-  static int addExtraFields(const oEvent &oe, gdioutput& gdi, oEvent::ExtraFieldContext context);
+  static int addExtraFields(const oEvent &oe, gdioutput& gdi, bool startNewLine, 
+                            bool oneLine, oEvent::ExtraFieldContext context,
+                            const vector<oEvent::ExtraFields>& exclude = {});
+
   static void saveExtraFields(gdioutput& gdi, oBase &r);
   static void loadExtraFields(gdioutput& gdi, const oBase* r);
 
@@ -183,7 +208,9 @@ public:
     gdioutput &gdi, 
     int numX, int numY,
     bool onlySelectedRunner,
-    const deque<pair<int, bool>> &runnersToReport);
+    const deque<pair<int, bool>> &runnersToReport,
+    bool includeSplits,
+    int numResults);
 
   TabRunner(oEvent *oe);
   ~TabRunner(void);

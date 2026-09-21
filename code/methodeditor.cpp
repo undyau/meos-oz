@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ void MethodEditor::show(gdioutput &gdi) {
   else
     gdi.addString("", boldLarge, "Edit Result Modules");
 
-  gdi.setOnClearCb(methodCB);
+  gdi.setOnClearCb("method_editor", methodCB);
   gdi.setData("MethodEditorClz", this);
   gdi.dropLine(0.5);
   gdi.fillRight();
@@ -139,7 +139,7 @@ void MethodEditor::show(gdioutput &gdi) {
     oe->getListContainer().getListsByResultModule(tag, listIx);
     
     string udtag = DynamicResult::undecorateTag(tag);
-    gdi.addInput("Tag", gdi.widen(udtag), 20, methodCB, L"Result module identifier:");
+    gdi.addInput("Tag", gdi.widen(udtag), 20, methodCB, L"Result module identifier:").limitText(24);
     if (!listIx.empty()) {
       gdi.disableInput("Tag");
       gdi.getBaseInfo("Tag").setExtra(1);
@@ -393,7 +393,7 @@ int MethodEditor::methodCb(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
         return 0;
 
       gdi.clearPage(true);
-      gdi.setOnClearCb(methodCB);
+      gdi.setOnClearCb("method_editor", methodCB);
       gdi.setData("MethodEditorClz", this);
 
       gdi.pushX();
@@ -568,7 +568,7 @@ int MethodEditor::methodCb(gdioutput &gdi, GuiEventType type, BaseInfo &data) {
       for (size_t k = 0; k < rr.size(); k++) {
         int txp = xp;
         int wi = 0;
-        gdi.addStringUT(yp, txp, 0, rr[k]->getCompleteIdentification(), w[wi]-diff);
+        gdi.addStringUT(yp, txp, 0, rr[k]->getCompleteIdentification(oRunner::IDType::OnlyThis), w[wi]-diff);
         txp += w[wi++];
         currentResult->prepareCalculations(*rr[k], true);
         int rt = 0, pt = 0;

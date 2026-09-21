@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <tuple>
 /************************************************************************
     MeOS - Orienteering Software
     Copyright (C) 2009-2019 Melin Software HB
@@ -63,4 +64,16 @@ public:
 
   private:
     ImportFormatOptions option;
+};
+
+struct ExportSplitsData {
+  int cSVLanguageHeaderIndex = 0;
+  ImportFormats::ExportFormats filterIndex = ImportFormats::ExportFormats::IOF30;
+  bool includeStage = true;
+  bool unroll = false;
+  bool includeSplits = true;
+  bool withPartialResults = false;
+  tuple<string, string, bool> preferredIdTypes;
+
+  int legType = -1;
 };

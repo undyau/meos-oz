@@ -8,6 +8,7 @@
 #include "Download.h"
 #include "progress.h"
 #include "csvparser.h"
+#include "xmlparser.h"
 #include <time.h>
 #include "iof30interface.h"
 

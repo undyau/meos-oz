@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -33,7 +33,13 @@
 enum RunnerStatus {
   StatusOK = 1, StatusDNS = 20, StatusCANCEL = 21, StatusOutOfCompetition = 15, StatusMP = 3,
   StatusDNF = 4, StatusDQ = 5, StatusMAX = 6, StatusNoTiming = 2,
-  StatusUnknown = 0, StatusNotCompetiting = 99
+  StatusUnknown = 0, StatusNotCompeting = 99
+};
+
+enum class DynamicRunnerStatus {
+  StatusInactive,
+  StatusActive,
+  StatusFinished
 };
 
 /** Returns true for a status that might or might not indicate a result. */
@@ -46,7 +52,7 @@ template<int dummy=0>
 vector<RunnerStatus> getAllRunnerStatus() {
   return { StatusOK, StatusDNS, StatusCANCEL, StatusOutOfCompetition, StatusMP,
            StatusDNF, StatusDQ, StatusMAX,
-           StatusUnknown, StatusNotCompetiting , StatusNoTiming};
+           StatusUnknown, StatusNotCompeting , StatusNoTiming};
 }
 
 
@@ -71,6 +77,7 @@ enum SortOrder {
   ClassFinishTime,
   ClassStartTimeClub,
   ClassPoints,
+  ClassTotalPoints,
   ClassLiveResult,
   ClassKnockoutTotalResult,
   SortByName,
@@ -84,6 +91,7 @@ enum SortOrder {
   SortByEntryTime,
   CoursePoints,
   ClubClassStartTime,
+  SortByBib,
   Custom,
   SortEnumLastItem
 };
@@ -100,6 +108,7 @@ static bool orderByClass(SortOrder so) {
   case ClassFinishTime:
   case ClassStartTimeClub:
   case ClassPoints:
+  case ClassTotalPoints:
   case ClassLiveResult:
   case ClassKnockoutTotalResult:
     return true;
@@ -128,6 +137,8 @@ protected:
   int tStartTime;
 
   int FinishTime;
+  bool finishTimeWasSet = false;
+
   mutable int tComputedTime = 0;
 
   RunnerStatus status;
@@ -265,6 +276,7 @@ public:
     FlagNoTiming = 512, // No timing requested
     FlagNoDatabase = 1024, // Do not store in databse
     FlagPayBeforeResult = 2048, // Require payment before result
+    FlagUnnamed = 2 << 12
   };
 
   bool hasFlag(TransferFlags flag) const;
@@ -308,7 +320,7 @@ public:
   
   // Time
   void setInputTime(const wstring &time);
-  wstring getInputTimeS() const;
+  wstring getInputTimeS(bool useFullHour) const;
   int getInputTime() const {return inputTime;}
 
   // Status
@@ -338,9 +350,8 @@ public:
   //Get time after on leg/for race
   virtual int getTimeAfter(int leg, bool allowUpdate) const = 0;
 
-
-  virtual void fillSpeakerObject(int leg, int controlCourseId, int previousControlCourseId, bool totalResult,
-                                 oSpeakerObject &spk) const = 0;
+  virtual void fillSpeakerObject(int leg, int previousControlCourseId, const vector<int> &controlIds, 
+                                 bool totalResult, oSpeakerObject &spk) const = 0;
 
   virtual int getBirthAge() const;
 
@@ -405,7 +416,7 @@ public:
   virtual int getRogainingPointsGross(bool computed) const = 0;
   
   virtual const wstring &getStartTimeS() const;
-  virtual const wstring &getStartTimeCompact() const;
+  const wstring &getStartTimeCompact() const;
   const wstring &getFinishTimeS(bool adjusted, SubSecond mode) const;
 
   const wstring &getTotalRunningTimeS(SubSecond mode) const;
@@ -426,7 +437,9 @@ public:
   
   virtual const pair<wstring, int> getRaceInfo() = 0;
 
-
+  virtual int getLegNumber() const {
+    return 0;
+  }
   wstring getPlaceS() const;
   wstring getPrintPlaceS(bool withDot) const;
 
@@ -438,7 +451,8 @@ public:
 
   virtual RunnerStatus getStatusComputed(bool allowUpdate) const = 0;
   RunnerStatus getStatus() const { return tStatus;}
-  
+  virtual DynamicRunnerStatus getDynamicStatus() const = 0;
+
   /** Status OK, including NoTiming/OutOfCompetition*/
   bool isStatusOK(bool computed, bool allowUpdate) const;
 
@@ -454,13 +468,20 @@ public:
     }
     return ok;
   }
+  
+  /** Return true if competitor/team has a time and a readout card (if expected) */
+  virtual bool runnerHasResult() const {
+    return getRunningTime(false) > 0;
+  }
+
   // Returns true if the competitor has a definite result
   bool hasResult() const {
     RunnerStatus st = getStatusComputed(true);
-    if (st == StatusUnknown || st == StatusNotCompetiting)
+    if (st == StatusUnknown || st == StatusNotCompeting)
       return false;
-    if (isPossibleResultStatus(st))
-      return getRunningTime(false) > 0;
+    if (isPossibleResultStatus(st)) {
+      return runnerHasResult();
+    }
     else
       return true;
   }
@@ -477,6 +498,9 @@ public:
   virtual RunnerStatus getTotalStatus(bool allowUpdate = true) const;
 
   RunnerStatus getStageResult(int stage, int &time, int &point, int &place) const;
+  
+  int getStageTimeAfter(int stage) const; // Time after (in class) on specific stage (currently only for oRunner)
+
   // Get results from all previous stages
   void getInputResults(vector<RunnerStatus> &st, vector<int> &times, vector<int> &points, vector<int> &places) const;
   // Add current result to input result. Only use when transferring to next stage. ThisStageNumber is zero indexed.
@@ -600,6 +624,7 @@ protected:
 
   int cardNumber;
   pCard Card;
+  bool cardWasSet = false;
 
   vector<pRunner> multiRunner;
   vector<int> multiRunnerId;
@@ -629,8 +654,7 @@ protected:
   int tTimeAfter; // Used in time line calculations, time after "last radio".
   int tInitialTimeAfter; // Used in time line calculations, time after when started.
   //Speaker data
-  map<int, int> priority;
-  int cPriority;
+  int speakerPriority = 0;
 
   static constexpr int dataSize = 256+64;
   int getDISize() const final {return dataSize;}
@@ -723,12 +747,15 @@ protected:
   mutable OnCourseResultCollection tOnCourseResults;
 
   // Rogainig results. Control and punch time
-  vector< pair<pControl, int> > tRogaining;
+  vector<pair<pControl, int>> tRogaining;
   int tRogainingPoints;
   int tRogainingPointsGross;
   int tReduction;
   int tRogainingOvertime;
   wstring tProblemDescription;
+  DataRevisionCache<double> rogainingBaseSpeed;
+  map<pair<int, int>, pair<int, int>> rogainingLegSplitPlace; // Computed at the same time as rogainingBaseSpeed
+
   // Sets up mutable data above
   void setupRunnerStatistics() const;
 
@@ -768,6 +795,20 @@ protected:
   int getBuiltinAdjustment() const override;
 
 public:
+
+  /** Return best time in class and expected time on leg for this runner */
+  oClass::RogainingAnalysis getRogainingAnalysis(int from, int to) const;
+
+  bool runnerHasResult() const final {
+    if (Card == nullptr) {
+      if (pCourse crs = getCourse(false); crs != nullptr)
+        return false; // A card is expected but not present
+    }
+    return getRunningTime(false) > 0;
+  }
+  
+  DynamicRunnerStatus getDynamicStatus() const final;
+
   /// Second external ID (local and WRE etc)
   
   /// Set a second external identifier (0 if none)
@@ -789,6 +830,9 @@ public:
   int getStartGroup(bool useTmpStartGroup) const;
   void setStartGroup(int sg);
 
+  void restoreDefaultStartTime(bool recalculate);
+  void storeDefaultStartTime();
+
   // Get the leg defineing parallel results for this runner (in a team)
   int getParResultLeg() const;
 
@@ -797,13 +841,12 @@ public:
   
   /** Return true if the race is completed (or definitely never will be started), e.g., not in forest*/
   bool hasFinished() const {
-    if (tStatus == StatusUnknown)
-      return false;
-    else if (isPossibleResultStatus(tStatus)) {
-      return Card || FinishTime > 0;
-    }
-    else
+    if (Card != nullptr || FinishTime > 0)
       return true;
+    else if (tStatus == StatusUnknown)
+      return false;
+    else
+      return !isStatusUnknown(false, false);
   }
 
   /** Returns a check time (or zero for no time). */
@@ -888,7 +931,7 @@ public:
   // Set wheather the card number should be transferred to the next stage
   void setTransferCardNoNextStage(bool state);
 
-  int getLegNumber() const {return tLeg;}
+  int getLegNumber() const final {return tLeg;}
   int getSpeakerPriority() const;
 
   RunnerStatus getTempStatus() const { return tempStatus; }
@@ -910,7 +953,22 @@ public:
   int getRaceRunningTime(bool computedTime, int leg, bool allowUpdate) const;
 
   // Get the complete name, including team and club.
-  wstring getCompleteIdentification(bool includeExtra = true) const;
+  enum class IDType {
+    OnlyThis,
+    ParallelLeg,
+    ParallelLegExtra,
+  };
+
+  enum class NameType {
+    Default,
+    Compact,
+    CompactClub
+  };
+
+  wstring getCompleteIdentification(IDType type, NameType compactName = NameType::Default) const;
+
+  /** Return compact name 'H. Abrams'*/
+  wstring getCompactName() const;
 
   /// Get total status for this running (including team/earlier races)
   RunnerStatus getTotalStatus(bool allowUpdate = true) const override;
@@ -997,7 +1055,7 @@ public:
   void setFinishTime(int t) override;
   int getTimeAfter(int leg, bool allowUpdate) const override;
   int getTimeAfter() const;
-  int getTimeAfterCourse() const;
+  int getTimeAfterCourse(bool considerClass) const;
 
   bool skip() const {return isRemoved() || tDuplicateLeg!=0;}
 
@@ -1006,9 +1064,8 @@ public:
   void createMultiRunner(bool createMaster, bool sync);
   int getRaceNo() const {return tDuplicateLeg;}
   wstring getNameAndRace(bool useUIName) const;
-
-  void fillSpeakerObject(int leg, int courseControlId, int previousControlCourseId, bool totalResult,
-                         oSpeakerObject &spk) const;
+  void fillSpeakerObject(int leg, int previousControlCourseId, const vector<int>& courseControlIds, 
+                         bool totalResult, oSpeakerObject &spk) const;
 
   bool needNoCard() const;
 
@@ -1053,7 +1110,9 @@ public:
   void resetPersonalData();
 
   //Local user data. No Update.
-  void setPriority(int courseControlId, int p){priority[courseControlId]=p;}
+  void setPriority(int p) { 
+    speakerPriority = p;
+  }
 
   wstring getGivenName() const;
   wstring getFamilyName() const;
@@ -1070,8 +1129,8 @@ public:
   bool operator<(const oRunner &c) const;
   bool static CompareCardNumber(const oRunner &a, const oRunner &b) { return a.cardNumber < b.cardNumber; }
 
-  bool evaluateCard(bool applyTeam, vector<int> &missingPunches, int addPunch, ChangeType changeType);
-  void addPunches(pCard card, vector<int> &missingPunches);
+  bool evaluateCard(bool applyTeam, vector<pair<int, pControl>> &missingPunches, int addPunch, ChangeType changeType);
+  void addCard(pCard card, vector<pair<int, pControl>> &missingPunches);
 
   /** Get split time for a controlId and optionally controlIndex on course (-1 means unknown, uses the first occurance on course)*/
   void getSplitTime(int courseControlId, RunnerStatus &stat, int &rt) const;
@@ -1079,6 +1138,10 @@ public:
   //Returns only Id of a runner-specific course, not classcourse
   int getCourseId() const {if (Course) return Course->Id; else return 0;}
   void setCourseId(int id);
+
+  bool useCoursePool() const {
+    return Class && (Class->hasCoursePool() || getClassRef(true)->hasCoursePool());
+  }
 
   /** Return true if rental card*/
   bool isRentalCard() const;
@@ -1152,5 +1215,7 @@ public:
   friend class RunnerDB;
   friend class oListInfo;
   static bool sortSplit(const oRunner &a, const oRunner &b);
-
+  static bool sortSplitPtr(const oRunner *a, const oRunner *b) {
+    return sortSplit(*a, *b);
+  }
 };

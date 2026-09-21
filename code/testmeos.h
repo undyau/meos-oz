@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -113,6 +113,8 @@ public:
   void press(const char *btn) const;
   void press(const char *btn, int extra) const;
   void press(const char *btn, const char *extra) const;
+
+  void leftclick(int x, int y) const;
 
   string selectString(const char *btn, const char *data) const;
   string select(const char *btn, size_t data) const;

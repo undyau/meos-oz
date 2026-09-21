@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -141,6 +141,8 @@ protected:
 
 public:
 
+  DynamicRunnerStatus getDynamicStatus() const final;
+
   bool matchAbstractRunner(const oAbstractRunner* target) const override;
 
   /** Deduce from computed runner times.*/
@@ -218,8 +220,9 @@ public:
   int getRogainingPatrolReduction() const;
   int getRogainingPatrolOvertime() const;
 
-  void fillSpeakerObject(int leg, int courseControlId, int previousControlCourseId,
-                          bool totalResult, oSpeakerObject &spk) const;
+  void fillSpeakerObject(int leg, int previousControlCourseId,
+                         const vector<int> &courseControlIds,
+                         bool totalResult, oSpeakerObject &spk) const;
 
   bool isRunnerUsed(int Id) const;
   void setRunner(unsigned i, pRunner r, bool syncRunner);
@@ -286,6 +289,9 @@ public:
   static bool compareResult(const oTeam &a, const oTeam &b);
   static bool compareResultNoSno(const oTeam &a, const oTeam &b);
   static bool compareResultClub(const oTeam& a, const oTeam& b);
+
+  template<SortOrder so>
+  static bool compareGeneral(const oTeam& a, const oTeam& b);
 
   static void checkClassesWithReferences(oEvent &oe, set<int> &clsWithRef);
   static void convertClassWithReferenceToPatrol(oEvent &oe, const set<int> &clsWithRef);

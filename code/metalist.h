@@ -2,7 +2,7 @@
 
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -301,14 +301,15 @@ public:
   static void getAutoComplete(const wstring &w, vector<AutoCompleteRecord> &records);
 
   MetaList();
-  virtual ~MetaList() {}
+  virtual ~MetaList();
 
   void getUsedImages(set<uint64_t>& imgId) const;
 
   static constexpr bool isAllStageType(EPostType type) {
     return type == lRunnerStagePlace || type == lRunnerStageStatus ||
       type == lRunnerStageTime || type == lRunnerStageTimeStatus ||
-      type == lRunnerStagePoints || type == lRunnerStageNumber;
+      type == lRunnerStagePoints || type == lRunnerStageNumber ||
+      type == lRunnerStageTimeAfter;
   }
 
   static constexpr bool isAllLegType(EPostType type) {
@@ -322,6 +323,12 @@ public:
     return type == lResultModuleNumber || type == lResultModuleTime ||
       type == lResultModuleTimeTeam || type == lResultModuleNumberTeam;
   }
+
+  static constexpr bool isLegBased(EPostType type) {
+    return !isResultModuleOutput(type) && !isAllStageType(type) &&
+      type != lRunnerAnnotation && type != lTeamAnnotation;
+  }
+
   bool supportClasses() const;
   const wstring &getListInfo(const oEvent &oe) const;
   void clearTag() {tag.clear();}
@@ -371,6 +378,11 @@ public:
   }
 
   const wstring &getListName() const {return listName;}
+  
+  const wstring& getLocalizedListName() const;
+
+  void init(oListInfo &li) const;
+
   oListInfo::EBaseType getListType() const;
 
   oListInfo::ResultType getResultType() const; // Classwise or global
@@ -443,7 +455,13 @@ public:
 
 class Image;
 
-class MetaListContainer {
+class ListUpdater {
+public:
+  virtual ~ListUpdater() = 0;
+  virtual void updateListParam(int index, oListParam& listParam) = 0;
+};
+
+class MetaListContainer : public ListUpdater {
 public:
   enum MetaListType {InternalList, ExternalList, RemovedList};
 private:
@@ -521,6 +539,7 @@ public:
   void removeParam(int index);
   /** Return the list index.*/
   int addListParam(oListParam &listParam);
+  void updateListParam(int index, oListParam& listParam) final;
 
   void mergeParam(int toInsertAfter, int toMerge, bool showTitleBetween);
   void getMergeCandidates(int toMerge, vector< pair<wstring, size_t> > &param) const;

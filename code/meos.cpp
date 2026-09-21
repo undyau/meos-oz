@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -37,25 +37,18 @@
 #include "TabBase.h"
 #include "TabCompetition.h"
 #include "TabAuto.h"
-#include "TabClass.h"
 #include "TabCourse.h"
 #include "TabControl.h"
 #include "TabSI.h"
 #include "TabList.h"
 #include "TabTeam.h"
 #include "TabSpeaker.h"
-#include "TabMulti.h"
 #include "TabRunner.h"
 #include "TabClub.h"
 #include "progress.h"
-#include "inthashmap.h"
 #include <cassert>
 #include "localizer.h"
-#include "intkeymap.hpp"
-#include "intkeymapimpl.hpp"
-#include "download.h"
 #include "meos_util.h"
-#include <sys/stat.h>
 #include "random.h"
 #include "metalist.h"
 #include "gdiconstants.h"
@@ -67,17 +60,15 @@
 #include "restserver.h"
 #include "autocomplete.h"
 #include "image.h"
-#include "csvparser.h"
-#include "generalresult.h"
 
 int defaultCodePage = 1252;
 
 Image image;
-gdioutput *gdi_main=0;
-oEvent *gEvent=0;
-SportIdent *gSI=0;
+gdioutput *gdi_main = nullptr;
+oEvent *gEvent = nullptr;
+SportIdent *gSI = nullptr;
 Localizer lang;
-AutoTask *autoTask = 0;
+AutoTask *autoTask = nullptr;
 #ifdef _DEBUG
   bool enableTests = true;
 #else
@@ -98,6 +89,7 @@ HWND hWndWorkspace;
 
 void removeTempFiles();
 void Setup(bool overwrite, bool overwriteAll);
+void saveMainWindowPos();
 
 // Global Variables:
 HINSTANCE hInst; // current instance
@@ -107,7 +99,7 @@ TCHAR szWorkSpaceClass[MAX_LOADSTRING]; // The title bar text
 
 // Foward declarations of functions included in this code module:
 ATOM MyRegisterClass(HINSTANCE hInstance);
-BOOL InitInstance(HINSTANCE, int);
+BOOL initInstance(HINSTANCE, int);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK WorkSpaceWndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK About(HWND, UINT, WPARAM, LPARAM);
@@ -152,9 +144,9 @@ wchar_t exePath[MAX_PATH];
 void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
   MSG msg;
   BOOL bRet;
-  
+  uint64_t timeLimit = 0;
   if (time > 0) {
-    time += GetTickCount();
+    timeLimit = time + GetTickCount64();
   }
   // Main message loop:
   while ( (bRet = GetMessage(&msg, NULL, 0, 0)) != 0 ) {
@@ -167,8 +159,8 @@ void mainMessageLoop(HACCEL hAccelTable, DWORD time) {
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     }
-    if (time != 0) {
-      if (GetTickCount() > time)
+    if (timeLimit != 0) {
+      if (GetTickCount64() > timeLimit)
         return;
     }
   }
@@ -205,7 +197,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     ShowWindow(hSplash, SW_SHOW);
     UpdateWindow(hSplash);
   }
-  DWORD splashStart = GetTickCount();
+  uint64_t splashStart = GetTickCount64();
 
   for (int k = 0; k < 100; k++) {
     RunnerStatusOrderMap[k] = 0;
@@ -221,30 +213,10 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   RunnerStatusOrderMap[StatusCANCEL] = 7;
   RunnerStatusOrderMap[StatusDNS] = 8;
   RunnerStatusOrderMap[StatusUnknown] = 9;
-  RunnerStatusOrderMap[StatusNotCompetiting] = 10;
-
-  lang.init();
-  StringCache::getInstance().init();
-  
-  for (RunnerStatus st : getAllRunnerStatus()) {
-    if (st != StatusOK)
-      assert(RunnerStatusOrderMap[st] > 0);
-    oAbstractRunner::encodeStatus(st);
-  }
+  RunnerStatusOrderMap[StatusNotCompeting] = 10;
 
   GetCurrentDirectory(MAX_PATH, programPath);
-  bool utfRecode = false;
-  if (utfRecode) {
-    vector<wstring> dyn;
 
-    expandDirectory(L".", L"*.cpp", dyn);
-    expandDirectory(L".", L"*.h", dyn);
-    expandDirectory(L"./meosdb", L"*.cpp", dyn);
-    expandDirectory(L"./meosdb", L"*.h", dyn);
-    for (auto &f : dyn)
-      csvparser::convertUTF(f);
-  }
-  
   GetModuleFileName(NULL, exePath, MAX_PATH);
   int lastDiv = -1;
   for (int i = 0; i < MAX_PATH; i++) {
@@ -257,6 +229,17 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     exePath[lastDiv] = 0;
   else
     exePath[0] = 0;
+
+  oClub::loadNameMap();
+
+  lang.init();
+  StringCache::getInstance().init();
+  
+  for (RunnerStatus st : getAllRunnerStatus()) {
+    if (st != StatusOK)
+      assert(RunnerStatusOrderMap[st] > 0);
+    oAbstractRunner::encodeStatus(st);
+  }
 
   getUserFile(settings, L"meoswpref.xml");
   Parser::test();
@@ -303,8 +286,10 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   lang.get().addLangResource(L"Français", L"110");
   lang.get().addLangResource(L"Español", L"111");
   lang.get().addLangResource(L"Russian", L"107");
-  lang.get().addLangResource(L"Ukrainian", L"112");
-  lang.get().addLangResource(L"Portuguese", L"113");
+  lang.get().addLangResource(L"українська", L"112");
+  lang.get().addLangResource(L"Português", L"113");
+  lang.get().addLangResource(L"български", L"114");
+  lang.get().addLangResource(L"Català", L"115");
 
   if (fileExists(L"extra.lng")) {
     lang.get().addLangResource(L"Extraspråk", L"extra.lng");
@@ -424,16 +409,16 @@ int APIENTRY WinMain(HINSTANCE hInstance,
       defSize = 3;
   }
   gdi_main->setFont(gEvent->getPropertyInt("TextSize", defSize),
-                    gEvent->getPropertyString("TextFont", L"Arial"));
+                    gEvent->getPropertyString("UIFont", L"Segoe UI"));
 
   if (hSplash != nullptr) {
-    DWORD startupToc = GetTickCount() - splashStart;
+    DWORD startupToc = GetTickCount64() - splashStart;
     Sleep(min<int>(1000, max<int>(0, 700 - startupToc)));
   }
 
   // Perform application initialization:
-  if (!InitInstance (hInstance, nCmdShow)) {
-    return FALSE;
+  if (!initInstance(hInstance, nCmdShow)) {
+    return false;
   }
 
   RECT rc;
@@ -442,6 +427,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 
   gdi_main->init(hWndWorkspace, hWndMain, hMainTab);
   gdi_main->getTabs().get(TCmpTab)->loadPage(*gdi_main);
+  gdi_main->updateMonitorConfiguration();
+  saveMainWindowPos();
 
   image.loadImage(IDI_MEOSEDIT, Image::ImageMethod::Default);
 
@@ -679,7 +666,7 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
       gdi->escape();
   }
   else if (wParam==VK_F2) {
-    ProgressWindow pw(hWnd);
+    ProgressWindow pw(hWnd, 1.0);
 
     pw.init();
     for (int k=0;k<=20;k++) {
@@ -762,61 +749,80 @@ LRESULT CALLBACK KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
 //        In this function, we save the instance handle in a global variable and
 //        create and display the main program window.
 //
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-  HWND hWnd;
+BOOL initInstance(HINSTANCE hInstance, int nCmdShow) {
+  try {
+    HWND hWnd;
 
-  HWND hDskTop=GetDesktopWindow();
-  RECT rc;
-  GetClientRect(hDskTop, &rc);
+    HWND hDskTop = GetDesktopWindow();
+    RECT rc;
+    GetClientRect(hDskTop, &rc);
 
-  int xp = gEvent->getPropertyInt("xpos", 50);
-  int yp = gEvent->getPropertyInt("ypos", 20);
+    int xp = gEvent->getPropertyInt("xpos", 50);
+    int yp = gEvent->getPropertyInt("ypos", 20);
 
-  int xs = gEvent->getPropertyInt("xsize", max(850, min<int>(int(rc.right)-yp, (rc.right*9)/10)));
-  int ys = gEvent->getPropertyInt("ysize", max(650, min<int>(int(rc.bottom)-yp-40, (rc.bottom*8)/10)));
+    int xs = gEvent->getPropertyInt("xsize", max(850, min<int>(int(rc.right) - yp, (rc.right * 9) / 10)));
+    int ys = gEvent->getPropertyInt("ysize", max(650, min<int>(int(rc.bottom) - yp - 40, (rc.bottom * 8) / 10)));
 
-  if ((xp + xs > rc.right) || xp < rc.left || yp + ys > rc.bottom || yp < rc.top) {
-    // out of bounds, just use default position and size
-    xp = 50;
-    yp = 20;
-    xs = max(850, min<int>(int(rc.right) - yp, (rc.right * 9) / 10));
-    ys = max(650, min<int>(int(rc.bottom) - yp - 40, (rc.bottom * 8) / 10));
+    gEvent->setProperty("ypos", yp + 16);
+    gEvent->setProperty("xpos", xp + 32);
+    gEvent->saveProperties(settings); // For other instance starting while running
+    gEvent->setProperty("ypos", yp);
+    gEvent->setProperty("xpos", xp);
+
+    hWnd = CreateWindowEx(0, szWindowClass, szTitle,
+      WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+      xp, yp, max(min(int(rc.right) - yp, xs), 200),
+      max(min(int(rc.bottom) - yp - 40, ys), 100),
+      NULL, NULL, hInstance, NULL);
+
+    if (!hWnd)
+      return FALSE;
+
+    hWndMain = hWnd;
+
+    SetWindowsHookEx(WH_KEYBOARD, KeyboardProc, 0, GetCurrentThreadId());
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    hWnd = CreateWindowEx(0, szWorkSpaceClass, L"WorkSpace", WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+      50, 200, 200, 100, hWndMain, NULL, hInstance, NULL);
+
+    if (!hWnd)
+      return FALSE;
+
+    hWndWorkspace = hWnd;
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
   }
-
-  gEvent->setProperty("ypos", yp + 16);
-  gEvent->setProperty("xpos", xp + 32);
-  gEvent->saveProperties(settings); // For other instance starting while running
-  gEvent->setProperty("ypos", yp);
-  gEvent->setProperty("xpos", xp);
-
-  hWnd = CreateWindowEx(0, szWindowClass, szTitle,
-          WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,
-          xp, yp, max(min(int(rc.right)-yp, xs), 200),
-                  max(min(int(rc.bottom)-yp-40, ys), 100),
-          NULL, NULL, hInstance, NULL);
-
-  if (!hWnd)
-    return FALSE;
-
-  hWndMain = hWnd;
-
-  SetWindowsHookEx(WH_KEYBOARD, KeyboardProc, 0, GetCurrentThreadId());
-  ShowWindow(hWnd, nCmdShow);
-  UpdateWindow(hWnd);
-
-  hWnd = CreateWindowEx(0, szWorkSpaceClass, L"WorkSpace", WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,
-    50, 200, 200, 100, hWndMain, NULL, hInstance, NULL);
-
-  if (!hWnd)
-    return FALSE;
-
-  hWndWorkspace=hWnd;
-  ShowWindow(hWnd, nCmdShow);
-  UpdateWindow(hWnd);
-
+  catch (const meosException& ex) {
+    MessageBox(NULL, lang.tl(ex.wwhat()).c_str(), L"Error", MB_OK);
+    return false;
+  }
+  catch (const std::exception & ex) {
+    MessageBox(NULL, gdioutput::widen(ex.what()).c_str(), L"Error", MB_OK);
+    return false;
+  }
+  catch (...) {
+    MessageBox(NULL, L"Unknown error", L"MeOS", MB_OK);
+    return false;
+  }
   return TRUE;
 }
+
+void saveMainWindowPos() {
+  int xp = gEvent->getPropertyInt("xpos", 50);
+  int yp = gEvent->getPropertyInt("ypos", 20);
+  
+  int offY = (GetSystemMetrics(SM_CYSMICON) * 3) / 2;
+
+  gEvent->setProperty("ypos", yp + offY);
+  gEvent->setProperty("xpos", xp + offY*2);
+  gEvent->saveProperties(settings); // For other instance starting while running
+
+  gEvent->setProperty("ypos", yp);
+  gEvent->setProperty("xpos", xp);
+}
+
 
 void destroyExtraWindows() {
   for (size_t k = 1; k<gdi_extra.size(); k++) {
@@ -906,7 +912,7 @@ gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x,
     if (max_y > 0)
       ys = min(max_y, ys);
   }
-  
+
   hWnd = CreateWindowEx(0, szWorkSpaceClass, title.c_str(),
     WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,
     xp, yp, max(xs, 200), max(ys, 100), 0, NULL, hInst, NULL);
@@ -918,7 +924,7 @@ gdioutput *createExtraWindow(const string &tag, const wstring &title, int max_x,
   UpdateWindow(hWnd);
   gdioutput *gdi = new gdioutput(tag, 1.0);
   gdi->setFont(gEvent->getPropertyInt("TextSize", 0),
-               gEvent->getPropertyString("TextFont", L"Arial"));
+               gEvent->getPropertyString("UIFont", L"Segoe UI"));
 
   gdi->init(hWnd, hWnd, 0);
   gdi->isTestMode = gdi_main->isTestMode;
@@ -1116,18 +1122,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_WINDOWPOSCHANGED:
       if (gEvent) {
         LPWINDOWPOS wp = (LPWINDOWPOS) lParam; // points to size and position data
-
-        if (wp->x>=0 && wp->y>=0 && wp->cx>300 && wp->cy>200) {
-          gEvent->setProperty("xpos", wp->x);
-          gEvent->setProperty("ypos", wp->y);
+        gEvent->setProperty("xpos", wp->x);
+        gEvent->setProperty("ypos", wp->y);
+        if (wp->cx>300 && wp->cy>200) {
           gEvent->setProperty("xsize", wp->cx);
           gEvent->setProperty("ysize", wp->cy);
         }
-        else {
-          Sleep(0);
-        }
       }
       return DefWindowProc(hWnd, message, wParam, lParam);
+
+    case WM_DISPLAYCHANGE:
+      if (gdi_main)
+        gdi_main->updateMonitorConfiguration();
+      break;
+
     case WM_TIMER:
 
       if (!gdi_main) return 0;
@@ -1240,7 +1248,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     
     case WM_USER + 5:
       if (gdi_main)
-        gdi_main->addInfoBox("ainfo", L"info:advanceinfo", 10000);
+        gdi_main->addInfoBox("ainfo", L"info:advanceinfo", L"", BoxStyle::Header, 10000);
       break;
 
     case WM_USER + 6:
@@ -1803,17 +1811,15 @@ void exportSetup()
   }
 }
 
-bool getMeOSFile(wchar_t *FileNamePath, const wchar_t *FileName) {
-  wchar_t Path[MAX_PATH];
+wstring getMeOSFile(const wchar_t *fileName) {
+  wstring out = programPath;
+  int i = out.length();
 
-  wcscpy_s(Path, programPath);
-  int i=wcslen(Path);
-  if (Path[i-1]!='\\')
-    wcscat_s(Path, MAX_PATH, L"\\");
+  if (i > 0 && out[i - 1] != '\\')
+    out.push_back('\\');
 
-  wcscat_s(Path, FileName);
-  wcscpy_s(FileNamePath, MAX_PATH, Path);
-  return true;
+  out += fileName;
+  return out;
 }
 
 bool getUserFile(wchar_t* FileNamePath, const wchar_t* FileName) {
@@ -1960,7 +1966,7 @@ INT_PTR CALLBACK splashDialogProc(
     image.loadImage(IDI_SPLASHIMAGE, Image::ImageMethod::MonoAlpha);
     int h = image.getHeight(IDI_SPLASHIMAGE);
     int w = image.getWidth(IDI_SPLASHIMAGE);
-    image.drawImage(IDI_SPLASHIMAGE, Image::ImageMethod::MonoAlpha, hdc, (rt.right - w) / 2, (rt.bottom - h) / 2, w, h);
+    image.drawImage(IDI_SPLASHIMAGE, Image::ImageMethod::MonoAlpha, hdc, (rt.right - w) / 2, (rt.bottom - h) / 2, w, h, 0,0,0,0);
     EndPaint(hwndDlg, &ps);
     break;
   }

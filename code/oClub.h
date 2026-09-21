@@ -1,17 +1,11 @@
-﻿// oClub.h: interface for the oClub class.
+﻿#pragma once
+// oClub.h: interface for the oClub class.
 //
 //////////////////////////////////////////////////////////////////////
 
-#if !defined(AFX_OCLUB_H__8B2917E2_6A48_4E7F_82AD_4F8C64167439__INCLUDED_)
-#define AFX_OCLUB_H__8B2917E2_6A48_4E7F_82AD_4F8C64167439__INCLUDED_
-
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
-
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,8 +26,8 @@
 ************************************************************************/
 
 #include <map>
-#include "xmlparser.h"
 #include "oBase.h"
+
 class oEvent;
 
 class oClub;
@@ -46,14 +40,15 @@ typedef oClub* pClub;
 class oDataInterface;
 class oDataConstInterface;
 class Table;
+class xmlparser;
+class xmlobject;
 
-class oClub : public oBase
-{
+class oClub : public oBase {
 protected:
 
   struct InvoiceLine {
     InvoiceLine() : fee(0), rent(0), paid(0), payMode(0) {}
-    vector< pair<int, pair<bool, wstring> > > xposAndString;
+    vector<pair<int, pair<bool, wstring>>> xposAndString;
     int fee;
     int rent;
     int paid;
@@ -66,7 +61,10 @@ protected:
   wstring name;
   vector<wstring> altNames;
   wstring tPrettyName;
+  wstring tCompactName;
 
+  static map<wstring, wstring> manualCompactNameMap;
+  
   static const int dataSize = 768;
   int getDISize() const final {return dataSize;}
   BYTE oData[dataSize];
@@ -141,6 +139,12 @@ protected:
 
 public:
 
+  static void loadNameMap();
+
+  void nameChanged() {
+    internalSetName(name);
+  }
+
   static const shared_ptr<Table> &getTable(oEvent *oe);
 
   int getStartGroup() const;
@@ -172,11 +176,23 @@ public:
                        map<int, int> &paidPerMode);
 
   wstring getInfo() const;
-  bool sameClub(const oClub &c);
+  
+  // Check same name
+  bool sameClub(const oClub &c) const;
+
+  // True of the club has an adress
+  bool isBillable() const;
+
+  // Return number of stored data field (address, phone, mail etc) 
+  // Use to determine which version is best in case of duplicated club data etc
+  int getDataAmount() const;
 
   const wstring &getName() const {return name;}
 
   const wstring &getDisplayName() const {return tPrettyName.empty() ?  name : tPrettyName;}
+
+  const wstring& getCompactName() const { return tCompactName.empty() ? name : tCompactName; }
+
 
   void setName(const wstring &n);
 
@@ -198,4 +214,3 @@ public:
   friend class MeosSQL;
 };
 
-#endif // !defined(AFX_OCLUB_H__8B2917E2_6A48_4E7F_82AD_4F8C64167439__INCLUDED_)

@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,6 +36,8 @@
 #include "Table.h"
 #include "MeOSFeatures.h"
 #include <set>
+#include "xmlparser.h"
+
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
@@ -130,13 +132,18 @@ void oControl::setStatus(ControlStatus st){
   }
 }
 
-void oControl::setName(wstring name) {
-  if (name != getName()) {
+void oControl::setName(const wstring &name) {
+  if (name == getDefaultName()) {
+    if (!Name.empty()) {
+      Name = L"";
+      updateChanged();
+    }
+  }
+  else if (name != getName()) {
     Name = name;
     updateChanged();
   }
 }
-
 
 void oControl::set(const xmlobject* xo) {
   xmlList xl;
@@ -187,7 +194,7 @@ wstring oControl::getString() {
   if (Status == ControlStatus::StatusMultiple)
     num = codeNumbers('+');
   else if (Status == ControlStatus::StatusRogaining || Status == ControlStatus::StatusRogainingRequired)
-    num = codeNumbers('|') + L", " + itow(getRogainingPoints()) + L"p";
+    num = codeNumbers('|') + L" (" + (getRogainingPoints() != 0 ? oe->formatScore(getRogainingPoints()) : L"0") + L"p)";
   else
     num = codeNumbers('|');
 
@@ -212,7 +219,7 @@ wstring oControl::getLongString()
     return wstring(lang.tl("ALLA(")) + codeNumbers(',') + L")";
   }
   else if (Status == ControlStatus::StatusRogaining || Status == ControlStatus::StatusRogainingRequired)
-    return wstring(lang.tl("RG(")) + codeNumbers(',') + L"|" + itow(getRogainingPoints()) + L"p)";
+    return wstring(lang.tl("RG(")) + codeNumbers(',') + L"|" + (getRogainingPoints() != 0 ? oe->formatScore(getRogainingPoints()) : L"0") + L"p)";
   else
     return wstring(lang.tl("TRASIG(")) + codeNumbers(',') + L")";
 }
@@ -253,8 +260,7 @@ bool oControl::hasNumberUnchecked(int i)
   else return true;
 }
 
-int oControl::getNumMulti()
-{
+int oControl::getNumMulti() {
   if (Status== ControlStatus::StatusMultiple)
     return nNumbers;
   else
@@ -322,16 +328,22 @@ bool oControl::setNumbers(const wstring &numbers)
   return success;
 }
 
-wstring oControl::getName() const
-{
-	if (!Name.empty())
-		return Name;
-	else {
-		wchar_t bf[16];
-		swprintf_s(bf, L"[%d]", Id);
-		return bf;
-	}
+const wstring &oControl::getName() const {
+  if (!Name.empty())
+    return Name;
+  else
+    return getDefaultName();
 }
+
+/// Get name or [id]
+const wstring &oControl::getDefaultName() const {
+  wchar_t bf[16];
+  swprintf_s(bf, L"[%d]", Id);
+  wstring &res = StringCache::getInstance().wget();
+  res = bf;
+  return res;
+}
+
 
 wstring oControl::getIdS() const
 {
@@ -403,7 +415,7 @@ const vector<pair<wstring, size_t>>& oEvent::fillControls(vector< pair<wstring, 
           }
 
           if (it->Status == oControl::ControlStatus::StatusRogaining || it->Status == oControl::ControlStatus::StatusRogainingRequired)
-            b += L"\t(" + itow(it->getRogainingPoints()) + L"p)";
+            b += L"\t(" + (it->getRogainingPoints() != 0 ? oe->formatScore(it->getRogainingPoints()) : L"0") + L"p)";
           else if (it->Name.length() > 0) {
             b += L"\t(" + it->Name + L")";
           }
@@ -544,10 +556,8 @@ int oControl::getRogainingPoints() const
   return getDCI().getInt("Rogaining");
 }
 
-wstring oControl::getRogainingPointsS() const
-{
-  int pt = getRogainingPoints();
-  return pt != 0 ? itow(pt) : L"";
+wstring oControl::getRogainingPointsS() const {
+  return oe->formatScore(getRogainingPoints());
 }
 
 bool oControl::setTimeAdjust(int v) {
@@ -592,9 +602,8 @@ void oControl::setRogainingPoints(int v)
   getDI().setInt("Rogaining", v);
 }
 
-void oControl::setRogainingPoints(const string &s)
-{
-  setRogainingPoints(atoi(s.c_str()));
+void oControl::setRogainingPoints(const wstring &s) {
+  setRogainingPoints(oe->convertScore(s));
 }
 
 void oControl::startCheckControl()
@@ -609,14 +618,14 @@ wstring oControl::getInfo() const
   return getName();
 }
 
-void oControl::addUncheckedPunches(vector<int> &mp, bool supportRogaining) const
+void oControl::addUncheckedPunches(vector<pair<int, pControl>> &mp, bool supportRogaining) const
 {
   if (controlCompleted(supportRogaining))
     return;
 
   for (int k=0;k<nNumbers;k++)
     if (!checkedNumbers[k]) {
-      mp.push_back(Numbers[k]);
+      mp.emplace_back(Numbers[k], pControl(this));
 
       if (Status!= ControlStatus::StatusMultiple)
         return;
@@ -703,26 +712,26 @@ int oControl::getNumRunnersRemaining() const {
 
 void oEvent::setupControlStatistics() const {
   // Reset all times
-  for (oControlList::const_iterator it = Controls.begin(); it != Controls.end(); ++it) {
-    it->tMissedTimeMax = 0;
-    it->tMissedTimeTotal = 0;
-    it->tNumVisitorsActual = 0;
-    it->tNumVisitorsExpected = 0;
-    it->tNumRunnersRemaining = 0;
-    it->tMissedTimeMedian = 0;
-    it->tMistakeQuotient = 0;
-    it->tStatDataRevision = dataRevision; // Mark as up-to-date
+  for (auto &ctrl : Controls) {
+    ctrl.tMissedTimeMax = 0;
+    ctrl.tMissedTimeTotal = 0;
+    ctrl.tNumVisitorsActual = 0;
+    ctrl.tNumVisitorsExpected = 0;
+    ctrl.tNumRunnersRemaining = 0;
+    ctrl.tMissedTimeMedian = 0;
+    ctrl.tMistakeQuotient = 0;
+    ctrl.tStatDataRevision = dataRevision; // Mark as up-to-date
   }
 
-  map<int, pair<int, vector<int> > > lostPerControl; // First is "actual" misses,
+  map<int, pair<int, vector<int>>> lostPerControl; // First is "actual" misses,
   vector<int> delta;
-  for (auto it = Runners.begin(); it != Runners.end(); ++it) {
-    if (it->isRemoved())
+  for (auto &r : Runners) {
+    if (r.isRemoved())
       continue;
-    pCourse pc = it->getCourse(true);
+    pCourse pc = r.getCourse(true);
     if (!pc)
       continue;
-    it->getSplitAnalysis(delta);
+    r.getSplitAnalysis(delta);
 
     int nc = pc->getNumControls();
     if (unsigned(nc) < delta.size()) {
@@ -746,23 +755,29 @@ void oEvent::setupControlStatistics() const {
       }
     }
 
-    if (!it->isVacant() && it->getStatus() != StatusDNS && it->getStatus() != StatusCANCEL
-                        && it->getStatus() != StatusNotCompetiting) {
-
-      for (int i = 0; i < nc; i++) {
+    if (!r.isVacant() && r.getStatus() != StatusDNS && r.getStatus() != StatusCANCEL
+                        && r.getStatus() != StatusNotCompeting) {
+      bool foundRadio = false;
+      bool unordered = pc->getCommonControl() != false;
+      
+      for (int i = nc - 1; i >= 0; i--) {
         pControl ctrl = pc->getControl(i);
         ctrl->tNumVisitorsExpected++;
 
-        if (it->getStatus() == StatusUnknown)
-          ctrl->tNumRunnersRemaining++;
+        if (r.getStatus() == StatusUnknown) {
+          if (!foundRadio && r.getPunchTime(i, false, false, false) == -1)
+            ctrl->tNumRunnersRemaining++;
+          else if (!unordered) {
+            foundRadio = true;
+          }
+        }
       }
-
     }
   }
 
-  for (oControlList::const_iterator it = Controls.begin(); it != Controls.end(); ++it) {
-    if (!it->isRemoved()) {
-      int id = it->getId();
+  for (auto &ctrl : Controls) {
+    if (!ctrl.isRemoved()) {
+      int id = ctrl.getId();
 
       auto res = lostPerControl.find(id);
       if (res != lostPerControl.end()) {
@@ -774,16 +789,16 @@ void oEvent::setupControlStatistics() const {
             avg = res->second.second[nMistakes / 2];
           else
             avg = (res->second.second[nMistakes / 2] + res->second.second[nMistakes / 2 -1]) / 2;
-          it->tMissedTimeMedian = avg;
+          ctrl.tMissedTimeMedian = avg;
         }
-        if (it->tNumVisitorsActual > 0)
-          it->tMistakeQuotient = (int)round((100.00 * res->second.first) / double(it->tNumVisitorsActual));
+        if (ctrl.tNumVisitorsActual > 0)
+          ctrl.tMistakeQuotient = (int)round((100.00 * res->second.first) / double(ctrl.tNumVisitorsActual));
         else
-          it->tMistakeQuotient = 0;
+          ctrl.tMistakeQuotient = 0;
       }
       else {
-        it->tMistakeQuotient = 0;
-        it->tMissedTimeMedian = 0;
+        ctrl.tMistakeQuotient = 0;
+        ctrl.tMissedTimeMedian = 0;
       }
     }
   }
@@ -869,6 +884,8 @@ const shared_ptr<Table> &oControl::getTable(oEvent *oe) {
     table->addColumn("Status", 70, false);
     table->addColumn("Stämpelkoder", 100, true);
     table->addColumn("Antal löpare", 70, true, true);
+    table->addColumn("Kvar-i-skogen", 70, true, true);
+
     table->addColumn("Bomtid (max)", 70, true, true);
     table->addColumn("Bomtid (medel)", 70, true, true);
     table->addColumn("Bomtid (median)", 70, true, true);
@@ -876,7 +893,7 @@ const shared_ptr<Table> &oControl::getTable(oEvent *oe) {
     oe->oControlData->buildTableCol(table.get());
     oe->setTable("control", table);
 
-    table->setTableProp(Table::CAN_DELETE);
+    table->setTableProp(Table::CAN_DELETE | Table::CAN_PASTE);
   }
 
   return oe->getTable("control");
@@ -912,8 +929,10 @@ void oControl::addTableRow(Table &table) const {
   table.set(row++, it, TID_STATUS, getStatusS(), canEdit, cellSelection);
   table.set(row++, it, TID_CODES, codeNumbers(), true);
 
+  table.set(row++, it, 50, itow(getNumVisitors(false)), false);
+  table.set(row++, it, 50, itow(getNumRunnersRemaining()), false);
+
   int nv = getNumVisitors(true);
-  table.set(row++, it, 50, itow(nv), false);
   table.set(row++, it, 51, nv > 0 ? formatTime(getMissedTimeMax(), SubSecond::Off) : L"-", false);
   table.set(row++, it, 52, nv > 0 ? formatTime(getMissedTimeTotal()/nv, SubSecond::Off) : L"-", false);
   table.set(row++, it, 53, nv > 0 ? formatTime(getMissedTimeMedian(),  SubSecond::Off) : L"-", false);
@@ -987,8 +1006,8 @@ void oEvent::getControls(vector<pControl> &c, bool calculateCourseControls) cons
     }
     for (oCourseList::const_iterator it = Courses.begin(); it != Courses.end(); ++it) {
       map<int, int> count;
-      for (int i = 0; i < it->nControls; i++) {
-        ++count[it->Controls[i]->getId()];
+      for (int i = 0; i < it->nControls(); i++) {
+        ++count[it->controls[i]->getId()];
       }
       for (map<int, int>::iterator it = count.begin(); it != count.end(); ++it) {
         unordered_map<int, pControl>::iterator res = cById.find(it->first);

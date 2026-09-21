@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -29,9 +29,9 @@
 #include "Table.h"
 #include "meos_util.h"
 #include "Localizer.h"
-#include "intkeymapimpl.hpp"
 #include "socket.h"
 #include "gdioutput.h"
+#include "xmlparser.h"
 
 bool oFreePunch::disableHashing = false;
 
@@ -193,7 +193,7 @@ void oFreePunch::addTableRow(Table &table) const {
   table.set(row++, it, TID_ID, itow(getId()), false, cellEdit);
   table.set(row++, it, TID_MODIFIED, getTimeStamp(), false, cellEdit);
   table.set(row++, it, TID_CARD, itow(getCardNo()), true, cellEdit);
-  table.set(row++, it, TID_CONTROL, getType(), true, cellEdit);
+  table.set(row++, it, TID_CONTROL, getType(nullptr), true, cellEdit);
   table.set(row++, it, TID_UNIT, punchUnit > 0 ? itow(punchUnit) : _EmptyWString, true, cellEdit);
 
   table.set(row++, it, TID_TIME, getTime(false, SubSecond::Auto), true, cellEdit);
@@ -231,7 +231,7 @@ pair<int, bool> oFreePunch::inputData(int id, const wstring &input,
     case TID_CONTROL:
       setType(input);
       synchronize(true);
-      output = getType();
+      output = getType(nullptr);
       break;
 
     case TID_UNIT:
@@ -388,7 +388,7 @@ int oEvent::getControlIdFromPunch(int time, int type, int card,
 
     if (c!=0) {
       race = r->getRaceNo();
-      for (int k=0; k<c->nControls; k++) {
+      for (int k=0; k<c->nControls(); k++) {
         pControl ctrl=c->getControl(k);
         if (ctrl && ctrl->hasNumber(type)) {
           int courseControlId = c->getCourseControlId(k);
@@ -516,9 +516,9 @@ pFreePunch oEvent::addFreePunch(int time, int type, int unit, int card, bool upd
             else if (tr->getCourse(false) != 0 && tr->getCard() == 0) {
               pCard card = allocateCard(tr);
               card->setupFromRadioPunches(*tr);
-              vector<int> mp;
+              vector<pair<int, pControl>> mp;
               card->synchronize();
-              tr->addPunches(card, mp);
+              tr->addCard(card, mp);
             }
           }
 

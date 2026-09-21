@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -68,6 +68,7 @@ public:
 
   bool isComplete() const { return complete; }
   void startXML(xmlparser &xml, const wstring &dest);
+  void startTagXML(xmlparser &xml);
 };
 
 class InfoBase
@@ -101,7 +102,8 @@ typedef InfoBase * pInfoBase;
 class InfoRadioControl : public InfoBase {
   protected:
     wstring name;
-    bool synchronize(oControl &c, int number);
+    bool trueRadio = false;
+    bool synchronize(oControl &c, bool trueRadio, int number);
     void serialize(xmlbuffer &xml, bool diffOnly) const;
   public:
     InfoRadioControl(int id);
@@ -113,10 +115,14 @@ class InfoRadioControl : public InfoBase {
 class InfoClass : public InfoBase {
   protected:
     wstring name;
-    int sortOrder;
     vector< vector<int> > radioControls;
     vector<int> linearLegNumberToActual;
     vector<int> courses;
+    int sortOrder = 0;
+    int numMaps = 0;
+    int length = 0;
+    int climb = 0;
+
   public:
     bool synchronize(bool includeCourses, oClass &c, const set<int> &ctrls);
     void serialize(xmlbuffer &xml, bool diffOnly) const;
@@ -130,13 +136,15 @@ class InfoClass : public InfoBase {
 class InfoMeosStatus : public InfoBase {
   protected:
     wstring eventNameId; // event Name Id, actual name of the database, can also be matched in oevent table of meosmain
-    bool onDatabase; // true if currently on database
+    bool onDatabase = false; // true if currently on database
+    int eventId = 0; // numeric event id, used for UDP DirectSocket filtering
   public:
     void serialize(xmlbuffer &xml, bool diffOnly) const;
     InfoMeosStatus();
     virtual ~InfoMeosStatus() {}
     void setEventNameId(const wstring &);
     void setOnDatabase(const bool);
+    void setEventId(int id) { eventId = id; }
 };
 
 class InfoOrganization : public InfoBase {
@@ -165,21 +173,23 @@ struct RadioTime {
 class InfoBaseCompetitor : public InfoBase {
   protected:
     wstring name;
+    wstring bib;
+    wstring nationality;
+
     int organizationId;
     int classId;
-
     int status;
     int startTime;
     int runningTime;
     int points = -1;
     int penalty = -1;
-    wstring bib;
-    wstring nationality;
+
+    bool preliminary;
     void serialize(xmlbuffer &xml, bool diffOnly, int course) const;
     bool synchronizeBase(oAbstractRunner &bc);
   public:
     InfoBaseCompetitor(int id);
-    virtual ~InfoBaseCompetitor() {}
+    virtual ~InfoBaseCompetitor() = default;
 };
 
 class InfoCompetitor : public InfoBaseCompetitor {
@@ -191,9 +201,9 @@ class InfoCompetitor : public InfoBaseCompetitor {
     int cardNo = 0;
     bool isRunning = false;
     bool synchronize(const InfoCompetition &cmp, oRunner &c);
-    bool changeTotalSt;
-    bool changeRadio;
-    mutable bool changeCard = false;
+    bool changeTotalSt = false;
+    bool changeRadio = false;
+    mutable bool changeCard = true;
   public:
     bool synchronize(bool useTotalResults, bool useCourse, oRunner &c);
     void serialize(xmlbuffer &xml, bool diffOnly) const;
@@ -251,10 +261,19 @@ protected:
     void includeCourse(bool inc) { withCourse = inc; }
 
     const vector<int> &getControls(int classId, int legNumber) const;
-    bool synchronize(oEvent &oe, bool onlyCmp, const set<int> &classes, const set<int> &ctrls, bool allowDeletion);
+
+    enum class SynchType {
+      All,
+      OnlyCmp,
+      CmpAndClass,
+      Entries,
+    };
+
+    bool synchronize(oEvent &oe, const wstring &cmpName, SynchType whatSynch, 
+                     const set<int> &classes, const set<int> &ctrls, const set<int> &trueRadio, bool allowDeletion);
     bool synchronize(oEvent &oe) {
       set<int> dmy;
-      return synchronize(oe, true, dmy, dmy, false);
+      return synchronize(oe, L"", SynchType::OnlyCmp, dmy, dmy, dmy, false);
     }
     void getCompleteXML(xmlbuffer &xml);
     void getDiffXML(xmlbuffer &xml);
@@ -262,5 +281,5 @@ protected:
     void commitComplete();
 
     InfoCompetition(int id);
-    virtual ~InfoCompetition() {}
+    virtual ~InfoCompetition() = default;
 };

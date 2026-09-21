@@ -1,7 +1,7 @@
 ﻿#pragma once
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -44,12 +44,14 @@ enum EPostType {
   lCmpDate,
   lCurrentTime,
   lClubName,
+  lClubNameShort,
   lClassName,
   lClassStartName,
   lClassStartTime,
   lClassStartTimeRange,
   lClassLength,
   lClassResultFraction,
+  lClassRemainInForest  ,
   lClassAvailableMaps,
   lClassTotalMaps,
   lClassNumEntries,
@@ -67,12 +69,16 @@ enum EPostType {
   lCourseClasses,
   lCourseNumControls,
   lRunnerName,
+  lRunnerNameCompact,
   lRunnerGivenName,
   lRunnerFamilyName,
   lRunnerCompleteName,
+  lRunnerCompleteNameCompact,
+  lRunnerCompleteNameCompactClub,
   lRunnerLegTeamLeaderName, // The runner on the (parallell) leg (in the team) with best result
   lPatrolNameNames, // Single runner's name or both names in a patrol
   lPatrolClubNameNames, // Single runner's club or combination of patrol clubs
+  lPatrolClubNameNamesShort, // Single runner's club (short) or combination of patrol clubs
   lRunnerFinish,
   lRunnerTime,
   lRunnerGrossTime,
@@ -86,6 +92,7 @@ enum EPostType {
   lRunnerCoursePlace,
   lRunnerTotalTimeAfter,
   lRunnerClassCourseTimeAfter,
+  lRunnerCourseTimeAfter,
   lRunnerTimeAfterDiff,
   lRunnerTempTimeStatus,
   lRunnerTempTimeAfter,
@@ -100,6 +107,7 @@ enum EPostType {
   lRunnerStartCond,
   lRunnerStartZero,
   lRunnerClub,
+  lRunnerClubShort,
   lRunnerCard,
   lRunnerRentalCard,
   lRunnerBib,
@@ -121,7 +129,9 @@ enum EPostType {
   lRunnerStageTimeStatus,
   lRunnerStagePlace,
   lRunnerStagePoints,
+  lRunnerStageTimeAfter,
   lRunnerStageNumber,
+  lStageNumber,
 
   lRunnerUMMasterPoint,
   lRunnerTimePlaceFixed,
@@ -144,8 +154,10 @@ enum EPostType {
   lRunnerDataA,
   lRunnerDataB,
   lRunnerTextA,
+  lRunnerAnnotation,
 
   lTeamName,
+  lTeamNameRaw,
   lTeamStart,
   lTeamStartCond,
   lTeamStartZero,
@@ -168,6 +180,7 @@ enum EPostType {
   lTeamGrossTime,
   lTeamStatus,
   lTeamClub,
+  lTeamClubShort,
   lTeamRunner,
   lTeamRunnerCard,
   lTeamBib,
@@ -184,6 +197,7 @@ enum EPostType {
   lTeamDataA,
   lTeamDataB,
   lTeamTextA,
+  lTeamAnnotation,
 
   lPunchNamedTime,
   lPunchTeamTotalNamedTime,
@@ -229,6 +243,15 @@ enum EPostType {
   lControlMistakeQuotient,
   lControlRunnersLeft,
   lControlCodes,
+  lControlTo,
+  lControlFrom,
+
+  lRogainingLeg,
+  lRogainingLegFrom,
+  lRogainingLegTo,
+  lRogainingLegBestTime,
+  lRogainingLegNumCompetitors,
+  lRogainingMaxPoints,
 
   lNumEntries,
   lNumStarts,
@@ -255,7 +278,7 @@ enum EStdListType {
   unused_EStdTeamResultListLeg,//EStdTeamResultListLeg,
   EStdTeamResultList,
   EStdTeamStartList,
-  EStdTeamStartListLeg,
+  unused_EStdTeamStartListLeg,
   EStdIndMultiStartListLeg,
   EStdIndMultiResultListLeg,
   EStdIndMultiResultListAll,
@@ -307,6 +330,8 @@ enum EFilterList
   EFilterWrongFee,
   EFilterIncludeNotParticipating,
   EFilterModifiedCard,
+  EFilterTimeNoResult, // Finish time, but not card yet
+  EFilterUnexpectedPunchOrder, // Order of punches does not match time
   _EFilterMax
 };
 
@@ -329,7 +354,8 @@ struct oPrintPost {
   oPrintPost();
   oPrintPost(EPostType type, const wstring &format,
              int style, int dx, int dy, 
-             pair<int, bool> legIndex = make_pair(0, true));
+             pair<int, bool> legIndex = make_pair(0, true),
+             bool fixedLeg = false);
   oPrintPost(const wstring& image,
              int style, int dx, int dy,
              int width, int height);
@@ -337,7 +363,7 @@ struct oPrintPost {
   static string encodeFont(const string &face, int factor);
   static wstring encodeFont(const wstring &face, int factor);
 
-  EPostType type;
+  mutable EPostType type;
   int format;
 
   wstring text;
@@ -351,6 +377,15 @@ struct oPrintPost {
   mutable int xlimit = 0;
   int legIndex;
   bool linearLegIndex;
+  bool fixedLeg = false; // Specified explicitly in MetaList. Otherwise soft (form parameters)
+
+  void updateParamLeg(pair<int, bool> &par) {
+    if (!fixedLeg) {
+      legIndex = par.first;
+      linearLegIndex = par.second;
+    }
+  }
+
   gdiFonts getFont() const {return gdiFonts(format & 0xFF);}
   oPrintPost &setFontFace(const wstring &font, int factor) {
     fontFace = encodeFont(font, factor);
@@ -377,6 +412,12 @@ struct SplitPrintListInfo {
   bool withResult = true;
   bool withAnalysis = true;
   bool withStandardHeading = true;
+  bool withAbsTime = true;
+  bool withControlCode = true;
+  bool withAccLegPlace = false;
+  bool withLegPlace = false;
+  bool withTimeLoss = false;
+
   int numClassResults = 3;
 
   void serialize(xmlparser& xml) const;
@@ -496,6 +537,8 @@ struct oListParam {
       legNumber = code;
   }
 
+  pClass getSampleClass(const oEvent *oe) const;
+
   bool matchLegNumber(const pClass cls, int leg) const;
   int getLegNumber(const pClass cls) const;
   pair<int, bool> getLegInfo(const pClass cls) const;
@@ -528,6 +571,8 @@ public:
                   EBaseTypeTeamGlobal, // Used only in metalist (meaning global, not classwise)
                   EBaseTypeCourse,
                   EBaseTypeControl,
+                  EBaseTypeRGLeg,
+                  EBaseTypeRGLegGlobal,
                   EBasedTypeLast_};
 
   bool isTeamList() const {return listType == EBaseTypeTeam;}
@@ -566,6 +611,8 @@ public:
 
   void shrinkSize();
 
+  void updateParamLegNumber(pair<int, bool> legIndex);
+
 protected:
   wstring Name;
   EBaseType listType;
@@ -587,6 +634,8 @@ protected:
   list<oPrintPost> listPost;
   list<oPrintPost> subListPost;
   
+  void transformTypes(oEvent& oe) const;
+
   vector<char> listPostFilter;
   vector<char> listPostSubFilter;
   bool fixedType;
@@ -602,9 +651,16 @@ protected:
 
   shared_ptr<SplitPrintListInfo> splitPrintInfo;
 
+  EPostType transformType(oEvent& oe, EPostType in) const;
+
+  mutable int transformStatus = -1;
+
 public:
   ResultType getResultType() const;
 
+  /** Set no transformation of types (ignore prefs) */
+  void setNoTransform();
+  
   bool supportClasses;
   bool supportLegs;
   bool supportParameter;
@@ -629,6 +685,11 @@ public:
   void replaceType(EPostType find, EPostType replace, bool onlyFirst);
 
   PunchMode needPunchCheck() const {return needPunches;}
+  
+  void setUpdateCheck(PunchMode np) {
+    needPunches = np;
+  }
+
   void setCallback(GUICALLBACK cb);
   int getLegNumberCoded() const {return lp.getLegNumberCoded();}
 
@@ -679,31 +740,34 @@ public:
   friend class MetaList;
   friend class MetaListContainer;
 
-  int getMaxCharWidth(const oEvent *oe,
+  int getMaxCharWidth(oEvent &oe,
                       const gdioutput &gdi,
                       const set<int> &clsSel,
-                      const vector< pair<EPostType, wstring> > &typeFormats,
+                      const vector<tuple<EPostType, int, wstring>> &typeFormats,
                       gdiFonts font,
                       const wchar_t *fontFace = nullptr,
                       bool large = false, 
                       int minSize = 0) const;
 
-
-  int getMaxCharWidth(const oEvent *oe, 
+  int getMaxCharWidth(oEvent &oe, 
                       const set<int> &clsSel,
                       EPostType type, 
+                      int legIndex,
                       wstring formats,
                       gdiFonts font,
                       const wchar_t *fontFace = nullptr,
                       bool large = false, 
                       int minSize = 0) const {
-    vector< pair<EPostType, wstring> > typeFormats(1, make_pair(type, formats));
-    return getMaxCharWidth(oe, oe->gdiBase(), clsSel, typeFormats, font, fontFace, largeSize, minSize);
+    vector<tuple<EPostType, int, wstring>> typeFormats(1, make_tuple(type, legIndex, formats));
+    return getMaxCharWidth(oe, oe.gdiBase(), clsSel, typeFormats, font, fontFace, largeSize, minSize);
   }
-
 
   const oListParam &getParam() const {return lp;}
   oListParam &getParam() {return lp;}
+
+  const list<oListInfo>& linkedLists() const {
+    return next;
+  }
 
   // Returns true if the list needs to be regenerated due to competition changes
   bool needRegenerate(const oEvent &oe) const;

@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,6 +43,7 @@ class oDataConstInterface;
 class oAbstractRunner;
 struct RunnerWDBEntry;
 class RunnerDB;
+class MapData;
 
 typedef oRunner * pRunner;
 typedef oClass * pClass;
@@ -74,8 +75,18 @@ class IOF30Interface {
   // Include data on stage number
   bool includeStageRaceInfo;
 
+  bool preferShortName;
+
   int classIdOffset = 0;
   int courseIdOffset = 0;
+
+  // Box of coordnates
+  double lngMin = 0;
+  double lngMax = 0;
+  double latMin = 0;
+  double latMax = 0;
+
+  void resetLngLatBox();
 
   const IOF30Interface &operator=(const IOF30Interface &) = delete;
 
@@ -157,6 +168,7 @@ class IOF30Interface {
   set<string> idProviders;
   pair<string, string> preferredIdProvider;
   vector<vector<pair<string, wstring>>> externalIdTypes;
+  bool includeMeOSId = false;
 
   void readEvent(gdioutput &gdi, const xmlobject &xo,
                  map<int, vector<LegInfo> > &teamClassConfig);
@@ -214,6 +226,9 @@ class IOF30Interface {
   void writeAssignedFee(xmlparser &xml, const oAbstractRunner &tr, int paidForCard) const;
   void writeRentalCardService(xmlparser &xml, int cardFee, bool paid) const;
 
+  void writeTeamForkings(xmlparser& xml) const;
+  void writeTeamForking(xmlparser& xml, const oTeam& t) const;
+
   void getProps(vector<wstring> &props) const;
 
   void writeClassResult(xmlparser &xml, const oClass &c, const vector<pRunner> &r,
@@ -237,7 +252,8 @@ class IOF30Interface {
 
 
   void getRunnersToUse(const pClass cls, vector<pRunner> &rToUse,
-                       vector<pTeam> &tToUse, int leg, bool includeUnknown) const;
+                       vector<pTeam> &tToUse, int leg, 
+                       bool includeUnknown, bool skipVacant) const;
 
   void writeClassStartList(xmlparser &xml, const oClass &c, const vector<pRunner> &r,
                            const vector<pTeam> &t);
@@ -264,7 +280,7 @@ class IOF30Interface {
                            int &duplicateCount);
   void writeXMLCompetitorDB(xmlparser &xml, const RunnerDB &db, const RunnerWDBEntry &rde) const;
 
-  int getStartIndex(const wstring &startId);
+  int getStartFinishIndex(const wstring &startId);
 
   bool readControl(const xmlobject &xControl);
   pCourse readCourse(const xmlobject &xcrs);
@@ -323,7 +339,7 @@ public:
                                string &dateOut, string &timeOut);
 
   void getIdTypes(vector<string> &types);
-  void setPreferredIdType(const pair<string, string>&type);
+  void setPreferredIdType(const pair<string, string>&type, bool includeMeOS);
 
   void readEventList(gdioutput &gdi, xmlobject &xo);
 
@@ -347,11 +363,14 @@ public:
 
   void readClubList(gdioutput &gdi, const xmlobject &xo, int &clubCount);
 
-  void readCourseData(gdioutput &gdi, const xmlobject &xo, bool updateClasses, int &courseCount, int &entFail);
+  void readCourseData(gdioutput &gdi, const xmlobject &xo,
+                      bool updateClasses, int &courseCount, int &entFail, 
+                      shared_ptr<MapData>& readMapData);
 
   void writeResultList(xmlparser &xml, const set<int> &classes, int leg,
                        bool useUTC, bool teamsAsIndividual, 
-                       bool unrollLoops, bool includeStageInfo);
+                       bool unrollLoops, bool includeStageInfo,
+                       bool withPartialResult);
 
   void writeStartList(xmlparser &xml, const set<int> &classes, bool useUTC, 
                       bool teamsAsIndividual, bool includeStageInfo);
@@ -363,4 +382,7 @@ public:
   void writeRunnerDB(const RunnerDB &db, xmlparser &xml) const;
 
   void writeClubDB(const RunnerDB &db, xmlparser &xml) const;
+
+  void writeForkings(xmlparser& xml) const;
+
 };
