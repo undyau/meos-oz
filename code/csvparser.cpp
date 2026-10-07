@@ -85,8 +85,13 @@ csvparser::CSV csvparser::iscsv(const wstring &file) {
     fin.getline(bf, 2048);
     isCSVType = strlen(bf) >= 3;
   }
-
+  bf[2047] = 0;
   fin.close();
+
+  string rawIn = bf;
+
+  if (rawIn.find("<?xml") != string::npos)
+    return CSV::NoCSV;
 
   vector<char *> sp;
   split(bf, sp);
@@ -99,8 +104,8 @@ csvparser::CSV csvparser::iscsv(const wstring &file) {
   if (sp.size()==1 && strcmp(sp[0], "RAIDDATA")==0)
     return CSV::RAID;
 
-  if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)
-   return CSV::OR; //Órreturn CSV::OR; //Ór
+  if (sp.size()==1 && _stricmp(bf, "FName,SName,Club,Class")==0)
+    return CSV::OR; //Ór
 
   if (sp.size()<2)//No csv
     return CSV::NoCSV;
