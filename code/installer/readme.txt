@@ -1,3 +1,7 @@
+  07 Oct 2026 4.0.1578.4
+ - Handle import of XML entrylist when there is an embedded semi-colon 
+   in the entrylist.
+
   10 Aug 2026 4.0.1578.3
  - Remove all support for export of results by course. This functionality
    is effectively available via LiveLox. Function was broken in 4.0.1578.3.
