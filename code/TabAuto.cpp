@@ -522,6 +522,46 @@ int TabAuto::processListBox(gdioutput &gdi, const ListBoxInfo &bu) {
   return 0;
 }
 
+void TabAuto::startLiveResults(gdioutput &gdi) {
+  bool running = false;
+  for (auto &am : machines) {
+    if (am && am->getType() == Machines::mOnlineResults)
+      running = true;
+  }
+
+  if (!running) {
+    auto sm = make_shared<OnlineResults>();
+    sm->setupLiveResults(*oe);
+
+    // Do the first upload now, as when starting from the settings page. If it fails
+    // (no network for example) the service keeps running and retries, the error
+    // is shown in the status of the service.
+    DWORD iv = sm->interval;
+    sm->interval = 0;
+    try {
+      sm->process(gdi, oe, AutoSyncType::SyncNone);
+    }
+    catch (const meosException &) {
+    }
+    catch (const std::exception &) {
+    }
+    sm->interval = iv;
+    sm->synchronize = true;
+    sm->synchronizePunches = true;
+
+    // Save the settings (after the first upload, which may have assigned a competition id)
+    sm->saveMachine(*oe, itow(iv));
+    oe->updateChanged();
+    oe->synchronize(false);
+
+    machines.push_back(sm);
+    setTimer(sm.get());
+    updateSyncInfo();
+  }
+
+  loadPage(gdi, false);
+}
+
 bool TabAuto::stopMachine(AutoMachine* am) {
   for (auto it = machines.begin(); it != machines.end(); ++it)
     if (am == it->get()) {

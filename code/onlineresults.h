@@ -82,6 +82,11 @@ public:
   int processButton(gdioutput &gdi, ButtonInfo &bi);
   InfoCompetition &getInfoServer() const;
 
+  // Configure as the "Live Results" service started by the Upload Results button:
+  // all classes, MeOS Online Protocol 2.0, sent to the web every few seconds.
+  // Uses the previously saved "Live Results" settings if there are any.
+  void setupLiveResults(oEvent &oe);
+
   void save(oEvent &oe, gdioutput &gdi, bool doProcess) final;
   void settings(gdioutput &gdi, oEvent &oe, State state) final;
   shared_ptr<AutoMachine> clone() const final { 

@@ -15,7 +15,10 @@ MeOS - A Much Easier Orienteering System
 - Support for weird Sydney age classes in quick entry mode
 - Simple set-up for Sydney Summer Series events
 - Pop-up with result for score events
-- Interface for upload to Sydney Summer Series results interface
+- "Start Live Results" button on the competition page starts a "Live Results" online
+  service that sends all results to https://liveresults.page/upload.php (or the
+  server already set up for online results) using MeOS Online Protocol 2 every
+  5 seconds. The service settings are saved with the competition.
 - Course displayed on start list
 - Support for import of Or format entries list
 - Last hire sticks file is automatically loaded at start-up

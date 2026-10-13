@@ -77,6 +77,51 @@ OnlineResults::~OnlineResults() {
     delete infoServer;
 }
 
+static const wchar_t *liveResultsName = L"Live Results";
+static const wchar_t *liveResultsDefaultURL = L"https://liveresults.page/upload.php";
+static const DWORD liveResultsInterval = 5; // Seconds
+
+void OnlineResults::setupLiveResults(oEvent &oe) {
+  machineName = liveResultsName;
+
+  if (oe.getMachineContainer().get(getTypeString(), machineName)) {
+    // Settings saved earlier (possibly adjusted by the user), use them
+    loadMachine(oe, machineName);
+    if (!sendToURL && !sendToFile)
+      sendToURL = true;
+    if (sendToURL && url.empty())
+      url = oe.getPropertyString("MOPURL", liveResultsDefaultURL);
+    if (interval == 0)
+      interval = liveResultsInterval;
+    return;
+  }
+
+  // Use the server already entered for online results if there is one
+  url = oe.getPropertyString("MOPURL", L"");
+  if (url.empty())
+    url = liveResultsDefaultURL;
+  oe.setProperty("MOPURL", url);
+
+  sendToURL = true;
+  sendToFile = false;
+  dataType = DataType::MOP20;
+  interval = liveResultsInterval;
+
+  oe.getAllClasses(classes);
+  allClasses = true;
+
+  // Same default as the settings page: radio controls
+  controls.clear();
+  vector<pControl> ctrl;
+  oe.getControls(ctrl, true);
+  for (pControl c : ctrl) {
+    if (!c->isValidRadio())
+      continue;
+    for (int i = 0; i < c->getNumberDuplicates(); i++)
+      controls.insert(oControl::getCourseControlIdFromIdIndex(c->getId(), i));
+  }
+}
+
 int OnlineResults::processButton(gdioutput &gdi, ButtonInfo &bi) {
 
   if (bi.id == "ToURL")
@@ -641,6 +686,12 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
               if (!found) {
                   pair<wstring, wstring> mk1(L"competition", cmpId);
                   key.push_back(mk1);
+              }
+
+              // Keep the id in the saved settings so a restart continues with the same competition
+              if (wasSaved()) {
+                saveMachine(*oe, itow(interval));
+                oe->updateChanged();
               }
           }
         }

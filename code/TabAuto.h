@@ -364,6 +364,10 @@ public:
   int processButton(gdioutput &gdi, const ButtonInfo &bu);
   int processListBox(gdioutput &gdi, const ListBoxInfo &bu);
 
+  // Start the "Live Results" online results service, unless an online results
+  // service is already running, and show the automatic services page.
+  void startLiveResults(gdioutput &gdi);
+
   bool loadPage(gdioutput &gdi, bool showSettingsLast);
   bool loadPage(gdioutput &gdi) {
     return loadPage(gdi, false);

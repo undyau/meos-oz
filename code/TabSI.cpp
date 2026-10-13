@@ -3372,7 +3372,6 @@ bool TabSI::processCard(gdioutput& gdi, pRunner runner, const SICard& csic, bool
 
   activeSIC.clear(&csic);
 
-  static_cast<oExtendedEvent*>(oe)->checkForPeriodicEvents();
   readCards.push_back(std::move(rout));
 
   checkMoreCardsInQueue(gdi);

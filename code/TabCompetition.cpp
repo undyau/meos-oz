@@ -39,6 +39,7 @@
 #include "RunnerDB.h"
 #include "gdifonts.h"
 #include "oExtendedEvent.h"  // Added to support BF customisations
+#include "TabAuto.h"
 #include "meosException.h"
 #include "socket.h"
 #include "iof30interface.h"
@@ -57,7 +58,6 @@
 
 #include <io.h>
 #include "generalresult.h"
-#include <time.h>
 
 void Setup(bool overwrite, bool overWriteall);
 void exportSetup();
@@ -207,45 +207,6 @@ int restoreCB(gdioutput *gdi, GuiEventType type, BaseInfo *data) {
   TabCompetition &tc = dynamic_cast<TabCompetition &>(*gdi->getTabs().get(TCmpTab));
 
   return tc.restoreCB(*gdi, type, data);
-}
-void TabCompetition::loadSssUploadPage(gdioutput &gdi)
-{
-  gdi.clearPage(false);
-  showConnectionPage=true;    
-  gdi.addString("", boldLarge, "Results Upload");
-  gdi.pushX();
-  gdi.dropLine();
-  gdi.addString("", italicText, "Check the results in the Lists tab before doing the upload");
-  gdi.dropLine();
-  string tmp = oe->getPropertyString("SssServer", "https://sportident.itsdamp.com/liveresult.php");
-  wstring defaultSssServer;
-  string2Wide(tmp, defaultSssServer);
-
-  gdi.fillRight();
-  gdi.addInput("SssServer", defaultSssServer, 30, 0, L"Upload server:", L"URL of server expecting upload");
-  if (static_cast<oExtendedEvent*>(oe)->getIsSydneySummerSeries()) {
-    gdi.addInput("SssSeriesPrefix", static_cast<oExtendedEvent*>(oe)->getSssSeriesPrefix(), 4, 0, L"Series");
-    gdi.addInput("SssEventNum", itow(static_cast<oExtendedEvent*>(oe)->getSssEventNum()), 4, 0, L"Number within series");
-  }
-  else {
-    gdi.addInput("SssAltName", static_cast<oExtendedEvent*>(oe)->getSssAltName(), 8, 0, L"Short event label (e.g. ML10)");
-    }
-  time_t last = static_cast<oExtendedEvent*>(oe)->getLastSssUploadTime();
-  if (last > 0) {
-    gdi.dropLine();
-    gdi.popX();
-    char buf[30];
-    ctime_s(buf, 30, &last);
-    buf[24] = '\0';
-    gdi.dropLine(2);
-    gdi.addString("", italicText, string("Last upload ") + string(buf));
-  }
-  gdi.dropLine(4);
-  gdi.popX();
-  gdi.addButton("SssUpload", "Upload Results", CompetitionCB);
-  gdi.addButton("SssUploadAuto", "Auto Upload", CompetitionCB);
-  gdi.addButton("Cancel", "Till huvudsidan", CompetitionCB);
-  gdi.refresh();
 }
 
 void ListIpAddresses(vector<string> &ip);
@@ -769,14 +730,12 @@ int TabCompetition::competitionCB(gdioutput &gdi, GuiEventType type, BaseInfo *d
     }
     else if (bi.id=="ConnectMySQL")
       loadConnectionPage(gdi);
-    else if (bi.id=="DoSSSUpload") 
-      loadSssUploadPage(gdi);
-    else if (bi.id=="SssUpload") 
-      static_cast<oExtendedEvent*>(oe)->uploadSss(gdi, false);
-    else if (bi.id == "SssUploadAuto")
-      static_cast<oExtendedEvent*>(oe)->setAutoUploadSss(true);
-    else if (bi.id == "SssUploadAutoStop")
-      static_cast<oExtendedEvent*>(oe)->setAutoUploadSss(false);
+    else if (bi.id=="UploadResults") {
+      // Start the Live Results online service (MOP 2.0 to liveresults.page by default)
+      TabAuto *tabAuto = dynamic_cast<TabAuto *>(gdi.getTabs().get(TAutoTab));
+      if (tabAuto)
+        tabAuto->startLiveResults(gdi);
+    }
     else if (bi.id=="SaveClient") {
       oe->setClientName(gdi.getText("ClientName"));
       if (gdi.getText("ClientName").length()>0)
@@ -2895,8 +2854,8 @@ bool TabCompetition::loadPage(gdioutput &gdi)
                     CompetitionCB, "", false, false);
     }
 
-    gdi.addButton(gdi.getCX(), gdi.getCY(), bw, "DoSSSUpload", "Upload Results", 
-                  CompetitionCB, "", false, false);
+    gdi.addButton(gdi.getCX(), gdi.getCY(), bw, "UploadResults", "Start Live Results", 
+                  CompetitionCB, "Start the Live Results service, sending results to the web", false, false);
     rc.bottom = gdi.getCY() + gdi.scaleLength(30);
     rc.right = rc.left + bw + gdi.scaleLength(60);
 
