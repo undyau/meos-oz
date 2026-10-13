@@ -105,6 +105,7 @@ void OnlineResults::setupLiveResults(oEvent &oe) {
   sendToURL = true;
   sendToFile = false;
   dataType = DataType::MOP20;
+  zipFile = false; // No compression by default
   interval = liveResultsInterval;
 
   oe.getAllClasses(classes);
