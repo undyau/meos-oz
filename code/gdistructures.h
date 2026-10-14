@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -26,12 +26,27 @@
 #include "guihandler.h"
 #include "gdifonts.h"
 
+class Table;
+enum KeyCommandCode;
+
+class MouseHandler {
+public:
+  enum class MouseEvent {
+    LButtonDown,
+    LButtonUp,
+  };
+
+  virtual void mouseButton(gdioutput &gdi, MouseEvent event, int x, int y) const = 0;
+  virtual ~MouseHandler() = 0 {};
+};
+
+
 class BaseInfo {
 protected:
-  void *extra;
-  GuiHandler *handler;
+  void *extra = nullptr;
+  GuiHandler *handler = nullptr;
   shared_ptr<GuiHandler> managedHandler;
-  bool dataString;
+  bool dataString = false;
 public:
 
   bool matchExtra(int requireExtraMatch) const {
@@ -55,8 +70,8 @@ public:
     return false;
   }
 
-  BaseInfo():extra(0), dataString(false), handler(0) {}
-  virtual ~BaseInfo() {}
+  BaseInfo() = default;
+  virtual ~BaseInfo() = default;
   string id;
 
   virtual HWND getControlWindow() const = 0;
@@ -133,8 +148,8 @@ public:
   int nTooltip;
   int nTables;
 
-  shared_ptr<GuiEvent> onClear;
-  shared_ptr<GuiEvent> postClear;
+  list<GuiEvent> onClear;
+  list<GuiEvent> postClear;
 
   set<string> restorePoints;
 
@@ -183,13 +198,7 @@ class TextInfo final: public BaseInfo
 {
 public:
 
-  TextInfo():format(0), color(0), xlimit(0), hasTimer(false),
-    hasCapture(false), callBack(0), highlight(false),
-    active(false), lineBreakPrioity(0),
-    absPrintX(0), absPrintY(0), realWidth(0) {
-      textRect.left = 0; textRect.right = 0;
-      textRect.top = 0; textRect.bottom = 0;
-  }
+  TextInfo() = default;
 
   TextInfo &setColor(GDICOLOR c) {color = c; return *this;}
   GDICOLOR getColor() const { return GDICOLOR(color); }
@@ -210,28 +219,31 @@ public:
   }
   wstring text;
   wstring font;
+  wstring timerFormat;
 
   int xp = -1;
   int yp = -1;
 
-  int format;
-  DWORD color;
-  int xlimit;
-  int lineBreakPrioity;
-  int absPrintX;
-  int absPrintY;
+  uint64_t zeroTime = -1;
+  uint64_t timeOut = 0;
+  GUICALLBACK callBack = nullptr;
+  
+  int format = 0;
+  DWORD color = 0;
+  
+  RECT textRect = { 0,0,0,0 };
+  RECT srcRect = { 0,0,0,0 };
+  int xlimit = 0;
+  int absPrintX = 0;
+  int absPrintY = 0;
 
-  bool hasTimer;
-  DWORD zeroTime = -1;
-  DWORD timeOut = 0;
+  int realWidth = 0; // The calculated actual width of the string in pixels
 
-  bool hasCapture;
-  GUICALLBACK callBack;
-  RECT textRect;
-  int realWidth; // The calculated actual width of the string in pixels
-  bool highlight;
-  bool active;
-
+  uint8_t lineBreakPrioity = 0;
+  bool highlight = false;
+  bool active = false;
+  bool hasTimer = false;
+  bool hasCapture = false;
 
   HWND getControlWindow() const final {throw std::exception("Unsupported");}
 
@@ -240,29 +252,31 @@ public:
 
 class ButtonInfo final : public BaseInfo {
 private:
+  bool *updateLastData;
   bool originalState;
   bool isEditControl;
   bool checked;
-  bool* updateLastData;
   void synchData() const { if (updateLastData) *updateLastData = checked; }
 
 public:
-  ButtonInfo() : callBack(0), hWnd(0), AbsPos(false), fixedRightTop(false),
+  ButtonInfo() : callBack(0), hWnd(0), absPos(false), fixedRightTop(false),
     flags(0), storedFlags(0), originalState(false), isEditControl(false),
-    isCheckbox(false), checked(false), updateLastData(0) {}
+    isCheckbox(false), checked(false), updateLastData(nullptr) {}
 
   ButtonInfo& isEdit(bool e) { isEditControl = e; return *this; }
 
-  int xp;
-  int yp;
-  int width;
   wstring text;
   HWND hWnd;
-  bool AbsPos;
-  bool fixedRightTop;
+  GUICALLBACK callBack;
+  int xp = 0;
+  int yp = 0;
+  int width = 0;
   int flags;
   int storedFlags;
+  bool absPos;
+  bool fixedRightTop;
   bool isCheckbox;
+
   bool isDefaultButton() const { return (flags & 1) == 1; }
   bool isCancelButton() const { return (flags & 2) == 2; }
 
@@ -274,10 +288,10 @@ public:
   void moveButton(gdioutput& gdi, int xp, int yp);
   void getDimension(const gdioutput& gdi, int& w, int& h) const;
 
+  ButtonInfo &setAbsPos() { absPos = true; return *this; }
   ButtonInfo& setDefault();
   ButtonInfo& setCancel() { flags |= 2, storedFlags |= 2; return *this; }
   ButtonInfo& fixedCorner() { fixedRightTop = true; return *this; }
-  GUICALLBACK callBack;
   friend class gdioutput;
 
   HWND getControlWindow() const final { return hWnd; }
@@ -295,6 +309,7 @@ public:
   InputInfo &setBgColor(GDICOLOR c) {bgColor = c; return *this;}
   InputInfo &setFgColor(GDICOLOR c) {fgColor = c; return *this;}
   InputInfo &setFont(gdioutput &gdi, gdiFonts font);
+  InputInfo &limitText(int limit);
   GDICOLOR getBgColor() const {return bgColor;}
   GDICOLOR getFgColor() const {return fgColor;}
   /** Return the previously stored text */
@@ -448,20 +463,31 @@ public:
   HWND getControlWindow() const final { throw std::exception("Unsupported"); }
 };
 
+enum class BoxStyle {
+  Header,
+  HeaderWarning,
+  SubLine,
+};
+
 class InfoBox final: public BaseInfo {
 public:
-  InfoBox() : callBack(0), HasCapture(0), HasTCapture(0), TimeOut(0) {}
+  InfoBox() : callBack(nullptr), hasCapture(false), hasTCapture(false), timeOut(0) {}
   wstring text;
+  wstring underLine;
+
   GUICALLBACK callBack;
+  
+  RECT textRect = { 0,0,0,0 };
+  RECT close = { 0,0,0,0 };
+  RECT boundingBox = { 0,0,0,0 };
+  
+  uint64_t timeOut;
+  
+  BoxStyle style;
+  int underlineY = 0;
 
-  RECT TextRect;
-  RECT Close;
-  RECT BoundingBox;
-
-  bool HasCapture;
-  bool HasTCapture;
-
-  DWORD TimeOut;
+  bool hasCapture;
+  bool hasTCapture;
 
   HWND getControlWindow() const final {throw std::exception("Unsupported");}
 };
@@ -471,6 +497,8 @@ typedef list<TextInfo> TIList;
 struct ToolInfo {
   string name;
   TOOLINFOW ti;
+  RECT rc;
+  bool hasRect = false;
   wstring tip;
-  uintptr_t id;
+  uintptr_t id = 0;
 };

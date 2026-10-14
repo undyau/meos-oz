@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -30,20 +30,15 @@
 #include "oEvent.h"
 #include "gdioutput.h"
 #include "oDataContainer.h"
-#include "csvparser.h"
 
 #include "TabAuto.h"
 
-#include "random.h"
-#include "SportIdent.h"
 #include "meosexception.h"
 #include "meos_util.h"
 #include "MeosSQL.h"
-#include "generalresult.h"
 #include "metalist.h"
 #include "image.h"
-
-#include "meos.h"
+#include "maprenderer.h"
 #include <cassert>
 
 extern Image image;
@@ -87,7 +82,7 @@ bool oEvent::msSynchronize(oBase *ob)
 
   string err;
   if (sqlConnection->getErrorMessage(err))
-    gdibase.addInfoBox("sqlerror", gdibase.widen(err), 15000);
+    gdibase.addInfoBox("sqlerror", gdibase.widen(err), L"Databasvarning", BoxStyle::HeaderWarning, 15000);
 
   if (ret==0) {
     verifyConnection();
@@ -99,8 +94,8 @@ bool oEvent::msSynchronize(oBase *ob)
   }
 
   if (ret==1) {
-    gdibase.RemoveFirstInfoBox("sqlwarning");
-    gdibase.addInfoBox("sqlwarning", L"Varning: ändringar i X blev överskrivna#" + ob->getInfo(), 5000);
+    gdibase.removeFirstInfoBox("sqlwarning");
+    gdibase.addInfoBox("sqlwarning", L"Varning: ändringar i X blev överskrivna#" + ob->getInfo(), L"Databasvarning", BoxStyle::HeaderWarning, 5000);
   }
   return ret!=0;
 }
@@ -392,6 +387,7 @@ bool oEvent::uploadSynchronize()
             wchar_t CurrentNameId[64];
             wcscpy_s(CurrentNameId, currentNameId.c_str());
             wcscpy_s(CurrentNameId + len - 7, 64 - len + 7, ex);
+            CurrentNameId[63] = 0;
             currentNameId = CurrentNameId;
           }
         }
@@ -405,7 +401,9 @@ bool oEvent::uploadSynchronize()
 
   isConnectedToServer = false;
 
-  if ( !sqlConnection->openDB(this) ){
+  auto status = sqlConnection->openDB(this, true);
+
+  if (status != MeosSQL::OpenStatus::OK){
     string err;
     sqlConnection->getErrorMessage(err);
     string error = string("Kunde inte öppna databasen (X).#") + err;
@@ -430,11 +428,15 @@ bool oEvent::uploadSynchronize()
   else if (stat == opStatusWarning) {
     string err;
     sqlConnection->getErrorMessage(err);
-    gdibase.addInfoBox("", wstring(L"Kunde inte ladda upp löpardatabasen (X).#") + lang.tl(err), 5000);
+    gdibase.addInfoBox("", wstring(L"Kunde inte ladda upp löpardatabasen (X).#") + lang.tl(err), L"", BoxStyle::Header, 5000);
   }
 
   set<uint64_t> img;
   listContainer->getUsedImages(img);
+  
+  if (renderMaps)
+    renderMaps->getUsedImage(img);
+ 
   if (!img.empty()) {
     for (auto imgId : img) {
       wstring fileName = image.getFileName(imgId);
@@ -452,8 +454,7 @@ bool oEvent::uploadSynchronize()
 }
 
 //Load a (new) competition from the server.
-bool oEvent::readSynchronize(const CompetitionInfo &ci)
-{
+bool oEvent::readSynchronize(const CompetitionInfo &ci) {
   if (ci.Id<=0)
     throw std::exception("help:12290");
 
@@ -495,10 +496,23 @@ bool oEvent::readSynchronize(const CompetitionInfo &ci)
   wchar_t file[260];
   swprintf_s(file, L"%s.dbmeos", currentNameId.c_str());
   getUserFile(CurrentFile, file);
-  if ( !sqlConnection->openDB(this) ) {
+
+  auto status = sqlConnection->openDB(this, false);
+
+  if (status == MeosSQL::OpenStatus::NeedUpdate) {
+    if (gdibase.ask(L"Uppdatera tävlingen till MeOS X?#" + getMeosCompectVersion()))
+      status = sqlConnection->openDB(this, true);
+    else
+      return false;
+  }
+
+  if (status != MeosSQL::OpenStatus::OK) {
     string err;
     sqlConnection->getErrorMessage(err);
-    throw meosException(err);
+    if (!err.empty())
+      throw meosException(err);
+    else
+      return false;
   }
 
   updateFreeId();
@@ -529,7 +543,7 @@ bool oEvent::readSynchronize(const CompetitionInfo &ci)
     string err;
     sqlConnection->getErrorMessage(err);
     wstring info = L"Databasvarning: X#" + lang.tl(err);
-    gdibase.addInfoBox("sqlerror", info, 15000);
+    gdibase.addInfoBox("sqlerror", info, L"Databasvarning", BoxStyle::HeaderWarning, 15000);
   }
 
   // Cache database locally
@@ -771,7 +785,7 @@ int oEvent::checkChanged(vector<wstring> &out) const
         it!=oe->Courses.end(); ++it)
     if (it->isChanged()) {
       changed++;
-      swprintf_s(bf, L"Course %s", it->Name.c_str());
+      swprintf_s(bf, L"Course %s", it->name.c_str());
       out.push_back(bf);
       it->synchronize();
     }
@@ -852,7 +866,7 @@ void oEvent::closeDBConnection()
 
   if (!oe->empty() && hadDB) {
     save();
-    Name+=L" (Lokal kopia från: " + gdibase.widen(serverName) + L")";
+    Name += L" (" + lang.tl(L"Lokal kopia från: X#" + gdibase.widen(serverName)) + L")";
     wstring cn = currentNameId + L"." + gdibase.widen(serverName) + L".meos";
     getUserFile(CurrentFile, cn.c_str());
     serverName.clear();

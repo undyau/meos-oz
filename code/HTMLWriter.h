@@ -1,6 +1,6 @@
 /************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ class HTMLWriter {
   string end;
 
   string page;
-
+  bool useTables = false;
   static map <string, shared_ptr<HTMLWriter>> tCache;
 
   string localize(const string &in);
@@ -45,7 +45,7 @@ class HTMLWriter {
     ENDIF,
     TEXTCOMMAND,
   };
-
+  mutable set<string> textCommands;
   map<string, wstring> conditions;
 
   Function parseFunc(const string& str, string& arg) const;
@@ -64,14 +64,25 @@ class HTMLWriter {
   };
 
   template<typename T, typename TI>
-  static void formatTL(std::ostream& fout,
-    ImageWriter& imageWriter,
-    const map< pair<gdiFonts, string>, pair<string, string> >& styles,
-    const T& tl,
-    double& yscale,
-    double& xscale,
-    int& offsetY,
-    int& offsetX);
+  static void formatTL(std::ostream &fout,
+                       ImageWriter &imageWriter,
+                       const map< pair<gdiFonts, wstring>, pair<string, string> > &styles,
+                       const T &tl,
+                       double &yscale,
+                       double &xscale,
+                       int &offsetY,
+                       int &offsetX);
+
+  template<typename T, typename TI>
+  static void formatTable(std::ostream &fout,
+                          ImageWriter &imgWriter,
+                          const map<pair<gdiFonts, wstring>, pair<string, string>> &styles,
+                          const T &tl,
+                          bool simpleFormat,
+                          int marginPercent,
+                          double scaleX);
+
+  static void parseTagName(const string& str, string& tag, wstring& name);
 
 public:
 
@@ -88,8 +99,13 @@ public:
 
   enum class TemplateType {
     List,
-    Page
+    Page,
+    Unknown
   };
+
+  TemplateType type = TemplateType::Unknown;
+  string tag;
+  wstring name;
 
   static const HTMLWriter &getWriter(TemplateType type, const string &tag, const vector<pair<string, wstring>> &options);
   
@@ -98,9 +114,20 @@ public:
     wstring name;
     wstring desc;
     wstring file;
+    bool userInstalled = false;
+    bool hasInnerPage = false;
+    bool hasOuterPage = false;
+    bool hasTimer = false;
+    bool empty() const { return tag.empty(); };
   };
 
   static void enumTemplates(TemplateType type, vector<TemplateInfo> &descriptionFile);
+
+  static TemplateInfo getTemplateInfo(TemplateType type, const string& tag, bool acceptMissing);
+  
+  static wstring getTemplateFile(TemplateType type, const string& tag) {
+    return getTemplateInfo(type, tag, false).file;
+  }
 
   void read(const wstring &fileName);
 

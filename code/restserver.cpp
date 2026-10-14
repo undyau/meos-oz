@@ -1,6 +1,6 @@
 ﻿/************************************************************************
 MeOS - Orienteering Software
-Copyright (C) 2009-2024 Melin Software HB
+Copyright (C) 2009-2026 Melin Software HB
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -40,7 +40,8 @@ Eksoppsvägen 16, SE-75646 UPPSALA, Sweden
 #include "HTMLWriter.h"
 #include "RunnerDB.h"
 #include "image.h"
-//#include "onlineinput.h"
+#include "cardsystem.h"
+#include <tuple>
 
 extern Image image;
 using namespace restbed;
@@ -226,7 +227,7 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
       "<title>MeOS Information Service</title>"
       "</head>"
       "<body>"
-      "<img src=\"/meos?image=meos\" alt=\"MeOS\">"
+      "<img src=\"/meos?image=meos\" alt=\"MeOS\" style=\"width:16em; height:6.656em;\">"
       "<p>" + ref.gdiBase().toUTF8(lang.tl(getMeosFullVersion())) + "<p>"
       "<ul>\n";
 
@@ -398,7 +399,7 @@ void RestServer::computeInternal(oEvent &ref, shared_ptr<RestServer::EventReques
     writer.getPage(ref, rq->answer);
   }
   else if (rq->parameters.count("enter") > 0) {
-    auto fields = ref.getExtraFields(oEvent::ExtraFieldContext::DirectEntry);
+    auto fields = ref.getExtraFields(oEvent::ExtraFieldContext::QuickEntry);
     
     vector<pair<string, wstring>> fn;
     auto makeUpper = [](string& v) -> string& {
@@ -541,9 +542,10 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
     set<int> cls;
     if (param.count("class") > 0)
       getSelection(param.find("class")->second, cls);
-    pair<string, string> preferredIdTypes;
+    tuple<string, string, bool> preferredIdTypes("", "", true);
 
-    oe.exportIOFSplits(oEvent::IOF30, exportFile.c_str(), false, useUTC, cls, preferredIdTypes, -1, false, false, true, false, false);
+    oe.exportIOFSplits(oEvent::IOF30, exportFile.c_str(), false, useUTC, cls, preferredIdTypes, L"",
+                       - 1, true, false, false, true, false, false);
     ifstream fin(exportFile.c_str());
     string rbf;
     while (std::getline(fin, rbf)) {
@@ -558,7 +560,7 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
     set<int> cls;
     if (param.count("class") > 0)
       getSelection(param.find("class")->second, cls);
-    pair<string, string> preferredIdTypes;
+    tuple<string, string, bool> preferredIdTypes("","",true);
 
     oe.exportIOFStartlist(oEvent::IOF30, exportFile.c_str(), useUTC, cls, preferredIdTypes, false, true, false, false);
     ifstream fin(exportFile.c_str());
@@ -980,16 +982,12 @@ void RestServer::getData(oEvent &oe, const string &what, const multimap<string, 
     }
   }
   else if (what == "status") {
-    InfoMeosStatus iStatus;
-    if (oe.empty()) {
-      iStatus.setEventNameId(L"");	// no event
-      iStatus.setOnDatabase(false);
-    }
-    else {
+    InfoMeosStatus iStatus;    
+    if (!oe.empty()) {
       iStatus.setEventNameId(oe.getNameId(0));	// id of event
       iStatus.setOnDatabase(oe.isClient());	// onDatabase
+      iStatus.setEventId(oe.getId());
     }
-
     iStatus.serialize(out, false);
     okRequest = true;
   }
@@ -1315,6 +1313,103 @@ void RestServer::setEntryPermission(EntryPermissionClass epClass, EntryPermissio
   this->epType = epType;
 }
 
+void RestServer::newEntryErrorCheck(oEvent &oe,
+                                    uint64_t &extId,
+                                    wstring &name,
+                                    wstring &club,
+                                    int classId,
+                                    int cardNo,
+                                    EntryPermissionClass epClass,
+                                    EntryPermissionType epType,
+                                    bool &permissionDenied,
+                                    wstring &error) {
+  permissionDenied = false;
+
+  if (epClass == EntryPermissionClass::None || epType == EntryPermissionType::None)
+    permissionDenied = true;
+
+  if (!permissionDenied) {
+    oe.synchronizeList({ oListId::oLClassId, oListId::oLRunnerId });
+    int clubId = 0;
+    RunnerWDBEntry *dbr = nullptr;
+    if (extId) {
+      dbr = oe.getRunnerDatabase().getRunnerById(extId);
+      if (dbr) {
+        clubId = dbr->dbe().clubNo;
+      }
+    }
+
+    pClub existingClub = oe.getClub(club);
+    pClub dbClub = nullptr;
+
+    if (epType != EntryPermissionType::Any) {
+      if (extId == 0) {
+        int clubExtId = 0;
+        if (existingClub)
+          clubExtId = (int)existingClub->getExtIdentifier();
+        else if (!club.empty()) {
+          dbClub = oe.getRunnerDatabase().getClub(club);
+          if (dbClub) {
+            clubExtId = dbClub->getId();
+            if (!existingClub) {
+              existingClub = oe.getClub(dbClub->getName());// Try from actual name (in db)
+            }
+          }
+        }
+        dbr = oe.getRunnerDatabase().getRunnerByName(name, clubExtId, 0);
+        if (dbr)
+          extId = dbr->getExtId();
+      }
+    }
+
+    if (existingClub)
+      clubId = existingClub->getId();
+
+    auto cls = oe.getClass(classId);
+    if (cls == nullptr) {
+      error = L"Okänd klass";
+    }
+    else if (epClass != EntryPermissionClass::Any && !cls->getAllowQuickEntry()) {
+      permissionDenied = true;
+    }
+    else {
+      int nm = cls->getNumRemainingMaps(false);
+      if (nm != numeric_limits<int>::min() && nm <= 0) {
+        error = L"Klassen är full";
+      }
+    }
+
+    if (epType != EntryPermissionType::Any && extId == 0) {
+      error = L"Anmälan måste hanteras manuellt";
+    }
+
+    if (epType == EntryPermissionType::InDbExistingClub && clubId == 0) {
+      error = L"Anmälan måste hanteras manuellt";
+    }
+    else if (epType == EntryPermissionType::InDbBillable) {
+      bool ok = (dbClub && dbClub->isBillable()) || (existingClub && existingClub->isBillable());
+      if (!ok)
+        error = L"Anmälan måste hanteras manuellt";
+    }
+
+    if (cardNo <= 0) {
+      error = L"Ogiltigt bricknummer X#" + itow(cardNo);
+    }
+    else {
+      if (oe.deprecateOldCards() && oe.getCardSystem().isDeprecated(cardNo))
+        error = L"Brickan är av äldre typ och kan inte användas.";
+
+      vector<pRunner> runners;
+      oe.getRunnersByCardNo(cardNo, true, oEvent::CardLookupProperty::CardInUse, runners);
+      for (auto r : runners) {
+        if (!r->getCard()) {
+          error = L"Bricknummret är upptaget (X)#" + r->getCompleteIdentification(oRunner::IDType::OnlyThis);
+        }
+      }
+    }
+  }
+}
+
 void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, string &answer) {
   xmlparser xml;
   xml.openMemoryOutput(false);
@@ -1329,15 +1424,11 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
   if (!permissionDenied) {
     oe.synchronizeList({ oListId::oLClassId, oListId::oLRunnerId });
     wstring name, club;
-    long long extId = 0;
+    uint64_t extId = 0;
     int clubId = 0;
     RunnerWDBEntry *dbr = nullptr;
     if (param.count("id")) {
       extId = oBase::converExtIdentifierString(wideParam(param.find("id")->second));
-      dbr = oe.getRunnerDatabase().getRunnerById(extId);
-      if (dbr) {
-        clubId = dbr->dbe().clubNo;
-      }
     }
     else if(param.count("name"))
       name = wideParam(param.find("name")->second);
@@ -1345,54 +1436,10 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
     if (param.count("club")) 
       club = wideParam(param.find("club")->second);
 
-    pClub existingClub = oe.getClub(club);
-
-    if (epType != EntryPermissionType::Any) {
-      if (extId == 0) {
-        int clubExtId = 0;
-        if (existingClub)
-          clubExtId = (int)existingClub->getExtIdentifier();
-        else if (!club.empty()) {
-          pClub dbClub = oe.getRunnerDatabase().getClub(club);
-          if (dbClub) {
-            clubExtId = dbClub->getId();
-          }
-        }
-        dbr = oe.getRunnerDatabase().getRunnerByName(name, clubExtId, 0);
-        if (dbr)
-          extId = dbr->getExtId();
-      }
-    }
-
-    if (existingClub)
-      clubId = existingClub->getId();
-
     int classId = 0;
     if (param.count("class"))
       classId = atoi(param.find("class")->second.c_str());
 
-    auto cls = oe.getClass(classId);
-    if (cls == nullptr) {
-      error = L"Okänd klass";
-    }
-    else if (epClass != EntryPermissionClass::Any && !cls->getAllowQuickEntry()) {
-      permissionDenied = true;
-    }
-    else {
-      int nm = cls->getNumRemainingMaps(false);
-      if (nm != numeric_limits<int>::min() && nm<=0) {
-        error = L"Klassen är full";
-      }
-    }
-
-    if (epType != EntryPermissionType::Any && extId == 0) {
-      error = L"Anmälan måste hanteras manuellt";
-    }
-
-    if (epType == EntryPermissionType::InDbExistingClub && clubId == 0) {
-      error = L"Anmälan måste hanteras manuellt";
-    }
-  
     bool noTiming = false;
     if (param.count("notiming"))
       noTiming = true;
@@ -1401,19 +1448,10 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
     if (param.count("card"))
       cardNo = atoi(param.find("card")->second.c_str());
 
-    if (cardNo <= 0) {
-      error = L"Ogiltigt bricknummer X#" + itow(cardNo);
-    }
-    else {
-      vector<pRunner> runners;
-      oe.getRunnersByCardNo(cardNo, true, oEvent::CardLookupProperty::CardInUse, runners);
-      for (auto r : runners) {
-        if (!r->getCard()) {
-          error = L"Bricknummret är upptaget (X)#" + r->getCompleteIdentification();
-        }
-      }
-    }
-
+    newEntryErrorCheck(oe, extId, name, club, classId, 
+                       cardNo, epClass, epType,
+                       permissionDenied, error);
+    
     wstring birthyear, sex, nat;
     wstring bib, phone, rank, text;
     int dataA = 0; int dataB = 0;
@@ -1470,12 +1508,12 @@ void RestServer::newEntry(oEvent &oe, const multimap<string, string> &param, str
         r->synchronize();
         r->markClassChanged(-1);
         xml.write("Status", "OK");
-        vector < pair<string, wstring> > rentCard;
+        vector<pair<string, wstring>> rentCard;
         if (cf != 0) {
           rentCard.emplace_back("hiredCard", L"true");
         }
         xml.write("Fee", rentCard, itow(r->getDCI().getInt("Fee") + max(cf, 0)));
-        xml.write("Info", r->getClass(true) + L", " + r->getCompleteIdentification(false));
+        xml.write("Info", r->getClass(true) + L", " + r->getCompleteIdentification(oRunner::IDType::ParallelLeg));
         if (r->getStatus() == StatusNoTiming)
           xml.write("NoTiming", "true");
       }
@@ -1499,13 +1537,15 @@ vector<pair<wstring, size_t>> RestServer::getPermissionsPersons() {
   res.emplace_back(lang.tl("Anyone"), size_t(EntryPermissionType::Any));
   res.emplace_back(lang.tl("Från löpardatabasen"), size_t(EntryPermissionType::InDbAny));
   res.emplace_back(lang.tl("Från löpardatabasen i befintliga klubbar"), size_t(EntryPermissionType::InDbExistingClub));
+  res.emplace_back(lang.tl("Från löpardatabasen fakturerbar klubb"), size_t(EntryPermissionType::InDbBillable));
+
   return res;
 }
 
 vector<pair<wstring, size_t>> RestServer::getPermissionsClass() {
   vector<pair<wstring, size_t>> res;
   res.emplace_back(lang.tl("Alla"), size_t(EntryPermissionClass::Any));
-  res.emplace_back(lang.tl("Med direktanmälan"), size_t(EntryPermissionClass::DirectEntry));
+  res.emplace_back(lang.tl("Med direktanmälan"), size_t(EntryPermissionClass::QuickEntry));
   return res;
 }
 
@@ -1593,7 +1633,7 @@ xmlbuffer * RestServer::getMOPXML(oEvent &oe, int id, int &nextId) {
           }
         }
       }
-      c.cmpModel->synchronize(oe, false, c.classes, c.controls, true);
+      c.cmpModel->synchronize(oe, L"", InfoCompetition::SynchType::All, c.classes, c.controls, c.controls, true);
       c.lastData = make_shared<xmlbuffer>();
       c.cmpModel->getDiffXML(*c.lastData);
       c.cmpModel->commitComplete();

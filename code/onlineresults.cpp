@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,20 +22,16 @@
 
 #include "stdafx.h"
 
-#include "resource.h"
-
-#include <commctrl.h>
-#include <commdlg.h>
 #include <sys/stat.h>
+#include <shellapi.h>
 
 #include "oEvent.h"
 #include "gdioutput.h"
 
 #include "onlineresults.h"
+#include "onlineinput.h"
 #include "meos_util.h"
-#include <shellapi.h>
 
-#include "gdiconstants.h"
 #include "infoserver.h"
 #include "meosException.h"
 #include "Download.h"
@@ -72,13 +68,59 @@ static int OnlineCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
 OnlineResults::OnlineResults() : AutoMachine("Onlineresultat", Machines::mOnlineResults), infoServer(nullptr), dataType(DataType::MOP20),
  zipFile(true), includeCourse(false),
  includeTotal(false), sendToURL(false), sendToFile(false),
- cmpId(0), exportCounter(1), bytesExported(0), lastSync(0) {
+ cmpId(L"0"), exportCounter(1), bytesExported(0), lastSync(0) {
 
 }
 
 OnlineResults::~OnlineResults() {
   if (infoServer)
     delete infoServer;
+}
+
+static const wchar_t *liveResultsName = L"Live Results";
+static const wchar_t *liveResultsDefaultURL = L"https://liveresults.page/upload.php";
+static const DWORD liveResultsInterval = 5; // Seconds
+
+void OnlineResults::setupLiveResults(oEvent &oe) {
+  machineName = liveResultsName;
+
+  if (oe.getMachineContainer().get(getTypeString(), machineName)) {
+    // Settings saved earlier (possibly adjusted by the user), use them
+    loadMachine(oe, machineName);
+    if (!sendToURL && !sendToFile)
+      sendToURL = true;
+    if (sendToURL && url.empty())
+      url = oe.getPropertyString("MOPURL", liveResultsDefaultURL);
+    if (interval == 0)
+      interval = liveResultsInterval;
+    return;
+  }
+
+  // Use the server already entered for online results if there is one
+  url = oe.getPropertyString("MOPURL", L"");
+  if (url.empty())
+    url = liveResultsDefaultURL;
+  oe.setProperty("MOPURL", url);
+
+  sendToURL = true;
+  sendToFile = false;
+  dataType = DataType::MOP20;
+  zipFile = false; // No compression by default
+  interval = liveResultsInterval;
+
+  oe.getAllClasses(classes);
+  allClasses = true;
+
+  // Same default as the settings page: radio controls
+  controls.clear();
+  vector<pControl> ctrl;
+  oe.getControls(ctrl, true);
+  for (pControl c : ctrl) {
+    if (!c->isValidRadio())
+      continue;
+    for (int i = 0; i < c->getNumberDuplicates(); i++)
+      controls.insert(oControl::getCourseControlIdFromIdIndex(c->getId(), i));
+  }
 }
 
 int OnlineResults::processButton(gdioutput &gdi, ButtonInfo &bi) {
@@ -99,7 +141,7 @@ int OnlineResults::processButton(gdioutput &gdi, ButtonInfo &bi) {
 void OnlineResults::settings(gdioutput &gdi, oEvent &oe, State state) {
   int iv = interval;
   if (state == State::Create) {
-    iv = 10;
+    iv = 1;
     url = oe.getPropertyString("MOPURL", L"");
     file = oe.getPropertyString("MOPFolderName", L"");
     oe.getAllClasses(classes);
@@ -115,7 +157,7 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, State state) {
     time = itow(iv);
 
   settingsTitle(gdi, "Resultat online");
-  startCancelInterval(gdi, "Save", state, IntervalSecond, time);
+  startCancelInterval(gdi, oe, "Save", state, IntervalType::IntervalSecond, time);
 
   int basex = gdi.getCX();
   gdi.pushY();
@@ -131,16 +173,35 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, State state) {
   gdi.popY();
   gdi.fillDown();
 
-
- // gdi.dropLine();
- // gdi.addInput("Interval", time, 10, 0, "Uppdateringsintervall (sekunder):");
-
   gdi.addSelection("Format", 200, 200, OnlineCB, L"Exportformat:");
   gdi.addItem("Format", L"MeOS Online Protocol XML 2.0", int(DataType::MOP20));
   gdi.addItem("Format", L"MeOS Online Protocol XML 1.0", int(DataType::MOP10));
   gdi.addItem("Format", L"IOF XML 3.0", int(DataType::IOF3));
   gdi.addItem("Format", L"IOF XML 2.0.3", int(DataType::IOF2));
   gdi.selectItemByData("Format", int(dataType));
+
+  class HandleCmpName : public GuiHandler {
+    const oEvent& oe;
+  public:
+    HandleCmpName(const oEvent& oe) : oe(oe) {}
+
+    void handle(gdioutput& gdi, BaseInfo& info, GuiEventType type) final {
+      InputInfo& ii = dynamic_cast<InputInfo&>(info);
+      GDICOLOR c = ii.text.empty() || ii.text == oe.getName() ?
+         GDICOLOR::colorDefault : GDICOLOR::colorLightCyan;
+
+      if (c != ii.getBgColor()) {
+        ii.setBgColor(c);
+        ii.refresh();
+      }
+    }
+  };
+
+  auto cmp = getCompetitionName(oe);
+  auto& nameField = gdi.addInput("CmpName", cmp.first, 30, nullptr, L"Tävlingsnamn för export:");
+  if (cmp.second)
+    nameField.setBgColor(GDICOLOR::colorLightCyan);
+  nameField.setHandler(make_shared<HandleCmpName>(oe));
 
   gdi.addCheckbox("IncludeCourse", "Inkludera bana", 0, includeCourse);
 
@@ -161,7 +222,7 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, State state) {
   gdi.addInput("URL", url, 40, 0, L"", L"Till exempel X#http://www.results.org/online.php");
   gdi.dropLine(2.5);
   gdi.popX();
-  gdi.addInput("CmpID", itow(cmpId), 10, 0, L"Tävlingens ID-nummer:");
+  gdi.addInput("CmpID", cmpId, 10, 0, L"Tävlingens ID-nummer:");
   gdi.addInput("Password", passwd, 15, 0, L"Lösenord:").setPassword(true);
 
   enableURL(gdi, sendToURL);
@@ -203,7 +264,7 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, State state) {
   vector<pControl> ctrl;
   oe.getControls(ctrl, true);
 
-  vector< pair<pControl, int> > ctrlP;
+  vector<pair<pControl, int>> ctrlP;
   for (size_t k = 0; k< ctrl.size(); k++) {
     for (int i = 0; i < ctrl[k]->getNumberDuplicates(); i++) {
       ctrlP.push_back(make_pair(ctrl[k], oControl::getCourseControlIdFromIdIndex(ctrl[k]->getId(), i)));
@@ -224,6 +285,8 @@ void OnlineResults::settings(gdioutput &gdi, oEvent &oe, State state) {
                     name, 0, controls.count(ctrlP[k].second) != 0);
   }
   gdi.dropLine();
+
+  gdi.addCheckbox("SendCard", "Skicka alla sträcktider efter brickavläsning", nullptr, sendCompleteCard);
 
   rc.top = gdi.getCY();
   rc.bottom = rc.top + 3;
@@ -269,10 +332,14 @@ void OnlineResults::save(oEvent &oe, gdioutput &gdi, bool doProcess) {
   if (!xurl.empty())
     oe.setProperty("MOPURL", xurl);
 
+  storedName = gdi.getText("CmpName");
+  if (storedName == oe.getName() || trim(storedName).empty())
+    storedName = L""; // Use default
+
   sendToURL = gdi.isChecked("ToURL");
   sendToFile = gdi.isChecked("ToFile");
 
-  cmpId = gdi.getTextNo("CmpID");
+  cmpId = OnlineInput::sanitizeId(gdi.getText("CmpID"));
   passwd = gdi.getText("Password");
   prefix = px;
   exportScript = gdi.getText("ExportScript");
@@ -348,6 +415,8 @@ void OnlineResults::save(oEvent &oe, gdioutput &gdi, bool doProcess) {
     }
   }
 
+  sendCompleteCard = gdi.isChecked("SendCard");
+
   if (doProcess) {
     process(gdi, &oe, SyncNone);
     interval = iv;
@@ -376,7 +445,7 @@ void OnlineResults::status(gdioutput &gdi)
   if (sendToFile || sendToURL) {
     if (interval > 0) {
       gdi.addString("", 0, "Exporterar om: ");
-      gdi.addTimer(gdi.getCY(), gdi.getCX(), timerIgnoreSign, (GetTickCount() - timeout) / 1000);
+      gdi.addTimer(gdi.getCY(), gdi.getCX(), timerIgnoreSign, (GetTickCount64() - timeout) / 1000);
     }
     gdi.addString("", 0, "Antal skickade uppdateringar X (Y kb)#" +
                           itos(exportCounter-1) + "#" + itos(bytesExported/1024));
@@ -391,89 +460,101 @@ void OnlineResults::status(gdioutput &gdi)
 }
 
 void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
-  errorLines.clear();
-  uint64_t tick = GetTickCount64();
-  if (lastSync + interval * 1000 > tick)
-    return;
+  processProtected(gdi, ast, [&]() {
+    errorLines.clear();
+    uint64_t tick = GetTickCount64();
+    if (lastSync + interval * 1000 > tick)
+      return;
 
-  if (!sendToFile && !sendToURL)
-    return;
-  ProgressWindow pwMain((sendToURL && ast == SyncNone) ? gdi.getHWNDTarget() : 0);
-  pwMain.init();
+    if (!sendToFile && !sendToURL)
+      return;
 
-  if (allClasses)
-    oe->getAllClasses(classes);
+    ProgressWindow pwMain((sendToURL && ast == SyncNone) ? gdi.getHWNDTarget() : 0, gdi.getScale());
+    pwMain.init();
 
-  wstring t;
-  int xmlSize = 0;
-  InfoCompetition &ic = getInfoServer();
-  xmlbuffer xmlbuff;
-  if (dataType == DataType::MOP10 || dataType == DataType::MOP20) {
-    if (ic.synchronize(*oe, false, classes, controls, dataType != DataType::MOP10)) {
-      lastSync = tick; // If error, avoid to quick retry
-      ic.getDiffXML(xmlbuff);
-    }
-  }
-  else {
-    t = getTempFile();
-    if (dataType == DataType::IOF2)
-      oe->exportIOFSplits(oEvent::IOF20, t.c_str(), false, false,
-                          classes, make_pair("",""), - 1, false, true, true, false, false);
-    else if (dataType == DataType::IOF3)
-      oe->exportIOFSplits(oEvent::IOF30, t.c_str(), false, false, 
-                          classes, make_pair("", ""), -1, false, true, true, false, false);
-    else
-      throw meosException("Internal error");
-  }
+    if (allClasses)
+      oe->getAllClasses(classes);
 
-  if (!t.empty() || xmlbuff.size() > 0) {
-    if (sendToFile) {
-
-      if (xmlbuff.size() > 0) {
-        t = getTempFile();
-        xmlparser xml;
-        if (sendToURL) {
-          xmlbuffer bcopy = xmlbuff;
-          bcopy.startXML(xml, t);
-          bcopy.commit(xml, xmlbuff.size());
+    wstring t;
+    int xmlSize = 0;
+    InfoCompetition& ic = getInfoServer();
+    xmlbuffer xmlbuff;
+    if (dataType == DataType::MOP10 || dataType == DataType::MOP20) {
+      set<int> useCtrlSet;
+      if (sendCompleteCard) {
+        vector<pControl> ctrl;
+        oe->getControls(ctrl, true);
+        for (size_t k = 0; k < ctrl.size(); k++) {
+          for (int i = 0; i < ctrl[k]->getNumberDuplicates(); i++) {
+            useCtrlSet.insert(oControl::getCourseControlIdFromIdIndex(ctrl[k]->getId(), i));
+          }
         }
-        else {
-          xmlbuff.startXML(xml, t);
-          xmlbuff.commit(xml, xmlbuff.size());
-        }
-        xml.endTag();
-        xmlSize = xml.closeOut();
-
       }
-      wstring fn = getExportFileName();
+      else
+        useCtrlSet = controls;
 
-      if (!CopyFile(t.c_str(), fn.c_str(), false))
-        gdi.addInfoBox("", L"Kunde inte skriva resultat till X#" + fn);
-      else if (!sendToURL) {
-        ic.commitComplete();
-        struct _stat st;
-        _wstat(t.c_str(), &st);
-        bytesExported += st.st_size;
-        removeTempFile(t);
-      }
-
-      if (!exportScript.empty()) {
-        ShellExecute(NULL, NULL, exportScript.c_str(), fn.c_str(), NULL, SW_HIDE);
+      if (ic.synchronize(*oe, getCompetitionName(*oe).first, InfoCompetition::SynchType::All, 
+                         classes, useCtrlSet, controls, dataType != DataType::MOP10)) {
+        lastSync = tick; // If error, avoid to quick retry
+        ic.getDiffXML(xmlbuff);
       }
     }
+    else {
+      t = getTempFile();
+      if (dataType == DataType::IOF2)
+        oe->exportIOFSplits(oEvent::IOF20, t.c_str(), false, false,
+          classes, make_tuple("", "", true), getCompetitionName(*oe).first, -1, false, false, true, true, false, false);
+      else if (dataType == DataType::IOF3)
+        oe->exportIOFSplits(oEvent::IOF30, t.c_str(), false, false,
+          classes, make_tuple("", "", true), getCompetitionName(*oe).first, -1, true, false, true, true, false, false);
+      else
+        throw meosException("Internal error");
+    }
 
-    constexpr int buffLimit = 64;
+    if (!t.empty() || xmlbuff.size() > 0) {
+      if (sendToFile) {
 
-    try {
+        if (xmlbuff.size() > 0) {
+          t = getTempFile();
+          xmlparser xml;
+          if (sendToURL) {
+            xmlbuffer bcopy = xmlbuff;
+            bcopy.startXML(xml, t);
+            bcopy.commit(xml, xmlbuff.size());
+          }
+          else {
+            xmlbuff.startXML(xml, t);
+            xmlbuff.commit(xml, xmlbuff.size());
+          }
+          xml.endTag();
+          xmlSize = xml.closeOut();
+
+        }
+        wstring fn = getExportFileName();
+
+        if (!CopyFile(t.c_str(), fn.c_str(), false))
+          gdi.addInfoBox("", L"Kunde inte skriva resultat till X#" + fn, L"");
+        else if (!sendToURL) {
+          ic.commitComplete();
+          bytesExported += xmlSize;
+          removeTempFile(t);
+        }
+
+        if (!exportScript.empty()) {
+          ShellExecute(NULL, NULL, exportScript.c_str(), fn.c_str(), NULL, SW_HIDE);
+        }
+      }
+
+      constexpr int buffLimit = 64;
+
       if (sendToURL) {
         Download dwl;
         dwl.initInternet();
-        ProgressWindow pw(0);
-        vector<pair<wstring,wstring> > key;
-    	pair<wstring, wstring> mk1(L"competition", itow(cmpId));
-        key.push_back(mk1);
-		pair<wstring, wstring> mk2(L"pwd", passwd);
-        key.push_back(mk2);
+        ProgressWindow pw(nullptr, gdi.getScale());
+        vector<pair<wstring, wstring>> key;
+        key.emplace_back(L"competition", OnlineInput::sanitizeId(cmpId));
+        if (!passwd.empty())
+          key.emplace_back(L"pwd", passwd);
 
         bool addedHeader = false;
         bool forceZIP = false;
@@ -515,8 +596,7 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
             moreToWrite = false;
         }
 
-        while(moreToWrite) {
-
+        while (moreToWrite) {
           t = getTempFile();
           xmlparser xmlOut;
           xmlbuff.startXML(xmlOut, t);
@@ -524,31 +604,29 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
           xmlOut.endTag();
           xmlSize = xmlOut.closeOut();
           wstring result = getTempFile();
-
+          bool wasZip = false;
           if (!forceNoZip && ((zipFile && xmlSize > 1024) || forceZIP)) {
             wstring zipped = getTempFile();
             zip(zipped.c_str(), 0, vector<wstring>(1, t));
             removeTempFile(t);
             t = zipped;
-
+            wasZip = true;
             struct _stat st;
             _wstat(t.c_str(), &st);
             bytesExported += st.st_size;
           }
           else
-            bytesExported +=xmlSize;
+            bytesExported += xmlSize;
 
 
           if (!addedHeader) {
-            if (zipFile) {
+            if (wasZip) {
               forceZIP = true;
-              pair<wstring, wstring> mk3(L"Content-Type", L"application/zip");
-              key.push_back(mk3);
+              key.emplace_back(L"Content-Type", L"application/zip");
             }
             else {
               forceNoZip = true;
-              pair<wstring, wstring> mk3(L"Content-Type", L"text/plain");
-              key.push_back(mk3);
+              key.emplace_back(L"Content-Type", L"text/plain");
             }
             addedHeader = true;
           }
@@ -556,7 +634,7 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
           dwl.postFile(url, t, result, key, pw);
           removeTempFile(t);
 
-          pwMain.setProgress(1000-(1000 * xmlbuff.size())/total);
+          pwMain.setProgress(1000 - (1000 * xmlbuff.size()) / total);
 
           xmlparser xml;
           xmlobject res;
@@ -564,13 +642,13 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
             xml.read(result);
             res = xml.getObject("MOPStatus");
           }
-          catch(std::exception &) {
+          catch (std::exception&) {
             ifstream is(result.c_str());
-            is.seekg (0, is.end);
+            is.seekg(0, is.end);
             int length = (int)is.tellg();
-            is.seekg (0, is.beg);
-            char * buffer = new char [length+1];
-            is.read (buffer,length);
+            is.seekg(0, is.beg);
+            char* buffer = new char[length + 1];
+            is.read(buffer, length);
             is.close();
             removeTempFile(result);
             buffer[length] = 0;
@@ -596,19 +674,25 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
           if (tmp != "OK")
             break;
 
-          if (cmpId == 0) {
+          if (cmpId.empty() || cmpId == L"0") {
               bool found(false);
-              cmpId = res.getObjectInt("competition");
+              cmpId = itow(res.getObjectInt("competition"));
               for (auto it = begin(key); it != end(key); ++it) {
                   if (it->first == L"competition") {
                       found = true;
-                      it->second = itow(cmpId);
+                      it->second = cmpId;
                   }     
               }
 
               if (!found) {
-                  pair<wstring, wstring> mk1(L"competition", itow(cmpId));
+                  pair<wstring, wstring> mk1(L"competition", cmpId);
                   key.push_back(mk1);
+              }
+
+              // Keep the id in the saved settings so a restart continues with the same competition
+              if (wasSaved()) {
+                saveMachine(*oe, itow(interval));
+                oe->updateChanged();
               }
           }
         }
@@ -618,23 +702,11 @@ void OnlineResults::process(gdioutput &gdi, oEvent *oe, AutoSyncType ast) {
         else
           throw meosException("Misslyckades med att ladda upp onlineresultat");
       }
-    }
-    catch (meosException &ex) {
-      if (ast == SyncNone)
-        throw;
-      else
-        gdi.addInfoBox("", L"Online Results Error X#" + lang.tl(ex.wwhat()), 5000);
-    }
-    catch(std::exception &ex) {
-      if (ast == SyncNone)
-        throw;
-      else
-        gdi.addInfoBox("", L"Online Results Error X#"+gdi.widen(ex.what()), 5000);
-    }
 
-    lastSync = GetTickCount64();
-    exportCounter++;
-  }
+      lastSync = GetTickCount64();
+      exportCounter++;
+    }
+  });
 }
 
 void OnlineResults::formatError(gdioutput &gdi) {
@@ -670,7 +742,15 @@ wstring OnlineResults::getExportFileName() const {
   return bf;
 }
 
+pair<wstring, bool> OnlineResults::getCompetitionName(const oEvent& oe) const {
+  if (storedName.empty())
+    return make_pair(oe.getName(), false);
+  else
+    return make_pair(storedName, true);
+}
+
 void OnlineResults::saveMachine(oEvent &oe, const wstring &guiInterval) {
+  AutoMachine::saveMachine(oe, guiInterval);
   auto &cnt = oe.getMachineContainer().set(getTypeString(), getMachineName());
   cnt.set("file", file);
   cnt.set("url", url);
@@ -685,6 +765,7 @@ void OnlineResults::saveMachine(oEvent &oe, const wstring &guiInterval) {
   
   cnt.set("classes", classes);
   cnt.set("controls", controls);
+  cnt.set("card", sendCompleteCard);
 
   cnt.set("dt", int(dataType));
   cnt.set("zip", zipFile);
@@ -693,6 +774,8 @@ void OnlineResults::saveMachine(oEvent &oe, const wstring &guiInterval) {
   cnt.set("doURL", sendToURL);
   cnt.set("doFile", sendToFile);
   cnt.set("script", exportScript);
+  if (!storedName.empty())
+    cnt.set("cname", storedName);
 }
 
 void OnlineResults::loadMachine(oEvent &oe, const wstring &name) {
@@ -709,11 +792,11 @@ void OnlineResults::loadMachine(oEvent &oe, const wstring &name) {
   string pwProp = "@respwd" + gdioutput::narrow(getMachineName());
   passwd = gdioutput::fromUTF8(oe.getPropertyStringDecrypt(pwProp.c_str(), ""));
 
-  cmpId = cnt->getInt("cmp");
+  cmpId = cnt->getString("cmp");
 
   classes = cnt->getSetInt("classes");
   controls = cnt->getSetInt("controls");
-
+  sendCompleteCard = cnt->getInt("card") != 0;
   dataType = DataType(cnt->getInt("dt"));
   zipFile = cnt->getInt("zip") != 0;
   includeTotal = cnt->getInt("tot") != 0;
@@ -721,4 +804,6 @@ void OnlineResults::loadMachine(oEvent &oe, const wstring &name) {
   sendToURL = cnt->getInt("doURL") != 0;
   sendToFile = cnt->getInt("doFile") != 0;
   exportScript = cnt->getString("script");
+  storedName = cnt->getString("cname");
 }
+

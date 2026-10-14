@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -46,6 +46,7 @@
 #include "qualification_final.h"
 #include "generalresult.h"
 #include "metalist.h"
+#include "xmlparser.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -419,7 +420,7 @@ int oClass::getNumRunners(bool checkFirstLeg, bool noCountVacant, bool noCountNo
       continue;
     if (noCountVacant && r.isVacant())
       continue;
-    if (noCountNotCompeting && (r.getStatus() == StatusNotCompetiting || r.getStatus() == StatusCANCEL))
+    if (noCountNotCompeting && (r.getStatus() == StatusNotCompeting || r.getStatus() == StatusCANCEL))
       continue;
 
     int id = r.getClassId(true);
@@ -481,22 +482,24 @@ void oClass::getNumResults(int leg, int &total, int &finished, int &dns) const {
 
     if (!(ct == oClassIndividual || ct == oClassIndividRelay || ct == oClassKnockout))
       cnt[c.Id].team = true;
+    else if (ct == oClassKnockout && c.isQualificationFinalBaseClass())
+      cnt[c.Id].team = true; // Count teams in the base class
   }
 
   for (auto &r : oe->Runners) {
-    if (r.isRemoved() || !r.Class || r.tStatus == StatusNotCompetiting || r.tStatus == StatusCANCEL)
+    if (r.isRemoved() || !r.Class || r.tStatus == StatusNotCompeting || r.tStatus == StatusCANCEL)
       continue;
 
     auto &c = cnt[r.getClassId(true)];
     if (c.team)
       continue;
 
-    int tleg = leg > 0 ? leg : c.maxleg;
+    int tleg = leg >= 0 ? leg : c.maxleg;
 
     if (r.tLeg == tleg || c.singleClass) {
       c.total++;
 
-      if (r.tStatus != StatusUnknown)
+      if (!r.isStatusUnknown(false, false) && r.tStatus != StatusDNS)
         c.finished++;
       
       if (r.tStatus == StatusDNS)
@@ -505,7 +508,7 @@ void oClass::getNumResults(int leg, int &total, int &finished, int &dns) const {
   }
 
   for (auto &t : oe->Teams) {
-    if (t.isRemoved() || !t.Class || t.tStatus == StatusNotCompetiting || t.tStatus == StatusCANCEL)
+    if (t.isRemoved() || !t.Class || t.tStatus == StatusNotCompeting || t.tStatus == StatusCANCEL)
       continue;
 
     auto &c = cnt[t.getClassId(true)];
@@ -729,18 +732,16 @@ void oEvent::getClasses(vector<pClass> &classes, bool sync) const {
   sort(classes.begin(), classes.end(), clsSortFunction);
 }
 
-
-pClass oEvent::getBestClassMatch(const wstring &cname) const {
-  return getClass(cname);
-}
-
-pClass oEvent::getClass(const wstring &cname) const
-{
-  for (oClassList::const_iterator it=Classes.begin(); it != Classes.end(); ++it) {
-    if (!it->isRemoved() && compareClassName(cname, it->Name))
-      return pClass(&*it);
+pClass oEvent::getClass(const wstring &cname) const {
+  for (auto &c : Classes) {
+    if (!c.isRemoved() && cname ==c.Name)
+      return pClass(&c);
   }
-  return 0;
+  for (auto &c : Classes) {
+    if (!c.isRemoved() && compareClassName(cname, c.Name))
+      return pClass(&c);
+  }
+  return nullptr;
 }
 
 pClass oEvent::getClass(int Id) const {
@@ -1676,6 +1677,13 @@ pCourse oClass::getCourse(bool getSampleFromRunner) const {
   return res;
 }
 
+bool oClass::isForked(int leg) const {
+  leg = mapLeg(leg);
+  if (leg < MultiCourse.size())
+    return MultiCourse[leg].size() > 1;
+  return false;
+}
+
 void oClass::getCourses(int leg, vector<pCourse> &courses) const {
   leg = mapLeg(leg);
 
@@ -1931,6 +1939,8 @@ oClass::LeaderInfo &oClass::getLeaderInfo(AllowRecompute recompute, int leg) con
 }
 
 bool oClass::LeaderInfo::updateComputed(int rt, Type t) {
+  if (rt <= 0)
+    return false;
   bool update = false;
 
   switch (t) {
@@ -1955,6 +1965,8 @@ bool oClass::LeaderInfo::updateComputed(int rt, Type t) {
 }
 
 bool oClass::LeaderInfo::update(int rt, Type t) {
+  if (rt <= 0)
+    return false;
   bool update = false;
   switch (t) {
   case Type::Leg:
@@ -2636,33 +2648,27 @@ int oClass::getExpectedAge() const
   return 0;
 }
 
-void oClass::setSex(PersonSex sex)
-{
+void oClass::setSex(PersonSex sex) {
   getDI().setString("Sex", encodeSex(sex));
 }
 
-PersonSex oClass::getSex() const
-{
+PersonSex oClass::getSex() const {
   return interpretSex(getDCI().getString("Sex"));
 }
 
-void oClass::setStart(const wstring &start)
-{
+void oClass::setStart(const wstring &start) {
   getDI().setString("StartName", start);
 }
 
-wstring oClass::getStart() const
-{
+const wstring &oClass::getStart() const {
   return getDCI().getString("StartName");
 }
 
-void oClass::setBlock(int block)
-{
+void oClass::setBlock(int block) {
   getDI().setInt("StartBlock", block);
 }
 
-int oClass::getBlock() const
-{
+int oClass::getBlock() const {
   return getDCI().getInt("StartBlock");
 }
 
@@ -2717,31 +2723,78 @@ void oClass::setBibMode(BibMode bibMode) {
   getDI().setString("BibMode", res);
 }
 
-
 bool oClass::getNoTiming() const {
   if (tNoTiming!=0 && tNoTiming!=1)
     tNoTiming = getDCI().getInt("NoTiming")!=0 ? 1 : 0;
   return tNoTiming!=0;
 }
 
-void oClass::setIgnoreStartPunch(bool ignoreStartPunch) {
+void oClass::setIgnoreStartPunch(bool ignoreStartPunch) { 
   tIgnoreStartPunch = ignoreStartPunch;
-  getDI().setInt("IgnoreStart", ignoreStartPunch);
+  getDI().setInt("IgnoreStart", ignoreStartPunch); 
+}
+
+void oClass::updatedIgnoreStartPunch() {
+  updateChanged();
+  synchronize();
+
+  bool updated = false;
+  bool ignoreSP = ignoreStartPunch();
+  vector<pRunner> rr;
+  oe->getRunners(getId(), -1, rr, false);
+  for (pRunner r : rr) {
+    if (ignoreSP && r->getStartTime() > 0) {
+      if (r->getCard()) {
+        int st = r->getCard()->getStartTime(oPunch::SpecialPunch::PunchStart);
+        if (st > 0 && st == r->getStartTime()) {
+          r->restoreDefaultStartTime(false);
+          r->synchronize();
+          updated = true;
+        }
+      }
+      else {
+        vector<pFreePunch> fp;
+        oe->getPunchesForRunner(r->getId(), false, fp);
+        for (pFreePunch p : fp) {
+          if (p->getTypeCode() == oPunch::SpecialPunch::PunchStart && r->getStartTime() == p->getTimeInt()) {
+            r->restoreDefaultStartTime(false);
+            r->synchronize();
+            updated = true;
+          }
+        }
+      }
+    }
+    else if (!ignoreSP && !r->getCard()) {
+      vector<pFreePunch> fp;
+      auto crs = r->getCourse(false);
+      int stCd = crs && crs->useFirstAsStart() && crs->getControl(0) ? crs->getControl(0)->getFirstNumber() : oPunch::SpecialPunch::PunchStart;
+      oe->getPunchesForRunner(r->getId(), false, fp);
+      for (pFreePunch p : fp) {
+        if (p->getTypeCode() == stCd) {
+          r->setStartTime(p->getTimeInt(), true, ChangeType::Update, false);
+          r->synchronize();
+          updated = true;
+        }
+      }
+    }
+  }
+
+  if (updated) {
+    oe->reEvaluateAll({ getId() }, true);
+  }
 }
 
 bool oClass::ignoreStartPunch() const {
-  if (tIgnoreStartPunch!=0 && tIgnoreStartPunch!=1)
-    tIgnoreStartPunch = getDCI().getInt("IgnoreStart")!=0 ? 1 : 0;
+  if (tIgnoreStartPunch != 0 && tIgnoreStartPunch != 1)
+    tIgnoreStartPunch = getDCI().getInt("IgnoreStart") != 0 ? 1 : 0;
   return tIgnoreStartPunch != 0;
 }
 
-void oClass::setFreeStart(bool quick)
-{
+void oClass::setFreeStart(bool quick) {
   getDI().setInt("FreeStart", quick);
 }
 
-bool oClass::hasFreeStart() const
-{
+bool oClass::hasFreeStart() const {
   bool fs = getDCI().getInt("FreeStart") != 0;
   return fs;
 }
@@ -3132,7 +3185,7 @@ void oClass::getStatistics(const set<int> &feeLock, int &entries, int &started) 
   for (it = oe->Runners.begin(); it != oe->Runners.end(); ++it) {
     if (it->skip() || it->isVacant())
       continue;
-    if (it->getStatus() == StatusNotCompetiting)
+    if (it->getStatus() == StatusNotCompeting)
       continue;
 
     if (it->getClassId(false)==Id) {
@@ -3460,7 +3513,7 @@ void oClass::getStartRange(int leg, int &firstStart, int &lastStart) const {
     size_t s = getLastStageIndex() + 1;
     assert(s>0);
     vector<int> lFirstStart, lLastStart;
-    lFirstStart.resize(s, timeConstHour * 24 * 365);
+    lFirstStart.resize(s, timeConstHour * 24 * 100);
     lLastStart.resize(s, 0);
     for (oRunnerList::iterator it = oe->Runners.begin(); it != oe->Runners.end(); ++it) {
       if (it->isRemoved() || it->getClassRef(true) != this)
@@ -4094,8 +4147,8 @@ bool oClass::checkForking(vector< vector<int> > &legOrder,
       pCourse pc = oe->getCourse(legOrder[k][j]);
       if (pc) {
         controlOrder[k].push_back(-1); // Finish/start
-        for (int i = 0; i < pc->nControls; i++) {
-          int id = pc->Controls[i]->nNumbers == 1 ? pc->Controls[i]->Numbers[0] : pc->Controls[i]->getId();
+        for (int i = 0; i < pc->nControls(); i++) {
+          int id = pc->controls[i]->nNumbers == 1 ? pc->controls[i]->Numbers[0] : pc->controls[i]->getId();
           controlOrder[k].push_back(id);
         }
       }
@@ -4821,6 +4874,7 @@ void oClass::drawSeeded(ClassSeedMethod seed, int leg, int firstStart,
   for (size_t k = 0; k < startOrder.size(); k++) {
     int kx = k/pairSize;
     startOrder[k]->setStartTime(firstStart + interval * kx, true, oBase::ChangeType::Update, false);
+    startOrder[k]->storeDefaultStartTime();
     startOrder[k]->synchronize(true);
   }
 }
@@ -5528,4 +5582,131 @@ void oClass::setFlag(TransferFlags flag, bool onoff) {
   int cf = getDCI().getInt("TransferFlags");
   cf = onoff ? (cf | flag) : (cf & (~flag));
   getDI().setInt("TransferFlags", cf);
+}
+
+void oClass::adjustNumVacant(int leg, int numVacant) {
+  const int vacantClubId = oe->getVacantClub(false);
+  const bool multiDay = oe->hasPrevStage();
+  
+  if (numVacant < 0)
+    throw meosException("Internal error");
+
+  if (numVacant > 0 && getClassType() == oClassRelay)
+    throw meosException("Vakanser stöds ej i stafett.");
+
+  if (numVacant > 0 && (leg > 0 || getParentClass()))
+    throw meosException("Det går endast att sätta in vakanser på sträcka 1.");
+
+  if (size_t(leg) < legInfo.size()) {
+    setStartType(leg, STDrawn, true); //Automatically change start method
+  }
+  else if (leg == -1) {
+    for (size_t j = 0; j < legInfo.size(); j++)
+      setStartType(j, STDrawn, true); //Automatically change start method
+  }
+  
+  vector<int> currentVacant;
+  vector<pRunner> rList;
+  oe->getRunners({ Id }, rList);
+
+  for (pRunner r : rList) {
+    if (r->tInTeam)
+      continue; // Cannot remove team runners
+    if (r->getClubId() == vacantClubId)
+      currentVacant.push_back(r->getId());
+  }
+
+  vector<int> toRemove;
+  while (currentVacant.size() > numVacant) {
+    toRemove.push_back(currentVacant.back());
+    currentVacant.pop_back();
+  }
+
+  while (currentVacant.size() < numVacant) {
+    pRunner r = oe->addRunnerVacant(Id);
+    currentVacant.push_back(r->getId());
+  }
+  oe->removeRunner(toRemove);
+}
+
+/** Get best rogaining time for leg, and expected time given base speed*/
+oClass::RogainingAnalysis oClass::getRogainingAnalysis(int from, int to, double baseSpeed) const {
+  RogainingAnalysis out;
+  if (!isRogaining())
+    return out;
+
+  if (rogainingStatistics.needsUpdate(*oe))
+    oe->computeRogainingStatistics();
+
+  auto &rgMap = rogainingStatistics.get();
+  auto res = rgMap.find(make_pair(from, to));
+  if (res != rgMap.end()) {
+    out.bestTime = res->second.bestTime;
+    out.lostTime = int(res->second.bestTime * baseSpeed);
+    out.numLegRunners = res->second.numCompetitors;
+  }
+
+  return out;
+}
+
+/** Get class statistics rogaining legs */
+vector<oClass::RogainingLeg> oClass::getRogainingLegs() const {
+  vector<oClass::RogainingLeg> out;
+
+  if (!isRogaining())
+    return out;
+
+  if (rogainingStatistics.needsUpdate(*oe))
+    oe->computeRogainingStatistics();
+
+  for (auto &[key, stat] : rogainingStatistics.get()) {
+    RogainingLeg s;
+    s.from = key.first;
+    s.to = key.second;
+    s.numCompetitors = stat.numCompetitors;
+    s.bestTime = stat.bestTime;
+    out.push_back(s);
+  }
+
+  sort(out.begin(), out.end(), [](const RogainingLeg &a, const RogainingLeg &b) {return a.numCompetitors > b.numCompetitors; });
+
+  return out;
+}
+
+bool oClass::isSingleStageOnly() const {
+  return getDCI().getInt("NoTotalResult") != 0;
+}
+
+void oClass::setSingleStageOnly(bool singleStageOnly) {
+  getDI().setInt("NoTotalResult", singleStageOnly);
+}
+
+int oClass::getStageLeader(int stage) const {
+  if (stageLeaderTime.needsUpdate(*oe)) {
+    stageLeaderTime.update(*oe, vector<int>());
+  }
+
+  auto& current = stageLeaderTime.get();
+  if (stage >= current.size() || current[stage] == -1) {
+    vector<int> newLeader = current;
+    newLeader.resize(stage + 1, -1);
+    vector<pRunner> rl;
+    oe->getRunners(Id, -1, rl, false);
+    int bt = numeric_limits<int>::max();
+
+    for (pRunner r : rl) {
+      int time, d;
+      if (r->getStageResult(stage, time, d, d) == StatusOK) {
+        if (time > 0) {
+          bt = min(bt, time);
+        }
+      }
+    }
+    newLeader[stage] = bt;
+    stageLeaderTime.update(*oe, newLeader);
+    return bt;
+  }
+  else {
+    return current[stage];
+  }
 }

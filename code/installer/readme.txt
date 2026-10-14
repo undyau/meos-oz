@@ -1,3 +1,8 @@
+  21 Sep 2026 5.0.1851.0
+ - Merge changes from MeOS 5.0 Update 3 (upstream 4.0 Update 3 -> 5.0 Update 3).
+ - Includes the fix for import of XML entrylist with an embedded semi-colon
+   (see 4.0.1578.4).
+
   07 Oct 2026 4.0.1578.4
  - Handle import of XML entrylist when there is an embedded semi-colon 
    in the entrylist.

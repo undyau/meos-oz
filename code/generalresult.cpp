@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@
 #include "oListInfo.h"
 #include "meosexception.h"
 #include "localizer.h"
+#include "xmlparser.h"
 
 extern gdioutput *gdi_main;
 
@@ -51,7 +52,10 @@ bool GeneralResultCtr::operator<(const GeneralResultCtr &c) const {
                        c.name.c_str(), c.name.length()) == CSTR_LESS_THAN;
 }
 
-GeneralResultCtr::~GeneralResultCtr() {
+const wstring& GeneralResultCtr::getName() const {
+  if (!name.empty() && name[0] == '%')
+    return lang.tl(name.substr(1));
+  else return name;
 }
 
 GeneralResultCtr::GeneralResultCtr(const GeneralResultCtr &ctr) {
@@ -148,9 +152,9 @@ void GeneralResult::calculateTeamResults(vector<oTeam *> &teams,
   if (teams.empty())
     return;
 
-  if (lockPrepare)
+  if (lockPrepare>2)
     throw meosException("Bad cyclic call");
-  lockPrepare = true;
+  lockPrepare++;
 
   try {
     set<int> clsId;
@@ -228,10 +232,10 @@ void GeneralResult::calculateTeamResults(vector<oTeam *> &teams,
         teams[k] = (oTeam *)teamScore[k].tr;
       }
     }
-    lockPrepare = false;
+    lockPrepare--;
   }
   catch (...) {
-    lockPrepare = false;
+    lockPrepare--;
     throw;
   }
 }
@@ -316,9 +320,9 @@ void GeneralResult::calculateIndividualResults(vector<oRunner *> &runners,
   if (runners.empty())
     return;
 
-  if (lockPrepare)
+  if (lockPrepare > 2)
     throw meosException("Bad cyclic call");
-  lockPrepare = true;
+  lockPrepare++;
 
   try {
 
@@ -425,10 +429,10 @@ void GeneralResult::calculateIndividualResults(vector<oRunner *> &runners,
     }
   }
   catch (...) {
-    lockPrepare = false;
+    lockPrepare--;
     throw;
   }
-  lockPrepare = false;
+  lockPrepare--;
 }
 
 void GeneralResult::prepareCalculations(oEvent &oe, bool classResult, const set<int> &cls, vector<pRunner> &runners, vector<pTeam> &teams, int inputNumber) const {
@@ -764,8 +768,8 @@ RunnerStatus DynamicResult::toStatus(int status) const {
     return StatusDNS;
   case StatusCANCEL:
     return StatusCANCEL;
-  case StatusNotCompetiting:
-    return StatusNotCompetiting;
+  case StatusNotCompeting:
+    return StatusNotCompeting;
   case StatusDQ:
     return StatusDQ;
   case StatusMAX:
@@ -980,6 +984,7 @@ void DynamicResult::declareSymbols(DynamicMethods m, bool clear) const {
   parser.declareSymbol("PointReduction", "Automatic rogaining point reduction", false);
   parser.declareSymbol("PointOvertime", "Runner/team rogaining overtime", false);
   parser.declareSymbol("PointGross", "Rogaining points before automatic reduction", false);
+  parser.declareSymbol("LocalTime", "Current local time", false);
 
   parser.declareSymbol("PointAdjustment", "Runner/team rogaining points adjustment", false);
   parser.declareSymbol("TimeAdjustment", "Runner/team time adjustment", false);
@@ -1062,6 +1067,11 @@ void DynamicResult::declareSymbols(DynamicMethods m, bool clear) const {
 
   parser.declareSymbol("MaxTime", "Maximum allowed running time", false);
 
+  parser.declareSymbol("RGTimeLimit", "Rogaining time limit", false);
+  parser.declareSymbol("RGMaxPoints", "Maximum number of rogaining points", false);
+  parser.declareSymbol("RGPointLimit", "Rogaining time limit", false);
+  parser.declareSymbol("RGReduction", "Rogaining point reduction per minute", false);
+
   parser.declareSymbol("StatusUnknown", "Status code for an unknown result", false);
   parser.declareSymbol("StatusOK", "Status code for a valid result", false);
   parser.declareSymbol("StatusMP", "Status code for a missing punch", false);
@@ -1071,7 +1081,9 @@ void DynamicResult::declareSymbols(DynamicMethods m, bool clear) const {
   parser.declareSymbol("StatusMAX", "Status code for a time over the maximum", false);
   parser.declareSymbol("StatusDQ", "Status code for disqualification", false);
   parser.declareSymbol("StatusOutOfCompetition", "Status code for running out-of-competition", false);
-  parser.declareSymbol("StatusNotCompetiting", "Status code for not competing", false);
+  parser.declareSymbol("StatusNotCompetiting", "@", false, false, true); // Deprecated
+  parser.declareSymbol("StatusNotCompeting", "Status code for not competing", false);
+
   parser.declareSymbol("StatusNoTiming", "Status code for no timing", false);
 
   parser.declareSymbol("ShortestClassTime", "Shortest time in class", false);
@@ -1155,8 +1167,11 @@ void DynamicResult::prepareCalculations(oEvent &oe,
   parser.addSymbol("StatusDQ", StatusDQ);
   parser.addSymbol("StatusOutOfCompetition", StatusOutOfCompetition);
   parser.addSymbol("StatusNoTiming", StatusNoTiming);
-  parser.addSymbol("StatusNotCompetiting", StatusNotCompetiting);
+  parser.addSymbol("StatusNotCompetiting", StatusNotCompeting); // Deprecated symbol
+  parser.addSymbol("StatusNotCompeting", StatusNotCompeting);
 
+  oe.updateComputerTime(false);
+  parser.addSymbol("LocalTime", oe.getComputerTime() / timeConstSecond);
   parser.addSymbol("MaxTime", oe.getMaximalTime());
   parser.addSymbol("InputNumber", inputNumber);
 }
@@ -1195,15 +1210,32 @@ void DynamicResult::prepareCommon(oAbstractRunner &runner, bool classResult) con
   parser.addSymbol("DataB", runner.getDCI().getInt("DataB"));
 
   pClass cls = runner.getClassRef(true);
+  pCourse crs = nullptr;
   if (cls) {
     parser.addSymbol("ClassDataA", cls->getDCI().getInt("DataA"));
     parser.addSymbol("ClassDataB", cls->getDCI().getInt("DataB"));
+
+    parser.addSymbol("MaxTime", cls->getMaximumRunnerTime()); // Already globally set
+    crs = cls->getCourse();
   }
   else {
     parser.addSymbol("ClassDataA", 0);
     parser.addSymbol("ClassDataB", 0);
-  }
 
+      }
+
+  if (crs) {
+    parser.addSymbol("RGTimeLimit", crs->getMaximumRogainingTime() / timeConstSecond);
+    parser.addSymbol("RGMaxPoints", crs->getMaxRogainingPoints());
+    parser.addSymbol("RGPointLimit", crs->getMinimumRogainingPoints());
+    parser.addSymbol("RGReduction", crs->getRogainingPointsPerMinute());
+  }
+  else {
+    parser.addSymbol("RGTimeLimit", 0);
+    parser.addSymbol("RGMaxPoints", 0);
+    parser.addSymbol("RGPointLimit", 0);
+    parser.addSymbol("RGReduction", 0);
+  }
   vector<RunnerStatus> inst;
   vector<int> times;
   vector<int> points;

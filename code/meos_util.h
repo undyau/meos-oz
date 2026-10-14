@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -75,7 +75,8 @@ wstring getLocalTimeFileName();
 enum class SubSecond {
   Off,
   On,
-  Auto
+  Auto,
+  AutoIncludeHour
 };
 
 int parseRelativeTime(const char *data);
@@ -134,7 +135,9 @@ wstring addOrSubtractDays(const wstring& m, int days);
 const vector<string> &split(const string &line, const string &separators, vector<string> &split_vector);
 
 const vector<wstring> &split(const wstring &line, const wstring &separators, vector<wstring> &split_vector);
-const wstring &unsplit(const vector<wstring> &split_vector, const wstring &separators, wstring &line);
+
+template<typename T>
+const T& unsplit(const vector<T>& split_vector, const T& separators, T& line);
 
 // Compare two strings, ignore case. 0 = equal, != zero compares as the integers.
 int compareStringIgnoreCase(const wstring &a, const wstring &b);
@@ -230,9 +233,9 @@ public:
 
   HLS(WORD H, WORD L, WORD S) : hue(H), lightness(L), saturation(S) {}
   HLS() : hue(0), lightness(0), saturation(1) {}
-  WORD hue;
-  WORD lightness;
-  WORD saturation;
+  short hue;
+  short lightness;
+  short saturation;
   void lighten(double f);
   void saturate(double s);
   void colorDegree(double d);
@@ -306,3 +309,5 @@ void string2Wide(const string &in, wstring &out);
 void wide2String(const wstring &in, string &out);
 
 void checkWriteAccess(const wstring &file);
+
+void moveFile(const wstring& src, const wstring& dst);

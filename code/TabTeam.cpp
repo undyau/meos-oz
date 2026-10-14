@@ -1,6 +1,6 @@
 ﻿/************************************************************************
     MeOS - Orienteering Software
-    Copyright (C) 2009-2024 Melin Software HB
+    Copyright (C) 2009-2026 Melin Software HB
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,6 +43,7 @@
 #include "MeOSFeatures.h"
 #include "RunnerDB.h"
 #include "autocomplete.h"
+#include "iof30interface.h"
 
 #include "TabSI.h"
 
@@ -63,7 +64,6 @@ int teamSearchCB(gdioutput *gdi, GuiEventType type, BaseInfo* data) {
 }
 
 int TabTeam::searchCB(gdioutput &gdi, int type, void *data) {
-  static DWORD editTick = 0;
   wstring expr;
   bool showNow = false;
   bool filterMore = false;
@@ -74,7 +74,6 @@ int TabTeam::searchCB(gdioutput &gdi, int type, void *data) {
     expr = trim(ii.text);
     filterMore = expr.length() > lastSearchExpr.length() &&
                   expr.substr(0, lastSearchExpr.length()) == lastSearchExpr;
-    editTick = GetTickCount();
     if (expr != lastSearchExpr) {
       int nr = oe->getNumRunners();
       if (timeToFill < 50 || (filterMore && (timeToFill * lastFilter.size())/nr < 50))
@@ -196,9 +195,9 @@ void TabTeam::selectTeam(gdioutput &gdi, pTeam t)
       else
         gdi.setText("PlaceIn", makeDash(L"-"));
 
-      gdi.setText("TimeIn", t->getInputTimeS());
+      gdi.setText("TimeIn", t->getInputTimeS(false));
       if (gdi.hasWidget("PointIn"))
-        gdi.setText("PointIn", t->getInputPoints());
+        gdi.setText("PointIn", oe->formatScore(t->getInputPoints()));
     }
 
     if (gdi.hasWidget("NoRestart")) {
@@ -276,7 +275,7 @@ void TabTeam::updateTeamStatus(gdioutput &gdi, pTeam t)
   gdi.setText("Finish",t->getFinishTimeS(false, SubSecond::Auto));
   gdi.setText("Time", t->getRunningTimeS(true, SubSecond::Auto));
   gdi.setText("TimeAdjust", formatTimeMS(t->getTimeAdjustment(false), false, SubSecond::Auto));
-  gdi.setText("PointAdjust", -t->getPointAdjustment());
+  gdi.setText("PointAdjust", oe->formatScore(-t->getPointAdjustment()));
   gdi.selectItemByData("Status", t->getStatus());
 
   auto ri = t->getRaceInfo();
@@ -387,7 +386,7 @@ bool TabTeam::save(gdioutput &gdi, bool dontReloadTeams) {
     classes.insert(t->getClassId(false));
 
     bool readStatusIn = true;
-    if (newClass && t->getInputStatus() != StatusNotCompetiting && t->hasInputData()) {
+    if (newClass && t->getInputStatus() != StatusNotCompeting && t->hasInputData()) {
       if (gdi.ask(L"Vill du sätta resultatet från tidigare etapper till <Deltar ej>?")) {
         t->resetInputData();
         readStatusIn = false;
@@ -413,7 +412,7 @@ bool TabTeam::save(gdioutput &gdi, bool dontReloadTeams) {
         t->setTimeAdjustment(time);
     }
     if (gdi.hasWidget("PointAdjust")) {
-      t->setPointAdjustment(-gdi.getTextNo("PointAdjust"));
+      t->setPointAdjustment(-oe->convertScore(gdi.getText("PointAdjust")));
     }
 
     if (gdi.hasWidget("StatusIn") && readStatusIn) {
@@ -421,7 +420,7 @@ bool TabTeam::save(gdioutput &gdi, bool dontReloadTeams) {
       t->setInputPlace(gdi.getTextNo("PlaceIn"));
       t->setInputTime(gdi.getText("TimeIn"));
       if (gdi.hasWidget("PointIn"))
-        t->setInputPoints(gdi.getTextNo("PointIn"));
+        t->setInputPoints(oe->convertScore(gdi.getText("PointIn")));
     }
 
     pClass pc=oe->getClass(classId);
@@ -636,6 +635,20 @@ int TabTeam::teamCB(gdioutput &gdi, GuiEventType type, BaseInfo* data) {
     else if (bi.id == "DoAddTeamMembers") {
       doAddTeamMembers(gdi);
     }
+    else if (bi.id == "ExportForking") {
+      int filterIndex = 0;
+      vector< pair<wstring, wstring> > ext;
+      ext.push_back(make_pair(L"IOF CourseData, version 3.0 (xml)", L"*.xml"));
+      wstring save = gdi.browseForSave(ext, L"xml", filterIndex);
+      if (save.length() > 0) {
+        IOF30Interface iof30(oe, false, false);
+        xmlparser xml;
+        xml.openOutput(save.c_str(), false);
+        iof30.writeForkings(xml);
+        xml.closeOut();
+      }
+
+    }
     else if (bi.id == "SaveTeams") {
       saveTeamImport(gdi, bi.getExtraInt() != 0);
     }
@@ -657,7 +670,7 @@ int TabTeam::teamCB(gdioutput &gdi, GuiEventType type, BaseInfo* data) {
 
       TabSI &tsi = dynamic_cast<TabSI &>(*gdi.getTabs().get(TSITab));
       tsi.setCardNumberField("DirCard");
-      gdi.setPostClearCb(TeamCB);
+      gdi.setPostClearCb("clear_si_link",TeamCB);
       bool rent = false;
       gdi.dropLine(1.1);
    
@@ -724,7 +737,7 @@ int TabTeam::teamCB(gdioutput &gdi, GuiEventType type, BaseInfo* data) {
         }
         else {
           oldR->setClassId(0, true);
-          vector<int> mp;
+          vector<pair<int, pControl>> mp;
           oldR->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
           oldR->synchronize(true);
           t->setRunner(leg, r, true);
@@ -1135,6 +1148,7 @@ int TabTeam::teamCB(gdioutput &gdi, GuiEventType type, BaseInfo* data) {
               gdi.setText(bf, ii.text);
             }
           }
+          enableRunner(gdi, i, !ii.text.empty());
           break;
         }
       }
@@ -1325,7 +1339,8 @@ void TabTeam::loadTeamMembers(gdioutput &gdi, int ClassId, int ClubId, pTeam t)
     gdi.addStringUT(yp + textOffY, numberPos, 0, pc->getLegNumber(i) + L".");
     if (pc->getLegRunner(i) == i) {
       gdi.addInput(xp + dx[0], yp, bf, L"", 18, TeamCB);//Name
-      gdi.addButton(xp + dx[1], yp - 2, gdi.scaleLength(28), "DR" + itos(i), L"\u21C6", TeamCB, L"Knyt löpare till sträckan.", false, false); // Change
+      if (pc->isTeamClass())
+        gdi.addButton(xp + dx[1], yp - 2, gdi.scaleLength(28), "DR" + itos(i), L"\u21C6", TeamCB, L"Knyt löpare till sträckan.", false, false); // Change
       sprintf_s(bf_si, "SI%d", i);
       hasSI = true;
       gdi.addInput(xp + dx[2], yp, bf_si, L"", 7, TeamCB).setExtra(i); //Si
@@ -1583,7 +1598,7 @@ bool TabTeam::loadPage(gdioutput &gdi)
     gdi.popX();
   }
   
-  TabRunner::addExtraFields(*oe, gdi, oEvent::ExtraFieldContext::Team);
+  TabRunner::addExtraFields(*oe, gdi, true, false, oEvent::ExtraFieldContext::Team);
   
   gdi.dropLine(0.5);
   gdi.popX();
@@ -1606,7 +1621,7 @@ bool TabTeam::loadPage(gdioutput &gdi)
   gdi.dropLine(2.5);
 
   posYForButtons = max(posYForButtons, gdi.getCY());
-  gdi.setOnClearCb(TeamCB);
+  gdi.setOnClearCb("team", TeamCB);
 
   addToolbar(gdi);
   
@@ -1622,6 +1637,8 @@ bool TabTeam::loadPage(gdioutput &gdi)
   gdi.fillRight();
   gdi.addButton("ImportTeams", "Importera laguppställningar", TeamCB);
   gdi.addButton("AddTeamMembers", "Skapa anonyma lagmedlemmar", TeamCB, "Fyll obesatta sträckor i alla lag med anonyma tillfälliga lagmedlemmar (N.N.)");
+  gdi.addButton("ExportForking", "Exportera gaffling", TeamCB);
+
   rc.right = gdi.getCX() + gdi.getLineHeight();
   gdi.dropLine(2);
   rc.bottom = gdi.getHeight();
@@ -1636,9 +1653,9 @@ bool TabTeam::loadPage(gdioutput &gdi)
 }
 
 void TabTeam::fillTeamList(gdioutput &gdi) {
-  timeToFill = GetTickCount();
+  uint64_t tic = GetTickCount64();
   oe->fillTeams(gdi, "Teams");
-  timeToFill = GetTickCount() - timeToFill;
+  timeToFill = GetTickCount64() - tic;
   lastSearchExpr = L"";
   ((InputInfo *)gdi.setText("SearchText", getSearchString()))->setFgColor(colorGreyBlue);
     lastFilter.clear();
@@ -1722,7 +1739,7 @@ void TabTeam::doTeamImport(gdioutput &gdi) {
       if (useExisting) {
         pRunner r = findRunner(member.name, member.cardNo);
         if (r != 0)
-          mdesc += r->getCompleteIdentification();
+          mdesc += r->getCompleteIdentification(oRunner::IDType::OnlyThis);
         else {
           mdesc += member.name + lang.tl(L" (ej funnen)");
           warn = true;
@@ -1977,46 +1994,25 @@ void TabTeam::processChangeRunner(gdioutput &gdi, pTeam t, int leg, pRunner r) {
     save(gdi, true);
     vector<int> mp;
     switchRunners(t, leg, r, oldR);
-    /*if (r->getTeam()) {
-      pTeam otherTeam = r->getTeam();
-      int otherLeg = r->getLegNumber();
-      otherTeam->setRunner(otherLeg, oldR, true);
-      if (oldR)
-        oldR->evaluateCard(true, mp, 0, true);
-      otherTeam->checkValdParSetup();
-      otherTeam->apply(true, 0, false);
-      otherTeam->synchronize(true);
-    }
-    else if (oldR) {
-      t->setRunner(leg, 0, false);
-      t->synchronize(true);
-      oldR->setClassId(r->getClassId(), true);
-      oldR->evaluateCard(true, mp, 0, true);
-      oldR->synchronize(true);
-    }
-
-    t->setRunner(leg, r, true);
-    r->evaluateCard(true, mp, 0, true);
-    t->checkValdParSetup();
-    t->apply(true, 0, false);
-    t->synchronize(true);*/
     loadPage(gdi);
   }
 }
 
 void TabTeam::switchRunners(pTeam t, int leg, pRunner r, pRunner oldR) {
-  vector<int> mp;
+  vector<pair<int, pControl>> mp;
   bool removeAnnonumousTeamMember = false;
+  int tId = t->getId();
   int crsIdR = r->getCourseId();
   int crsIdROld = oldR ? oldR->getCourseId() : 0;
-
+  wstring oldBib = oldR ? oldR->getBib() : L"";
   if (r->getTeam()) {
     pTeam otherTeam = r->getTeam();
     int otherLeg = r->getLegNumber();
     otherTeam->setRunner(otherLeg, oldR, true);
     if (oldR) {
       oldR->setCourseId(crsIdR);
-      oldR->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
+      oldR->setBib(r->getBib(), 0, false);
+      oldR->evaluateCard(true, mp, 0, oBase::ChangeType::Update); 
     }
     otherTeam->checkValdParSetup();
     otherTeam->apply(oBase::ChangeType::Update, nullptr);
@@ -2031,19 +2027,26 @@ void TabTeam::switchRunners(pTeam t, int leg, pRunner r, pRunner oldR) {
     else
       oldR->setClassId(r->getClassId(false), true);
     removeAnnonumousTeamMember = oldR->isAnnonumousTeamMember();
+    
+    oldR->setBib(r->getBib(), 0, false);
     oldR->setCourseId(crsIdR);
     oldR->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
     oldR->synchronize(true);
   }
+  t = oe->getTeam(tId);
 
-  t->setRunner(leg, r, true);
+  if (t) {
+    t->setRunner(leg, r, true);
+  }
   r->setCourseId(crsIdROld);
+  r->setBib(oldBib, 0, false);
   r->evaluateCard(true, mp, 0, oBase::ChangeType::Update);
-  t->checkValdParSetup();
-  t->apply(oBase::ChangeType::Update, nullptr);
-  t->adjustMultiRunners();
-  t->synchronize(true);
-
+  if (t) {
+    t->checkValdParSetup();
+    t->apply(oBase::ChangeType::Update, nullptr);
+    t->adjustMultiRunners();
+    t->synchronize(true);
+  }
   if (removeAnnonumousTeamMember)
     oe->removeRunner({ oldR->getId() });
 }
@@ -2074,7 +2077,7 @@ bool TabTeam::warnDuplicateCard(gdioutput &gdi, string id, int cno, pRunner r) {
   InputInfo &cardNo = dynamic_cast<InputInfo &>(gdi.getBaseInfo(id.c_str()));
   if (warnCardDupl) {
     cardNo.setBgColor(colorLightRed);
-    gdi.updateToolTip(id, L"Brickan används av X.#" + warnCardDupl->getCompleteIdentification());
+    gdi.updateToolTip(id, L"Brickan används av X.#" + warnCardDupl->getCompleteIdentification(oRunner::IDType::OnlyThis));
     cardNo.refresh();
     return warnCardDupl->getTeam() == r->getTeam();
   }
