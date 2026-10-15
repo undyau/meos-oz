@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="5.0">
+<ListName>Startlista, stafett (sträcka)</ListName>
+<Tag>startrelayleg</Tag>
+<SortOrder>ClassStartTime</SortOrder>
+<ListType>Team</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0">Arial</HeadFont>
+<SubHeadFont scale="100" above="0">Arial</SubHeadFont>
+<ListFont scale="100" above="0">Arial</ListFont>
+<SubListFont scale="100" above="0">Arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Startlista X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerLegNumber">
+<Text>- Sträcka X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassNumEntries">
+<Text> (X anmälda)</Text>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+<Block Type="ClassStartName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="StartTimeForClass">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Bricka</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerBib">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamNameRaw">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="TeamRunner">
+<Align BlockAlign="true">ClassStartName</Align>
+</Block>
+<Block Type="RunnerStartCond">
+<Align BlockAlign="true">StartTimeForClass</Align>
+</Block>
+<Block Type="TeamRunnerCard">
+<Align BlockAlign="true">Bricka</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

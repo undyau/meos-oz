@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MeOSListDefinition version="5.0">
+<ListName>Kontrollpasseringar</ListName>
+<Tag>controlpasses</Tag>
+<SortOrder>FinishTimeReverse</SortOrder>
+<ListType>RunnerLeg</ListType>
+<SubListType>None</SubListType>
+<ResultModule>totatcontrol</ResultModule>
+<SupportTo>1</SupportTo>
+<Filter name="FilterPrelResult"/>
+<Filter name="FilterNoCancel"/>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>X, </Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+<Color>381d3f</Color>
+</Block>
+<Block Type="ControlTo">
+<Text>vid X</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+<MergePrevious>1</MergePrevious>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Klass</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Namn</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Placering</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Tid</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Efter</Text>
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="ClassName">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerCompleteName">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Namn</Align>
+</Block>
+<Block Type="RunnerPlace">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Placering</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Tid</Align>
+</Block>
+<Block Type="RunnerTimeAfter">
+<ResultModule>totatcontrol</ResultModule>
+<Align BlockAlign="true">Efter</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

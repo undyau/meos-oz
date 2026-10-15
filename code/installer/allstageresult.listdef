@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="5.0">
+<ListName>Total- och etappresultat</ListName>
+<Tag>allstageresult</Tag>
+<SortOrder>ClassTotalResult</SortOrder>
+<ListType>Runner</ListType>
+<SubListType>None</SubListType>
+<Filter name="FilterResult"/>
+<HeadFont scale="100" above="0">Arial</HeadFont>
+<SubHeadFont scale="100" above="0">Arial</SubHeadFont>
+<ListFont scale="100" above="0">Arial</ListFont>
+<SubListFont scale="100" above="0">Arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Text>Totalresultat - X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+<Line>
+<Block Type="CmpDate">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="ClassName">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="ClassResultFraction">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Totaltid</Text>
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="RunnerStageNumber">
+<Text>Etapp X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="StageNumber">
+<Text>Etapp X</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RunnerTotalPlace">
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="RunnerName">
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="RunnerClub">
+<Align BlockAlign="false">None</Align>
+</Block>
+<Block Type="RunnerTotalTimeStatus">
+<Align BlockAlign="true">Totaltid</Align>
+</Block>
+<Block Type="RunnerTotalTimeAfter">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerStagePlace">
+<Align BlockAlign="true">RunnerStageNumber</Align>
+</Block>
+<Block Type="RunnerStageTimeStatus">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerStageTimeAfter">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerPlace">
+<Align BlockAlign="true">StageNumber</Align>
+</Block>
+<Block Type="RunnerTimeStatus">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RunnerTimeAfter">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

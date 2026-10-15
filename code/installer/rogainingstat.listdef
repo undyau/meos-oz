@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<MeOSListDefinition version="4.1">
+<ListName>Rogaining Statistics</ListName>
+<Tag>rogainingstat</Tag>
+<SortOrder>SortNameOnly</SortOrder>
+<ListType>RogainingLegsGlobal</ListType>
+<SubListType>None</SubListType>
+<HeadFont scale="100" above="0">arial</HeadFont>
+<SubHeadFont scale="100" above="0">arial</SubHeadFont>
+<ListFont scale="100" above="0">arial</ListFont>
+<SubListFont scale="100" above="0">arial</SubListFont>
+<Head>
+<Line>
+<Block Type="CmpName">
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</Head>
+<SubHead>
+<Line>
+<Block Type="String">
+<Text>Sträcka</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Bästa tid</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="String">
+<Text>Antal löpare</Text>
+<Align BlockAlign="true">None</Align>
+</Block>
+</Line>
+</SubHead>
+<List>
+<Line>
+<Block Type="RogainingLeg">
+<Align BlockAlign="true">None</Align>
+</Block>
+<Block Type="RogainingLegBestTime">
+<Align BlockAlign="true">Bästa tid</Align>
+</Block>
+<Block Type="RogainingLegNumCompetitors">
+<Align BlockAlign="true">Antal löpare</Align>
+</Block>
+</Line>
+</List>
+<SubList>
+</SubList>
+</MeOSListDefinition>

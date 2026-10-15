@@ -1,0 +1,97 @@
+@MEOS EXPORT TEMPLATE
+tableformat@Formatted table
+Table with format (example)
+% This is a MeOS HTML Template file.
+%  
+%  The file must begin with 
+%
+% @MEOS EXPORT TEMPLATE
+% [tag]@Short description / Name
+% Detailed description / help.
+%
+% The tag must be unique for the installation.
+%
+% The output is constructed like follows:
+%
+% With pages and columns
+%   
+% @HEAD  -- The text from head @HEAD section
+% @OUTERPAGE (@INNERPAGE @SEPARATOR @INNERPAGE ...) -- The @OUTERPAGE corresponds to a page and @INNERPAGE to a column  
+% @OUTERPAGE (@INNERPAGE @SEPARATOR @INNERPAGE ...) 
+% ...
+% @END -- The text from head @END section
+%
+% The number of inner pages is determined by the number of columns when exporting from MeOS.
+% The height of each inner page is determined by the number of rows per page set in the export.
+%
+% Structured output:
+% @USETABLE Add this command to make MeOS output structured data using a table, rather than positions.
+%
+% The following symbols will be replaced by MeOS output:
+% -----------------------------------------------------
+%    @STYLE           |  Dynamic (generated) CSS styles.
+%    @TITLE           |  Page title 
+%    @DESCRIPTION     |  Description of contents. (For example included class names, leg number, etc.) 
+%    @CONTENTS        |  Contents: For an inner page, the consents in that page/column, for an outer page its inner pages.
+%    @PAGE            |  Inner or outer page number. The inner page number (column number) starts at 1 for each outer page. 
+%    @NUMPAGE         |  Total number of (outer) pages
+%    @NUMCOL          |  Number of inner pages (columns) per page
+%    @PERCENTCOMPLETE |  How large fraction of the total document is completed for each page (inner or outer)
+%    @MEOS            |  MeOS version
+%    @TIME            |  Expected show time (milliseconds) per page etc (for animation)
+%
+@USETABLE
+
+@HEAD
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>@TITLE</title>
+
+@STYLE
+
+<style type="text/css">
+
+body {margin: 0px; background-color: LightPink}
+
+.vl {
+  border-left: 2px solid grey;
+  height: 100%;
+  box-shadow: 0px 3px 3px gray;
+}
+
+.bottomright {
+ position: absolute;
+ right: 16px;
+ font-size: 10px;
+ }
+ 
+a:link {
+  text-decoration: none;
+}
+
+a:visited {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a:active {
+  text-decoration: underline;
+}
+
+</style>
+
+</head>
+
+<body>
+
+@END
+
+<div class="bottomright">@MEOS</div>
+
+</body>
+</html> 
