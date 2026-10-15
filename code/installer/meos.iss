@@ -47,6 +47,7 @@ Source: "sss201230.meosxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sss101130.meosxml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Receipt Results.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "SSS Results.xml"; DestDir: "{app}"; Flags: ignoreversion
+Source: "clubnamemap.csv"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Prerequisites\vcredist_x86.exe"; DestDir: {tmp}; Flags: deleteafterinstall
 
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
