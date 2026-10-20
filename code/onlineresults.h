@@ -87,6 +87,18 @@ public:
   // Uses the previously saved "Live Results" settings if there are any.
   void setupLiveResults(oEvent &oe);
 
+  // If results are sent to liveresults.page and the server has assigned a competition id,
+  // return the page where the results can be followed. Otherwise empty.
+  wstring getLiveResultsFollowURL() const;
+
+  // As above, but from online results settings saved in the competition (any computer).
+  static wstring getSavedLiveResultsFollowURL(const oEvent &oe);
+
+private:
+  static wstring makeFollowURL(bool sendToURL, const wstring &url, const wstring &cmpId);
+
+public:
+
   void save(oEvent &oe, gdioutput &gdi, bool doProcess) final;
   void settings(gdioutput &gdi, oEvent &oe, State state) final;
   shared_ptr<AutoMachine> clone() const final { 

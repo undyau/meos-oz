@@ -228,6 +228,7 @@
     <ClCompile Include="printresultservice.cpp" />
     <ClCompile Include="progress.cpp" />
     <ClCompile Include="qf_editor.cpp" />
+    <ClCompile Include="qrcode.cpp" />
     <ClCompile Include="qualification_final.cpp" />
     <ClCompile Include="random.cpp" />
     <ClCompile Include="recorder.cpp" />
@@ -327,6 +328,7 @@
     <ClInclude Include="printresultservice.h" />
     <ClInclude Include="progress.h" />
     <ClInclude Include="qf_editor.h" />
+    <ClInclude Include="qrcode.h" />
     <ClInclude Include="qualification_final.h" />
     <ClInclude Include="random.h" />
     <ClInclude Include="recorder.h" />

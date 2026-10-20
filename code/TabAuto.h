@@ -386,5 +386,11 @@ public:
   static void tabAutoRegister(TabAuto* ta);
   static AutoMachine& tabAutoAddMachinge(const AutoMachine& am);
   static bool hasActiveReconnectionMachine();
+
+  /** The liveresults.page URL where results of an online results service can be
+      followed, or empty if there is no such service. Uses a service running on this
+      computer, otherwise service settings saved in the competition (which may have
+      been started on another computer in database mode). */
+  static wstring getLiveResultsFollowURL(const oEvent &oe);
 };
 

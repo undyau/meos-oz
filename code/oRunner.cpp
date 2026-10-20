@@ -48,6 +48,8 @@
 #include "cardsystem.h"
 #include "datadefiners.h"
 #include "xmlparser.h"
+#include "qrcode.h"
+#include "TabAuto.h"
 #include <unordered_map>
 
 char RunnerStatusOrderMap[100];
@@ -5636,6 +5638,23 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
   }
   if (lines.size()>0)
     gdi.dropLine(0.5);
+
+  // Link to the results on liveresults.page, if the Live Results service sends there
+  wstring followURL = TabAuto::getLiveResultsFollowURL(*oe);
+  if (!followURL.empty()) {
+    try {
+      QRCode qr(gdioutput::toUTF8(followURL));
+      gdi.addString("", fontSmall, "Live results:");
+      int x = gdi.getCX();
+      int y = gdi.getCY();
+      int w = qr.draw(gdi, x, y, max(1, gdi.scaleLength(3)));
+      gdi.setCX(x);
+      gdi.setCY(y + w + gdi.scaleLength(4));
+    }
+    catch (const meosException &) {
+      // URL too long for the QR code, skip it
+    }
+  }
 
   gdi.addString("", fontSmall, "Av MeOS: www.melin.nu/meos");
 }

@@ -152,6 +152,22 @@ bool TabAuto::hasActiveReconnectionMachine()
   return false;
 }
 
+wstring TabAuto::getLiveResultsFollowURL(const oEvent &oe) {
+  // A service running on this computer
+  if (tabAuto) {
+    for (auto &am : tabAuto->machines) {
+      if (am && am->getType() == Machines::mOnlineResults) {
+        wstring url = dynamic_cast<const OnlineResults &>(*am).getLiveResultsFollowURL();
+        if (!url.empty())
+          return url;
+      }
+    }
+  }
+
+  // A service started on another computer (database mode), known from the saved settings
+  return OnlineResults::getSavedLiveResultsFollowURL(oe);
+}
+
 bool TabAuto::hasActiveReconnection() const {
   for (auto am : machines) {
     if (am->getType() == Machines::mMySQLReconnect)

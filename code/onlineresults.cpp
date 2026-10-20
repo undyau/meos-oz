@@ -123,6 +123,63 @@ void OnlineResults::setupLiveResults(oEvent &oe) {
   }
 }
 
+wstring OnlineResults::getLiveResultsFollowURL() const {
+  return makeFollowURL(sendToURL, url, cmpId);
+}
+
+wstring OnlineResults::getSavedLiveResultsFollowURL(const oEvent &oe) {
+  // Saved settings are part of the competition, so in database mode they are
+  // also seen by computers where the service is not running.
+  auto &mc = oe.getMachineContainer();
+  const string type = getTypeString(Machines::mOnlineResults);
+  vector<pair<string, wstring>> saved = mc.enumerate();
+  // Prefer the settings saved by the Live Results button
+  stable_partition(saved.begin(), saved.end(), [](const pair<string, wstring> &m) {
+    return m.second == liveResultsName;
+  });
+
+  for (auto &m : saved) {
+    if (m.first != type)
+      continue;
+    auto *cnt = mc.get(m.first, m.second);
+    if (!cnt)
+      continue;
+    wstring res = makeFollowURL(cnt->getInt("doURL") != 0, cnt->getString("url"), cnt->getString("cmp"));
+    if (!res.empty())
+      return res;
+  }
+  return L"";
+}
+
+wstring OnlineResults::makeFollowURL(bool sendToURL, const wstring &url, const wstring &cmpId) {
+  if (!sendToURL)
+    return L"";
+
+  wstring id = OnlineInput::sanitizeId(cmpId);
+  if (id.empty() || id == L"0")
+    return L"";
+
+  // Extract the host name from the upload URL
+  wstring host = url;
+  for (auto &c : host)
+    c = towlower(c);
+  size_t scheme = host.find(L"://");
+  if (scheme != wstring::npos)
+    host = host.substr(scheme + 3);
+  size_t end = host.find_first_of(L"/:?#");
+  if (end != wstring::npos)
+    host = host.substr(0, end);
+
+  const wstring domain = L"liveresults.page";
+  bool match = host == domain ||
+    (host.length() > domain.length() &&
+     host.compare(host.length() - domain.length() - 1, wstring::npos, L"." + domain) == 0);
+  if (!match)
+    return L"";
+
+  return L"https://liveresults.page/followfull.php?comp=" + id + L"&lang=en";
+}
+
 int OnlineResults::processButton(gdioutput &gdi, ButtonInfo &bi) {
 
   if (bi.id == "ToURL")
