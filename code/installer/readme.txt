@@ -1,7 +1,14 @@
   21 Sep 2026 5.0.1851.0
  - Merge changes from MeOS 5.0 Update 3 (upstream 4.0 Update 3 -> 5.0 Update 3).
- - Includes the fix for import of XML entrylist with an embedded semi-colon
+ - Includes fix for import of XML entrylist with an embedded semi-colon
    (see 4.0.1578.4).
+ - Replace live results on itsdamp.com. New live results functionality uses
+   https://liveresults.page:
+     - A results service uploading to https://liveresults.page is started by 
+       "Start Live Results" button on competition tab.
+     - A QR code directing to the results is added to the splits printout.
+ - Add QR code as a formatting option in formatted outputs, such as splits
+   and receipts.
 
   07 Oct 2026 4.0.1578.4
  - Handle import of XML entrylist when there is an embedded semi-colon 
