@@ -39,6 +39,7 @@
 #include "csvparser.h"
 #include "RunnerDB.h"
 #include "xmlparser.h"
+#include "qrcode.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -863,7 +864,7 @@ void oClub::generateInvoice(gdioutput &gdi, int &toPay, int &hasPaid,
   vector< pair<wstring, int> > mlines;
   oe->getExtraLines("IVExtra", mlines);
   for (size_t k = 0; k < mlines.size(); k++) {
-    gdi.addStringUT(mlines[k].second, mlines[k].first);
+    QRCode::addTextLine(gdi, mlines[k].second, mlines[k].first);
   }
   if (mlines.size()>0)
     gdi.dropLine(0.5);

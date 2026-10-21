@@ -49,4 +49,16 @@ public:
   /** Draw the code with top left corner at (x, y), each module moduleSize pixels,
       including the four module wide white quiet zone. Returns the total width/height. */
   int draw(gdioutput &gdi, int x, int y, int moduleSize) const;
+
+  /** Draw the code at the current position, in the standard print size,
+      and move the position below it. */
+  void add(gdioutput &gdi) const;
+
+  /** Format value for custom text lines (stored with the line instead of a font):
+      print the text as a QR code. Not a valid gdiFonts value. */
+  static constexpr int textFormat = 98;
+
+  /** Add a custom text line: as a QR code if format is textFormat (as plain text if it
+      is too long for a QR code), otherwise as text in the format. */
+  static void addTextLine(gdioutput &gdi, int format, const std::wstring &text);
 };

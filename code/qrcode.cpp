@@ -416,3 +416,28 @@ int QRCode::draw(gdioutput &gdi, int x, int y, int moduleSize) const {
   }
   return total;
 }
+
+void QRCode::add(gdioutput &gdi) const {
+  int x = gdi.getCX();
+  int y = gdi.getCY();
+  int w = draw(gdi, x, y, std::max(1, gdi.scaleLength(3)));
+  gdi.setCX(x);
+  gdi.setCY(y + w + gdi.scaleLength(4));
+}
+
+void QRCode::addTextLine(gdioutput &gdi, int format, const std::wstring &text) {
+  if (format != textFormat) {
+    gdi.addStringUT(format, text);
+    return;
+  }
+
+  if (text.empty())
+    return;
+
+  try {
+    QRCode(gdioutput::toUTF8(text)).add(gdi);
+  }
+  catch (const meosException &) {
+    gdi.addStringUT(fontSmall, text); // Too long for a QR code
+  }
+}

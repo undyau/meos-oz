@@ -54,6 +54,7 @@
 #include "autocomplete.h"
 #include "random.h"
 #include "cardsystem.h"
+#include "qrcode.h"
 #include <random>
 
 constexpr bool addTestPort = false;
@@ -4437,7 +4438,7 @@ void TabSI::printCard(gdioutput& gdi, int lineBreak, int cardId, SICard* crdRef,
     oe->getExtraLines("SPExtra", lines);
 
     for (size_t k = 0; k < lines.size(); k++) {
-      gdi.addStringUT(lines[k].second, lines[k].first);
+      QRCode::addTextLine(gdi, lines[k].second, lines[k].first);
     }
     if (lines.size() > 0)
       gdi.dropLine(0.5);

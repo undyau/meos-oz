@@ -48,6 +48,7 @@
 #include "HTMLWriter.h"
 #include "printresultservice.h"
 #include "generalresult.h"
+#include "qrcode.h"
 
 constexpr static int CUSTOM_OFFSET = 10;
 constexpr static int NUMTEXTSAMPLE = 13;
@@ -3208,6 +3209,7 @@ void TabList::customTextLines(oEvent &oe, const char *dataField, bool withSymbol
   vector< pair<wstring, int> > lines;
 
   MetaListPost::getAllFonts(fonts);
+  fonts.emplace_back(lang.tl("QR-kod"), QRCode::textFormat);
   oe.getExtraLines(dataField, lines);
   int xp = gdi.getCX();
   for (int k = 0; k < 5; k++) {

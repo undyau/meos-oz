@@ -5634,7 +5634,7 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
   vector< pair<wstring, int> > lines;
   oe->getExtraLines("SPExtra", lines);
   for (size_t k = 0; k < lines.size(); k++) {
-    gdi.addStringUT(lines[k].second, formatExtraLine(pRunner(this), lines[k].first));
+    QRCode::addTextLine(gdi, lines[k].second, formatExtraLine(pRunner(this), lines[k].first));
   }
   if (lines.size()>0)
     gdi.dropLine(0.5);
@@ -5645,11 +5645,7 @@ void oRunner::printSplits(gdioutput& gdi, const oListInfo* li) const {
     try {
       QRCode qr(gdioutput::toUTF8(followURL));
       gdi.addString("", fontSmall, "Live results:");
-      int x = gdi.getCX();
-      int y = gdi.getCY();
-      int w = qr.draw(gdi, x, y, max(1, gdi.scaleLength(3)));
-      gdi.setCX(x);
-      gdi.setCY(y + w + gdi.scaleLength(4));
+      qr.add(gdi);
     }
     catch (const meosException &) {
       // URL too long for the QR code, skip it
@@ -5754,7 +5750,7 @@ void oRunner::printStartInfo(gdioutput &gdi, bool includeEconomy) const {
     gdi.dropLine(0.5);
 
   for (size_t k = 0; k < lines.size(); k++) {
-    gdi.addStringUT(lines[k].second, formatExtraLine(pRunner(this), lines[k].first));
+    QRCode::addTextLine(gdi, lines[k].second, formatExtraLine(pRunner(this), lines[k].first));
   }
 //  if (lines.size()>0)
 //    gdi.dropLine(0.5);
